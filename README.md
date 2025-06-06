@@ -8,10 +8,6 @@
 
 </div>
 
-<div align="center">
-  <img src="https://media1.tenor.com/m/gMU9WdWa4YIAAAAd/d4dj-d4dj-meme.gif" alt="anime gifka" width="350">
-</div>
-
 ## Описание
 
 SIMPLE BLOG — это веб-приложение для управления публикациями блога. Проект построен на FastAPI и использует HTML/CSS/JavaScript для фронтенда. 
@@ -39,8 +35,8 @@ SIMPLE BLOG — это веб-приложение для управления �
 
 1. **Клонируйте репозиторий:**
    ```bash
-   git clone https://github.com/Kene33/blog-api.git
-   cd blog-api
+   git clone https://github.com/Kene33/simple-blog.git
+   cd simple-blog
    ```
 
 2. **Установите зависимости:**
