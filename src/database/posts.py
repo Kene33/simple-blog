@@ -77,7 +77,7 @@ async def add_posts(username: str, title: str, content: str, category: str, tags
         async with aiosqlite.connect(DATABASE) as db:
             tags_json = json.dumps(tags)
 
-            await db.execute(f'''
+            await db.execute('''
             INSERT INTO posts (username, title, content, category, tags, createdAt, image_url) 
             VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (username, title, content, category, tags_json, createdAt, image_url))
