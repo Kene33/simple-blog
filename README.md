@@ -124,6 +124,7 @@ GET /api/user/{username}
 
 ## TODO (только api)
 
+- [ ] RESTful
 - [x] JWT аутентификация
 - [x] Базовый фронтенд
 - [x] Создание постов
