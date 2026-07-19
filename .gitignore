@@ -177,3 +177,7 @@ database/database.db
 README_2.md
 # Local Codex configuration
 .codex/
+# Local AI-assistant instructions and generated code graph
+AGENTS.md
+graphify-out/
+ROADMAP.md
