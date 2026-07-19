@@ -56,6 +56,7 @@ async def client(storage: FakeStorage) -> AsyncIterator[AsyncClient]:
     application.dependency_overrides[get_session] = override_session
     application.dependency_overrides[get_settings] = lambda: settings
     application.dependency_overrides[get_storage] = lambda: storage
+    application.state.session_factory = session_factory
     async with AsyncClient(transport=ASGITransport(app=application), base_url="http://testserver") as api_client:
         yield api_client
     await engine.dispose()

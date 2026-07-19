@@ -1,7 +1,10 @@
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
+
+from src.modules.auth.schemas import UserSummary
 
 
 class ReportCreateRequest(BaseModel):
@@ -17,3 +20,32 @@ class ReportCreateRequest(BaseModel):
         if self.details is not None:
             self.details = self.details.strip() or None
         return self
+
+
+class ReportUpdateRequest(BaseModel):
+    status: Literal["resolved", "rejected"]
+    resolution: str | None = Field(default=None, max_length=2_000)
+
+    @model_validator(mode="after")
+    def strip_resolution(self) -> "ReportUpdateRequest":
+        if self.resolution is not None:
+            self.resolution = self.resolution.strip() or None
+        return self
+
+
+class ReportRead(BaseModel):
+    id: UUID
+    reporter: UserSummary
+    post_id: UUID | None
+    comment_id: UUID | None
+    reason: str
+    details: str | None
+    status: str
+    resolution: str | None
+    created_at: datetime
+    resolved_at: datetime | None
+
+
+class ReportPage(BaseModel):
+    items: list[ReportRead]
+    next_cursor: str | None = None
