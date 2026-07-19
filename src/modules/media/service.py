@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.errors import AppError
-from src.db.models import Media
+from src.db.models import Media, PostMedia
 from src.modules.media.schemas import MediaPurpose, MediaRead
 from src.modules.media.storage import S3Storage
 
@@ -44,6 +44,25 @@ async def owned_media(session: AsyncSession, media_id: UUID, owner_id: UUID) -> 
     if media is None:
         raise AppError("RESOURCE_NOT_FOUND", "Media not found", 404)
     return media
+
+
+async def replace_post_media(session: AsyncSession, post_id: UUID, owner_id: UUID, media_ids: list[UUID]) -> None:
+    media = []
+    if media_ids:
+        media = (await session.scalars(select(Media).where(Media.id.in_(media_ids), Media.owner_id == owner_id, Media.purpose == "post", Media.status == "uploaded", Media.deleted_at.is_(None)))).all()
+        if len(media) != len(media_ids) or sum(item.kind == "video" for item in media) > 1:
+            raise AppError("VALIDATION_ERROR", "Media must be active post uploads owned by the author and include at most one video", 422)
+    previous_media = (await session.scalars(select(Media).join(PostMedia, PostMedia.media_id == Media.id).where(PostMedia.post_id == post_id))).all()
+    await session.execute(PostMedia.__table__.delete().where(PostMedia.post_id == post_id))
+    for item in previous_media:
+        item.status = "uploaded"
+        item.attached_at = None
+    now = datetime.now(timezone.utc)
+    for position, media_id in enumerate(media_ids):
+        session.add(PostMedia(post_id=post_id, media_id=media_id, position=position))
+    for item in media:
+        item.status = "attached"
+        item.attached_at = now
 
 
 async def delete_media(session: AsyncSession, storage: S3Storage, media: Media) -> None:

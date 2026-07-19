@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 from src.modules.auth.schemas import UserSummary
+from src.modules.media.schemas import MediaRead
 
 
 class PostCreateRequest(BaseModel):
@@ -63,7 +64,7 @@ class PostRead(BaseModel):
     content: str
     category: str
     tags: list[str]
-    media: list[object] = Field(default_factory=list)
+    media: list[MediaRead] = Field(default_factory=list)
     like_count: int
     comment_count: int
     share_count: int

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.errors import AppError
 from src.core.config import Settings
 from src.db.models import Media, Post, PostMedia, PostTag, Tag, User
+from src.modules.media.service import as_read, replace_post_media
 from src.modules.auth.service import user_summary
 from src.modules.posts.schemas import PostCreateRequest, PostPage, PostRead, PostUpdateRequest
 
@@ -63,20 +64,6 @@ async def resolve_tags(session: AsyncSession, names: list[str]) -> list[Tag]:
     return tags
 
 
-async def attach_media(session: AsyncSession, post: Post, owner_id: UUID, media_ids: list[UUID]) -> None:
-    if not media_ids:
-        return
-    media = (await session.scalars(select(Media).where(Media.id.in_(media_ids), Media.owner_id == owner_id, Media.status == "uploaded", Media.deleted_at.is_(None)))).all()
-    if len(media) != len(media_ids) or len([item for item in media if item.kind == "video"]) > 1:
-        raise AppError("VALIDATION_ERROR", "Media must be active, owned, and include at most one video", 422)
-    for position, media_id in enumerate(media_ids):
-        session.add(PostMedia(post_id=post.id, media_id=media_id, position=position))
-    now = datetime.now(timezone.utc)
-    for item in media:
-        item.status = "attached"
-        item.attached_at = now
-
-
 async def write_tags(session: AsyncSession, post: Post, names: list[str]) -> None:
     await session.execute(delete(PostTag).where(PostTag.post_id == post.id))
     for tag in await resolve_tags(session, names):
@@ -89,7 +76,7 @@ async def create_post(session: AsyncSession, author: User, payload: PostCreateRe
     session.add(post)
     await session.flush()
     await write_tags(session, post, payload.tags)
-    await attach_media(session, post, author.id, payload.media_ids)
+    await replace_post_media(session, post.id, author.id, payload.media_ids)
     await session.flush()
     return post
 
@@ -111,12 +98,7 @@ async def update_post(session: AsyncSession, post: Post, author_id: UUID, payloa
     if "tags" in payload.model_fields_set:
         await write_tags(session, post, payload.tags or [])
     if "media_ids" in payload.model_fields_set:
-        previous_media = (await session.scalars(select(Media).join(PostMedia, PostMedia.media_id == Media.id).where(PostMedia.post_id == post.id))).all()
-        await session.execute(delete(PostMedia).where(PostMedia.post_id == post.id))
-        for item in previous_media:
-            item.status = "uploaded"
-            item.attached_at = None
-        await attach_media(session, post, author_id, payload.media_ids or [])
+        await replace_post_media(session, post.id, author_id, payload.media_ids or [])
     await session.flush()
     return post
 
@@ -125,7 +107,7 @@ async def serialize_post(session: AsyncSession, post: Post) -> PostRead:
     author = await session.get(User, post.author_id)
     tags = (await session.scalars(select(Tag.name).join(PostTag, PostTag.tag_id == Tag.id).where(PostTag.post_id == post.id))).all()
     media = (await session.scalars(select(Media).join(PostMedia, PostMedia.media_id == Media.id).where(PostMedia.post_id == post.id).order_by(PostMedia.position))).all()
-    return PostRead(id=post.id, author=user_summary(author), title=post.title, content=post.content, category=post.category or "", tags=list(tags), media=[{"id": item.id, "kind": item.kind, "mime_type": item.mime_type, "url": f"/api/v1/media/{item.id}"} for item in media], like_count=post.like_count, comment_count=post.comment_count, share_count=post.share_count, created_at=post.created_at, updated_at=post.updated_at)
+    return PostRead(id=post.id, author=user_summary(author), title=post.title, content=post.content, category=post.category or "", tags=list(tags), media=[as_read(item) for item in media], like_count=post.like_count, comment_count=post.comment_count, share_count=post.share_count, created_at=post.created_at, updated_at=post.updated_at)
 
 
 async def list_posts(session: AsyncSession, *, settings: Settings, author: str | None, category: str | None, tag: str | None, query_text: str | None, search_in: str, sort: str, cursor: str | None, limit: int) -> PostPage:
