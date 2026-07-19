@@ -144,16 +144,11 @@ GET /api/user/{username}
 ```
 blog-api/
 ├── src/
-│   ├── api/           # FastAPI эндпоинты
-│   │   ├── posts.py   # Эндпоинты для постов
-│   │   ├── users.py   # Эндпоинты для пользователей
-│   │   └── images.py  # Эндпоинты для изображений
-│   ├── database/      # Работа с базой данных
-│   │   ├── posts.py   # Модели и операции с постами
-│   │   └── users.py   # Модели и операции с пользователями
-│   ├── schemas/       # Pydantic модели
-│   │   ├── posts.py   # Схемы для постов
-│   │   └── users.py   # Схемы для пользователей
+│   ├── main.py        # FastAPI application factory
+│   ├── api/           # HTTP routers
+│   ├── core/          # Configuration, logging and errors
+│   ├── db/            # SQLAlchemy models and sessions
+│   ├── modules/       # Domain modules
 │   └── frontend/      # Фронтенд часть
 │       ├── index.html    # Главная страница
 │       ├── login.html    # Страница входа

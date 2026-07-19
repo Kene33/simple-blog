@@ -4,8 +4,8 @@ import os
 from pwdlib import PasswordHash
 from sqlalchemy import select
 
-from app.db.models import User
-from app.db.session import session_factory
+from src.db.models import User
+from src.db.session import session_factory
 
 
 async def seed_admin() -> None:

@@ -5,7 +5,7 @@ from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index,
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base
+from src.db.base import Base
 
 
 class User(Base):

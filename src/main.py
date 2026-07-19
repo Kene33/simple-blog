@@ -2,18 +2,18 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.health import router as health_router
-from app.core.config import Settings, get_settings
-from app.core.errors import (
+from src.api.health import router as health_router
+from src.core.config import Settings, get_settings
+from src.core.errors import (
     AppError,
     app_error_handler,
     http_exception_handler,
     unhandled_exception_handler,
     validation_exception_handler,
 )
-from app.core.lifespan import lifespan
-from app.core.logging import configure_logging
-from app.core.middleware import RequestIdMiddleware
+from src.core.lifespan import lifespan
+from src.core.logging import configure_logging
+from src.core.middleware import RequestIdMiddleware
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

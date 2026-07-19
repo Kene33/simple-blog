@@ -30,7 +30,7 @@ HTTP routers -> application services -> repositories -> database/storage
 ## Target package structure
 
 ```text
-app/
+src/
   main.py
   api/v1/
   core/
@@ -97,11 +97,9 @@ flowchart LR
 
 ## Migration from the current codebase
 
-The current `src/api`, `src/database`, and `src/schemas` packages are the
-legacy implementation. They remain unchanged until the B1 and B2 foundation
-tasks create the new application structure and persistence layer. New features
-must be added only to the target modules after that migration begins; the old
-SQLite helpers must not receive new functionality.
+The legacy SQLite implementation was removed after the B1 and B2 foundation
+tasks. New features belong only in the `src` runtime and must use the
+PostgreSQL persistence layer.
 
 ## Non-goals for this boundary
 

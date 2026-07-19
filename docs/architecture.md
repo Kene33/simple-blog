@@ -130,7 +130,6 @@ an explicit deployment step before the application accepts traffic.
 
 ## Current repository boundary
 
-The existing `src/api`, `src/database`, and `src/schemas` packages are legacy
-code and are not imported by the new `app` runtime. The new runtime uses only
-PostgreSQL through SQLAlchemy and Alembic; the old SQLite files are not read or
-updated.
+The `src` package is the application runtime. It uses PostgreSQL through
+SQLAlchemy and Alembic; the old SQLite implementation has been removed and is
+not read or updated.

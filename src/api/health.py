@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.db.session import engine
+from src.db.session import engine
 
 router = APIRouter(prefix="/health", tags=["health"])
 

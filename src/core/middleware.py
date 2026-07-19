@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.core.request_id import request_id_context
+from src.core.request_id import request_id_context
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
