@@ -12,7 +12,7 @@ async def live(request: Request) -> dict[str, str]:
     return {"status": "ok", "service": request.app.title, "version": request.app.version}
 
 
-@router.get("/ready")
+@router.get("/ready", response_model=None)
 async def ready(request: Request) -> dict[str, object] | JSONResponse:
     try:
         async with engine.connect() as connection:
