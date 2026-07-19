@@ -175,3 +175,5 @@ cython_debug/
 database/database.db
 .vscode
 README_2.md
+# Local Codex configuration
+.codex/
