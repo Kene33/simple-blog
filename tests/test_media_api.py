@@ -1,0 +1,40 @@
+import pytest
+from httpx import AsyncClient
+
+from tests.conftest import FakeStorage
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+
+
+async def register(client: AsyncClient) -> str:
+    response = await client.post("/api/v1/auth/register", json={"username": "mediauser", "email": "mediauser@example.com", "password": "strong-password"})
+    assert response.status_code == 201
+    return client.cookies.get("csrf_token")
+
+
+@pytest.mark.asyncio
+async def test_upload_and_delete_unattached_image(client: AsyncClient, storage: FakeStorage) -> None:
+    csrf = await register(client)
+    response = await client.post("/api/v1/media", data={"purpose": "post"}, files={"file": ("photo.png", PNG, "image/png")}, headers={"X-CSRF-Token": csrf})
+    assert response.status_code == 201
+    media = response.json()
+    assert media["kind"] == "image"
+    assert media["status"] == "uploaded"
+    assert len(storage.objects) == 1
+
+    deleted = await client.delete(f"/api/v1/media/{media['id']}", headers={"X-CSRF-Token": csrf})
+    assert deleted.status_code == 204
+    assert not storage.objects
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_invalid_type_and_avatar_video(client: AsyncClient) -> None:
+    csrf = await register(client)
+    invalid = await client.post("/api/v1/media", data={"purpose": "post"}, files={"file": ("bad.txt", b"not an image", "text/plain")}, headers={"X-CSRF-Token": csrf})
+    assert invalid.status_code == 415
+    assert invalid.json()["error"]["code"] == "MEDIA_UNSUPPORTED"
+
+    video = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 64
+    avatar = await client.post("/api/v1/media", data={"purpose": "avatar"}, files={"file": ("movie.mp4", video, "video/mp4")}, headers={"X-CSRF-Token": csrf})
+    assert avatar.status_code == 415

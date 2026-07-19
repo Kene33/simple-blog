@@ -2,6 +2,7 @@ import asyncio
 from uuid import UUID, uuid4
 
 import boto3
+from botocore.exceptions import ClientError
 from botocore.config import Config
 
 from src.core.config import Settings
@@ -18,7 +19,16 @@ class S3Storage:
         return f"uploads/{owner_id}/{uuid4()}.{extension}"
 
     async def put(self, key: str, content: bytes, mime_type: str) -> None:
+        await self.ensure_bucket()
         await asyncio.to_thread(self.client.put_object, Bucket=self.bucket, Key=key, Body=content, ContentType=mime_type)
+
+    async def ensure_bucket(self) -> None:
+        try:
+            await asyncio.to_thread(self.client.head_bucket, Bucket=self.bucket)
+        except ClientError as error:
+            if error.response["Error"].get("Code") not in {"404", "NoSuchBucket"}:
+                raise
+            await asyncio.to_thread(self.client.create_bucket, Bucket=self.bucket)
 
     async def delete(self, key: str) -> None:
         await asyncio.to_thread(self.client.delete_object, Bucket=self.bucket, Key=key)
