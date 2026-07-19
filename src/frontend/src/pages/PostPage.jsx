@@ -1,0 +1,20 @@
+import { useEffect, useState } from "react";
+import { ArrowLeft, Flag, Send } from "lucide-react";
+import { AppShell } from "../components/AppShell";
+import { PostCard } from "../components/PostCard";
+import { api } from "../lib/api";
+import { useRouter } from "../lib/router";
+import { useSession } from "../session";
+import { ReportModal } from "../components/ReportModal";
+import "../styles/post.css";
+
+export function PostPage({ postId }) {
+  const { user } = useSession(); const { navigate } = useRouter(); const [post, setPost] = useState(null); const [comments, setComments] = useState([]); const [body, setBody] = useState(""); const [state, setState] = useState("loading"); const [error, setError] = useState(""); const [reporting, setReporting] = useState(false);
+  const load = async () => { setState("loading"); try { const [postValue, page] = await Promise.all([api.post(postId), api.comments(postId)]); setPost(postValue); setComments(page.items); setState("ready"); } catch { setState("error"); } };
+  useEffect(() => { load(); }, [postId]);
+  const toggle = async (item, kind) => { if (!user) return navigate("/login"); const next = kind === "like" ? { ...item, liked_by_me: !item.liked_by_me, like_count: item.like_count + (item.liked_by_me ? -1 : 1) } : { ...item, bookmarked_by_me: !item.bookmarked_by_me }; setPost(next); try { if (kind === "like") item.liked_by_me ? await api.unlike(item.id) : await api.like(item.id); else item.bookmarked_by_me ? await api.unbookmark(item.id) : await api.bookmark(item.id); } catch { setPost(item); } };
+  const submitComment = async (event) => { event.preventDefault(); if (!user) return navigate("/login"); if (!body.trim()) return; try { const comment = await api.createComment(postId, { body: body.trim(), parent_id: null }); setComments((items) => [comment, ...items]); setBody(""); } catch (cause) { setError(cause.message); } };
+  if (state === "loading") return <AppShell title="Публикация"><div className="card-state">Загружаем публикацию…</div></AppShell>;
+  if (state === "error") return <AppShell title="Публикация"><div className="card-state"><b>Публикация не найдена</b><button className="outline-button" onClick={() => navigate("/")}>К ленте</button></div></AppShell>;
+  return <AppShell title="Публикация"><section className="post-page"><button className="back-link button-link" onClick={() => navigate("/")}><ArrowLeft size={17} /> Назад к ленте</button><PostCard post={post} onLike={(item) => toggle(item, "like")} onBookmark={(item) => toggle(item, "bookmark")} /><section className="comments-card"><header><h2>Комментарии <span>{post.comment_count}</span></h2><button className="report-link" onClick={() => user ? setReporting(true) : navigate("/login")}><Flag size={15} /> Жалоба</button></header>{user && <form className="comment-form" onSubmit={submitComment}><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Добавить комментарий" maxLength="2000" /><button className="primary" aria-label="Отправить комментарий"><Send size={17} /> Отправить</button></form>}{error && <div className="form-error">{error}</div>}<div className="comment-list">{comments.map((comment) => <article className={`comment ${comment.is_deleted ? "deleted" : ""}`} key={comment.id}><span className="avatar">{comment.author.username.slice(0, 2).toUpperCase()}</span><div><b>{comment.author.username}</b><small>{comment.is_deleted ? "Комментарий удалён автором" : comment.body}</small><button>Ответить</button></div></article>)}</div></section></section>{reporting && <ReportModal postId={post.id} onClose={() => setReporting(false)} />}</AppShell>;
+}

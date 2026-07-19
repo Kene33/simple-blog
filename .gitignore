@@ -182,4 +182,8 @@ AGENTS.md
 graphify-out/
 ROADMAP.md
 FRONTEND_SPEC.md
+FRONTEND_IMPLEMENTATION_PLAN.md
+design-reference/
 .DS_Store
+node_modules/
+README-AUDIT-REPORT.md
