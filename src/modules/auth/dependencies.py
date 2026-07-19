@@ -59,6 +59,16 @@ async def require_csrf(request: Request, auth: CurrentAuth = Depends(get_current
     return auth
 
 
+async def optional_csrf(request: Request, auth: CurrentAuth | None = Depends(get_optional_auth), settings: Settings = Depends(get_settings)) -> CurrentAuth | None:
+    if auth is None:
+        return None
+    header_token = request.headers.get(settings.csrf_header_name)
+    cookie_token = request.cookies.get(settings.csrf_cookie_name)
+    if not header_token or not cookie_token or not secrets.compare_digest(header_token, cookie_token) or not secrets.compare_digest(header_token, auth.csrf_token):
+        raise AppError("CSRF_FAILED", "CSRF validation failed", 403)
+    return auth
+
+
 async def require_admin(auth: CurrentAuth = Depends(get_current_auth)) -> CurrentAuth:
     if auth.user.role != "admin":
         raise AppError("FORBIDDEN", "Administrator role is required", 403)

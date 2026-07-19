@@ -26,3 +26,20 @@ async def test_likes_are_idempotent_and_visible_to_current_user(client: AsyncCli
     assert (await client.delete(f"/api/v1/posts/{post_id}/like", headers={"X-CSRF-Token": csrf})).status_code == 204
     assert (await client.delete(f"/api/v1/posts/{post_id}/like", headers={"X-CSRF-Token": csrf})).status_code == 204
     assert (await client.get(f"/api/v1/posts/{post_id}")).json()["like_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_shares_support_anonymous_and_authenticated_events(client: AsyncClient) -> None:
+    csrf = await register(client, "sharer")
+    post = await client.post("/api/v1/posts", json={"title": "Post", "content": "content", "category": "tech"}, headers={"X-CSRF-Token": csrf})
+    post_id = post.json()["id"]
+    anonymous = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        copied = await anonymous.post(f"/api/v1/posts/{post_id}/shares", json={"channel": "copy"})
+        assert copied.status_code == 201
+    finally:
+        await anonymous.aclose()
+    native = await client.post(f"/api/v1/posts/{post_id}/shares", json={"channel": "native"}, headers={"X-CSRF-Token": csrf})
+    assert native.status_code == 201
+    assert native.json()["share_count"] == 2
+    assert native.json()["canonical_url"].endswith(f"/posts/{post_id}")

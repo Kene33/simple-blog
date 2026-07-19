@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     cookie_samesite: str = "lax"
     cookie_secure: bool = False
     cookie_domain: str | None = None
+    public_base_url: str = "http://localhost:4000"
     s3_endpoint_url: str = "http://localhost:9000"
     s3_bucket: str = "simple-blog-media"
     s3_access_key: str = "minio"
