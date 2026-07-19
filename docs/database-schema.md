@@ -117,7 +117,7 @@ erDiagram
     SHARE_EVENTS {
         uuid id PK
         uuid post_id FK
-        uuid user_id FK
+        uuid user_id FK "nullable"
         varchar channel
         timestamptz created_at
     }
@@ -128,6 +128,7 @@ erDiagram
         uuid post_id FK
         uuid comment_id FK
         varchar reason
+        text details
         varchar status
         text resolution
         timestamptz created_at
@@ -149,6 +150,8 @@ erDiagram
   verifies that a parent belongs to the same post.
 - `post_likes` has one row per user/post pair, making like and unlike naturally
   idempotent.
+- `share_events.user_id` is nullable so anonymous copy/native shares can be
+  counted without storing an account identity.
 - `reports` has exactly one target: either `post_id` or `comment_id`. A check
   constraint enforces this invariant.
 - Content uses `deleted_at` so a deleted post or comment can remain referenced

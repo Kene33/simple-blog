@@ -60,6 +60,10 @@ using `(created_at, id)` as the tie-breaker.
 | `GET` | `/media/{media_id}` | Public/owner policy | Read or redirect to media content | `200`/`302` |
 | `DELETE` | `/media/{media_id}` | Owner | Delete an unattached media object | `204` |
 
+`GET /media/{media_id}` returns binary content or redirects to the object-store
+content. It does not return `MediaRead` metadata; upload responses and embedded
+post/profile media use that schema.
+
 Post creation and update accept previously uploaded `media_ids`. The media
 service verifies ownership and attachment limits before the post transaction
 commits.
@@ -111,6 +115,9 @@ writing another module's tables directly.
 - `401` means no valid authentication; `403` means authentication succeeded
   but the principal lacks permission.
 - `404` does not reveal whether a soft-deleted or unauthorized resource exists.
+- A visible post's comment collection may return tombstones for deleted
+  comments so replies retain their place; direct access to a deleted comment
+  returns `404`.
 - `409` represents uniqueness or state conflicts.
 - `413` represents an upload that exceeds its limit; `415` an unsupported type.
 - `422` represents request validation failure.

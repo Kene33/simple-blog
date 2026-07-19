@@ -37,6 +37,23 @@ models must not be exposed directly from the API.
 
 `identifier` accepts either the normalized username or email.
 
+### `SessionRead`
+
+```json
+{
+  "user": {
+    "id": "uuid",
+    "username": "alice",
+    "avatar_url": null
+  },
+  "access_expires_at": "2026-07-19T12:45:00Z",
+  "refresh_expires_at": "2026-08-18T12:30:00Z"
+}
+```
+
+Registration, login, and refresh return `SessionRead`. Tokens are set in
+HttpOnly cookies and never appear in the response body. Logout returns `204`.
+
 ### `UserSummary`
 
 ```json
@@ -64,6 +81,19 @@ models must not be exposed directly from the API.
 
 The email and role fields are returned only by `GET /users/me`; public profile
 responses omit them.
+
+### `UserUpdateRequest`
+
+```json
+{
+  "username": "alice_new",
+  "email": "alice.new@example.com",
+  "avatar_media_id": "uuid"
+}
+```
+
+All fields are optional, but at least one must be provided. The password is
+not changed through this schema.
 
 ## Post schemas
 
@@ -185,6 +215,19 @@ object-store credentials are never returned.
 Deleted comments keep their ID and location in the tree but return a tombstone
 body and `is_deleted: true` so replies remain addressable.
 
+The tombstone behavior applies to collection responses for a visible post.
+`GET /comments/{comment_id}` returns `404` after deletion.
+
+### `CommentUpdateRequest`
+
+```json
+{
+  "body": "Updated comment"
+}
+```
+
+`body` is required and must contain 1–2,000 characters.
+
 ## Interaction schemas
 
 ### `LikeRead`
@@ -254,6 +297,18 @@ and limited to 2,000 characters.
   "resolved_at": null
 }
 ```
+
+### `ReportUpdateRequest`
+
+```json
+{
+  "status": "resolved",
+  "resolution": "Content removed"
+}
+```
+
+`status` is required and is one of `open`, `reviewing`, `resolved`, or
+`rejected`. `resolution` is optional and limited to 2,000 characters.
 
 ## Compatibility rules
 
