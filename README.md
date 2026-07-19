@@ -1,164 +1,73 @@
-# SIMPLY BLOG
+# Simple Blog
 
-<div align="center">
+Социальный блог с модульным FastAPI backend и frontend на HTML, CSS и vanilla JavaScript.
 
-![FastAPI](https://img.shields.io/badge/FastAPI-0.68.0-009688?style=flat-square&logo=fastapi)
-![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square&logo=python)
-![SQLite](https://img.shields.io/badge/SQLite-3.0.0-003B57?style=flat-square&logo=sqlite)
+## Backend
 
-</div>
+- FastAPI, SQLAlchemy 2 async, PostgreSQL и Alembic
+- JWT access/refresh cookies, CSRF и роли `user`/`admin`
+- REST API `/api/v1`: пользователи, посты, теги, поиск, медиа, комментарии, лайки, sharing и moderation
+- S3-compatible media storage: MinIO в development
+- Cursor pagination, soft-delete, structured errors и request IDs
 
-## Описание
+Контракты: [API v1](docs/api-v1.md), [схемы](docs/api-schemas.md), [архитектура](docs/architecture.md).
 
-SIMPLE BLOG — это веб-приложение для управления публикациями блога. Проект построен на FastAPI и использует HTML/CSS/JavaScript для фронтенда. 
+## Запуск
 
-### Основные возможности
+Нужны Docker и Docker Compose.
 
-- JWT аутентификация
-- Создание и управление постами
-- Профили пользователей
-- Категории и теги
-- Темная тема
-- Адаптивный дизайн
-
-## Установка
-
-### Необходимые зависимости
-
-- Python 3.10+
-- FastAPI
-- Uvicorn
-- Pydantic
-- SQLite3
-
-### Шаги по установке
-
-1. **Клонируйте репозиторий:**
-   ```bash
-   git clone https://github.com/Kene33/simple-blog.git
-   cd simple-blog
-   ```
-
-2. **Установите зависимости:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Запустите сервер:**
-   ```bash
-   python main.py
-   ```
-
-4. **Откройте frontend/index.html в браузере**
-
-## API Endpoints
-
-### Аутентификация
-
-#### Регистрация
-```http
-POST /api/auth/register
-Content-Type: application/json
-
-{
-    "username": "username",
-    "password": "password"
-}
+```bash
+cp .env.example .env
+docker compose up --build
 ```
 
-#### Вход
-```http
-POST /api/auth/login
-Content-Type: application/json
+API будет доступен на `http://localhost:8000`, OpenAPI — на `http://localhost:8000/docs`.
 
-{
-    "username": "username",
-    "password": "password"
-}
+Для запуска без Docker нужны PostgreSQL и MinIO, настроенные через `.env`:
+
+```bash
+alembic upgrade head
+uvicorn src.main:app --reload --port 4000
 ```
 
-### Посты
+## Проверки backend
 
-#### Получение всех постов
-```http
-GET /api/posts
+```bash
+ruff check src tests
+pytest -q tests
+alembic upgrade head --sql
 ```
 
-#### Создание поста
-```http
-POST /api/posts
-Authorization: Bearer <token>
-Content-Type: application/json
+GitHub Actions поднимает чистый PostgreSQL, применяет миграции и запускает весь
+набор тестов, включая проверку конкурентных likes.
 
-{
-    "title": "Заголовок",
-    "content": "Содержимое",
-    "category": "Категория",
-    "tags": ["tag1", "tag2"]
-}
+## Backend roadmap
+
+- [x] Архитектура, FastAPI-каркас, PostgreSQL и миграции
+- [x] Аутентификация, профили и роли
+- [x] Посты, теги, cursor pagination и full-text search
+- [x] Media upload через S3/MinIO
+- [x] Древовидные комментарии и tombstones
+- [x] Idempotent likes и share events
+- [x] Жалобы и admin moderation
+- [ ] Финальный PostgreSQL прогон в CI
+
+Локальный рабочий roadmap: `ROADMAP.md` (намеренно не отслеживается Git).
+
+## Структура
+
+```text
+src/
+  api/       HTTP routers
+  core/      configuration, security, logging, errors
+  db/        async sessions and SQLAlchemy models
+  modules/   domain services
+  frontend/  HTML, CSS and JavaScript
+docs/        architecture and API contracts
+alembic/     PostgreSQL migrations
+tests/       API and PostgreSQL integration tests
 ```
 
-#### Удаление поста
-```http
-DELETE /api/posts/{post_id}
-Authorization: Bearer <token>
-```
+## License
 
-### Пользователи
-
-#### Информация о пользователе
-```http
-GET /api/user/{username}
-```
-
-## Фронтенд
-
-Фронтенд часть приложения включает:
-
-- Адаптивный дизайн
-- Темная тема
-- Модальные окна
-- Система аутентификации
-- Профиль пользователя
-- Теги и категории
-
-## TODO (только api)
-
-- [ ] RESTful
-- [x] JWT аутентификация
-- [x] Базовый фронтенд
-- [x] Создание постов
-- [x] Удаление постов
-- [x] Профиль пользователя
-- [ ] Загрузка изображений
-- [ ] Комментарии к постам
-- [ ] Оценка постов
-- [ ] Шаринг постов
-- [ ] Поиск по тегам
-- [ ] Поиск по названию
-- [ ] Поиск по содержимому
-- [ ] Сортировка по дате
-
-## Структура проекта
-
-```
-blog-api/
-├── src/
-│   ├── main.py        # FastAPI application factory
-│   ├── api/           # HTTP routers
-│   ├── core/          # Configuration, logging and errors
-│   ├── db/            # SQLAlchemy models and sessions
-│   ├── modules/       # Domain modules
-│   └── frontend/      # Фронтенд часть
-│       ├── index.html    # Главная страница
-│       ├── login.html    # Страница входа
-│       ├── register.html # Страница регистрации
-│       ├── profile.html  # Страница профиля
-│       ├── main.js       # Основной JavaScript
-│       └── style.css     # Стили
-└── requirements.txt   # Зависимости Python
-```
-
-## Лицензия
-
-MIT License
+MIT
