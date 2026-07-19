@@ -1,4 +1,6 @@
 import base64
+import hashlib
+import hmac
 import json
 from datetime import datetime, timezone
 from uuid import UUID
@@ -7,20 +9,34 @@ from sqlalchemy import String, cast, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.errors import AppError
+from src.core.config import Settings
 from src.db.models import Media, Post, PostMedia, PostTag, Tag, User
 from src.modules.auth.service import user_summary
 from src.modules.posts.schemas import PostCreateRequest, PostPage, PostRead, PostUpdateRequest
 
 
-def encode_cursor(post: Post) -> str:
-    value = json.dumps({"created_at": post.created_at.isoformat(), "id": str(post.id)}, separators=(",", ":")).encode()
-    return base64.urlsafe_b64encode(value).decode().rstrip("=")
+def cursor_scope(*, author: str | None, category: str | None, tag: str | None, query_text: str | None, search_in: str, sort: str) -> str:
+    value = json.dumps({"author": author, "category": category, "tag": tag, "query": query_text, "search_in": search_in, "sort": sort}, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(value).hexdigest()
 
 
-def decode_cursor(value: str) -> tuple[datetime, UUID]:
+def encode_cursor(post: Post, scope: str, settings: Settings) -> str:
+    payload = {"v": 1, "resource": "posts", "created_at": post.created_at.isoformat(), "id": str(post.id), "scope": scope}
+    encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
+    signature = hmac.new(settings.jwt_secret_key.encode(), encoded.encode(), hashlib.sha256).hexdigest()
+    return f"{encoded}.{signature}"
+
+
+def decode_cursor(value: str, scope: str, settings: Settings) -> tuple[datetime, UUID]:
     try:
-        padded = value + "=" * (-len(value) % 4)
+        encoded, signature = value.split(".", 1)
+        expected = hmac.new(settings.jwt_secret_key.encode(), encoded.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            raise ValueError
+        padded = encoded + "=" * (-len(encoded) % 4)
         payload = json.loads(base64.urlsafe_b64decode(padded))
+        if payload["v"] != 1 or payload["resource"] != "posts" or payload["scope"] != scope:
+            raise ValueError
         return datetime.fromisoformat(payload["created_at"]), UUID(payload["id"])
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         raise AppError("INVALID_CURSOR", "Cursor is invalid", 400) from None
@@ -105,7 +121,7 @@ async def serialize_post(session: AsyncSession, post: Post) -> PostRead:
     return PostRead(id=post.id, author=user_summary(author), title=post.title, content=post.content, category=post.category or "", tags=list(tags), media=[{"id": item.id, "kind": item.kind, "mime_type": item.mime_type, "url": f"/api/v1/media/{item.id}"} for item in media], like_count=post.like_count, comment_count=post.comment_count, share_count=post.share_count, created_at=post.created_at, updated_at=post.updated_at)
 
 
-async def list_posts(session: AsyncSession, *, author: str | None, category: str | None, tag: str | None, query_text: str | None, search_in: str, sort: str, cursor: str | None, limit: int) -> PostPage:
+async def list_posts(session: AsyncSession, *, settings: Settings, author: str | None, category: str | None, tag: str | None, query_text: str | None, search_in: str, sort: str, cursor: str | None, limit: int) -> PostPage:
     query = select(Post).where(Post.deleted_at.is_(None))
     if author:
         query = query.join(User, User.id == Post.author_id).where(User.username_normalized == author.casefold())
@@ -126,11 +142,12 @@ async def list_posts(session: AsyncSession, *, author: str | None, category: str
     if sort not in {"newest", "oldest"}:
         raise AppError("VALIDATION_ERROR", "sort must be newest or oldest", 422)
     order = (Post.created_at.desc(), Post.id.desc()) if sort == "newest" else (Post.created_at.asc(), Post.id.asc())
+    scope = cursor_scope(author=author, category=category, tag=tag, query_text=query_text, search_in=search_in, sort=sort)
     if cursor:
-        created_at, post_id = decode_cursor(cursor)
+        created_at, post_id = decode_cursor(cursor, scope, settings)
         compare = cast(Post.id, String) < str(post_id) if sort == "newest" else cast(Post.id, String) > str(post_id)
         time_compare = Post.created_at < created_at if sort == "newest" else Post.created_at > created_at
         query = query.where(time_compare | ((Post.created_at == created_at) & compare))
     rows = (await session.scalars(query.order_by(*order).limit(limit + 1))).all()
-    next_cursor = encode_cursor(rows[limit - 1]) if len(rows) > limit else None
+    next_cursor = encode_cursor(rows[limit - 1], scope, settings) if len(rows) > limit else None
     return PostPage(items=[await serialize_post(session, post) for post in rows[:limit]], next_cursor=next_cursor)

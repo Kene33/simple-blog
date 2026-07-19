@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import Settings, get_settings
 from src.db.session import get_session
 from src.modules.auth.dependencies import CurrentAuth, require_csrf
 from src.modules.posts.schemas import PostCreateRequest, PostPage, PostRead, PostUpdateRequest
@@ -20,8 +21,8 @@ async def create(payload: PostCreateRequest, auth: CurrentAuth = Depends(require
 
 
 @router.get("", response_model=PostPage)
-async def list_feed(author: str | None = None, category: str | None = None, tag: str | None = None, query: str | None = None, search_in: str = "all", sort: str = "newest", cursor: str | None = None, limit: int = 20, session: AsyncSession = Depends(get_session)) -> PostPage:
-    return await list_posts(session, author=author, category=category, tag=tag, query_text=query, search_in=search_in, sort=sort, cursor=cursor, limit=min(max(limit, 1), 100))
+async def list_feed(author: str | None = None, category: str | None = None, tag: str | None = None, query: str | None = None, search_in: str = "all", sort: str = "newest", cursor: str | None = None, limit: int = 20, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PostPage:
+    return await list_posts(session, settings=settings, author=author, category=category, tag=tag, query_text=query, search_in=search_in, sort=sort, cursor=cursor, limit=min(max(limit, 1), 100))
 
 
 @router.get("/{post_id}", response_model=PostRead)
