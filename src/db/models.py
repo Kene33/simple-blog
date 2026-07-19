@@ -10,10 +10,11 @@ from src.db.base import Base
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (CheckConstraint("role IN ('user', 'admin')", name="ck_users_role"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    username: Mapped[str] = mapped_column(String(50), nullable=False)
-    username_normalized: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    username: Mapped[str] = mapped_column(String(30), nullable=False)
+    username_normalized: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     email_normalized: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)

@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.api.health import router as health_router
+from src.api.v1 import router as v1_router
 from src.core.config import Settings, get_settings
 from src.core.errors import (
     AppError,
@@ -38,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
     application.add_exception_handler(Exception, unhandled_exception_handler)
     application.include_router(health_router)
+    application.include_router(v1_router)
     return application
 
 

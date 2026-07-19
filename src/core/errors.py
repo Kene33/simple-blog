@@ -23,16 +23,12 @@ def _request_id(request: Request) -> str:
 
 
 def _response(request: Request, status_code: int, code: str, message: str, fields: list[dict[str, Any]] | None = None) -> JSONResponse:
+    error = {"code": code, "message": message, "request_id": _request_id(request)}
+    if fields:
+        error["fields"] = fields
     return JSONResponse(
         status_code=status_code,
-        content={
-            "error": {
-                "code": code,
-                "message": message,
-                "request_id": _request_id(request),
-                "fields": fields or [],
-            }
-        },
+        content={"error": error},
         headers={"X-Request-ID": _request_id(request)},
     )
 
@@ -51,7 +47,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    fields = [{"field": ".".join(str(part) for part in error["loc"]), "message": error["msg"]} for error in exc.errors()]
+    fields = [{"field": ".".join(str(part) for part in error["loc"]), "code": error["type"].upper(), "message": error["msg"]} for error in exc.errors()]
     return _response(request, 422, "VALIDATION_ERROR", "Request validation failed", fields)
 
 

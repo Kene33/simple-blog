@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +29,18 @@ class Settings(BaseSettings):
     cookie_domain: str | None = None
     s3_endpoint_url: str = "http://localhost:9000"
     s3_bucket: str = "simple-blog-media"
+
+    @model_validator(mode="after")
+    def validate_production_security(self) -> "Settings":
+        if self.environment != "production":
+            return self
+        if self.jwt_secret_key == "dev-only-change-me" or len(self.jwt_secret_key) < 32:
+            raise ValueError("JWT_SECRET_KEY must be a random secret of at least 32 characters in production")
+        if not self.cookie_secure:
+            raise ValueError("COOKIE_SECURE must be true in production")
+        if self.jwt_algorithm != "HS256":
+            raise ValueError("JWT_ALGORITHM must be HS256")
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:

@@ -41,9 +41,9 @@ def create_access_token(settings: Settings, user_id: uuid.UUID, session_id: uuid
     return TokenData(jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm), expires_at)
 
 
-def create_refresh_token(settings: Settings, user_id: uuid.UUID, session_id: uuid.UUID) -> TokenData:
+def create_refresh_token(settings: Settings, user_id: uuid.UUID, session_id: uuid.UUID, csrf_token: str) -> TokenData:
     expires_at = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_days)
-    payload = {"sub": str(user_id), "sid": str(session_id), "type": "refresh", "exp": expires_at}
+    payload = {"sub": str(user_id), "sid": str(session_id), "csrf": csrf_token, "type": "refresh", "exp": expires_at}
     return TokenData(jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm), expires_at)
 
 
