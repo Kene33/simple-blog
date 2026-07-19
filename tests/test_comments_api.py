@@ -35,6 +35,8 @@ async def test_comment_roots_replies_and_pagination(client: AsyncClient) -> None
     assert len(next_page.json()["items"]) == 1
     replies = await client.get(f"/api/v1/posts/{post_id}/comments", params={"parent_id": roots[0]["id"]})
     assert [item["id"] for item in replies.json()["items"]] == [reply.json()["id"]]
+    nested = await client.post(f"/api/v1/posts/{post_id}/comments", json={"body": "Nested", "parent_id": reply.json()["id"]}, headers={"X-CSRF-Token": csrf})
+    assert nested.status_code == 201
     mismatched = await client.get(f"/api/v1/posts/{post_id}/comments", params={"parent_id": roots[0]["id"], "cursor": page.json()["next_cursor"]})
     assert mismatched.status_code == 400
 
@@ -47,3 +49,32 @@ async def test_comment_rejects_parent_from_another_post(client: AsyncClient) -> 
     root = await client.post(f"/api/v1/posts/{first_post}/comments", json={"body": "Root"}, headers={"X-CSRF-Token": csrf})
     invalid = await client.post(f"/api/v1/posts/{second_post.json()['id']}/comments", json={"body": "Wrong tree", "parent_id": root.json()["id"]}, headers={"X-CSRF-Token": csrf})
     assert invalid.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_comment_edit_delete_and_tombstone(client: AsyncClient) -> None:
+    csrf = await register(client, "owner")
+    post_id = await create_post(client, csrf)
+    root = await client.post(f"/api/v1/posts/{post_id}/comments", json={"body": "Root"}, headers={"X-CSRF-Token": csrf})
+    reply = await client.post(f"/api/v1/posts/{post_id}/comments", json={"body": "Reply", "parent_id": root.json()["id"]}, headers={"X-CSRF-Token": csrf})
+    edited = await client.patch(f"/api/v1/comments/{reply.json()['id']}", json={"body": "Edited"}, headers={"X-CSRF-Token": csrf})
+    assert edited.status_code == 200
+    assert edited.json()["body"] == "Edited"
+    deleted = await client.delete(f"/api/v1/comments/{root.json()['id']}", headers={"X-CSRF-Token": csrf})
+    assert deleted.status_code == 204
+    assert (await client.get(f"/api/v1/comments/{root.json()['id']}")).status_code == 404
+    roots = await client.get(f"/api/v1/posts/{post_id}/comments")
+    assert roots.json()["items"][0]["is_deleted"] is True
+    assert roots.json()["items"][0]["body"] == "[deleted]"
+    replies = await client.get(f"/api/v1/posts/{post_id}/comments", params={"parent_id": root.json()["id"]})
+    assert replies.json()["items"][0]["id"] == reply.json()["id"]
+    assert (await client.get(f"/api/v1/posts/{post_id}")).json()["comment_count"] == 1
+    blocked = await client.post(f"/api/v1/posts/{post_id}/comments", json={"body": "Late", "parent_id": root.json()["id"]}, headers={"X-CSRF-Token": csrf})
+    assert blocked.status_code == 422
+
+    other = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        other_csrf = await register(other, "otherowner")
+        assert (await other.patch(f"/api/v1/comments/{reply.json()['id']}", json={"body": "Stolen"}, headers={"X-CSRF-Token": other_csrf})).status_code == 404
+    finally:
+        await other.aclose()

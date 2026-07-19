@@ -12,7 +12,7 @@ from src.core.config import Settings
 from src.core.errors import AppError
 from src.db.models import Comment, Post, User
 from src.modules.auth.service import user_summary
-from src.modules.comments.schemas import CommentCreateRequest, CommentPage, CommentRead
+from src.modules.comments.schemas import CommentCreateRequest, CommentPage, CommentRead, CommentUpdateRequest
 from src.modules.posts.service import get_post
 
 TOMBSTONE_BODY = "[deleted]"
@@ -46,7 +46,7 @@ def _decode_cursor(value: str, scope: str, settings: Settings) -> tuple[datetime
 async def create_comment(session: AsyncSession, post_id: UUID, author: User, payload: CommentCreateRequest) -> Comment:
     await get_post(session, post_id)
     if payload.parent_id is not None:
-        parent = await session.scalar(select(Comment).where(Comment.id == payload.parent_id, Comment.post_id == post_id))
+        parent = await session.scalar(select(Comment).where(Comment.id == payload.parent_id, Comment.post_id == post_id, Comment.deleted_at.is_(None)))
         if parent is None:
             raise AppError("VALIDATION_ERROR", "Parent comment must belong to this post", 422)
     now = datetime.now(timezone.utc)
@@ -64,7 +64,20 @@ async def get_comment(session: AsyncSession, comment_id: UUID, owner_id: UUID | 
     comment = await session.scalar(query)
     if comment is None or owner_id is not None and comment.author_id != owner_id:
         raise AppError("RESOURCE_NOT_FOUND", "Comment not found", 404)
+    await get_post(session, comment.post_id)
     return comment
+
+
+async def update_comment(session: AsyncSession, comment: Comment, payload: CommentUpdateRequest) -> Comment:
+    comment.body = payload.body
+    comment.updated_at = datetime.now(timezone.utc)
+    await session.flush()
+    return comment
+
+
+async def delete_comment(session: AsyncSession, comment: Comment) -> None:
+    comment.deleted_at = datetime.now(timezone.utc)
+    await session.execute(update(Post).where(Post.id == comment.post_id, Post.comment_count > 0).values(comment_count=Post.comment_count - 1))
 
 
 async def serialize_comments(session: AsyncSession, comments: list[Comment]) -> list[CommentRead]:

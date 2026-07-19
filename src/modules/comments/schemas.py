@@ -30,6 +30,15 @@ class CommentRead(BaseModel):
     updated_at: datetime
 
 
+class CommentUpdateRequest(BaseModel):
+    body: str = Field(min_length=1, max_length=2_000)
+
+    @field_validator("body")
+    @classmethod
+    def strip_body(cls, value: str) -> str:
+        return CommentCreateRequest.strip_body(value)
+
+
 class CommentPage(BaseModel):
     items: list[CommentRead]
     next_cursor: str | None = None
