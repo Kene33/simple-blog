@@ -19,3 +19,5 @@ def downgrade() -> None:
     op.execute("DROP INDEX ix_refresh_sessions_expires_at")
     op.execute("DROP INDEX ix_refresh_sessions_user_id")
     op.execute("ALTER TABLE users DROP CONSTRAINT ck_users_role")
+    op.execute("ALTER TABLE users ALTER COLUMN username TYPE VARCHAR(50)")
+    op.execute("ALTER TABLE users ALTER COLUMN username_normalized TYPE VARCHAR(50)")

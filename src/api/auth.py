@@ -6,9 +6,9 @@ from src.core.config import Settings, get_settings
 from src.core.errors import AppError
 from src.core.security import new_csrf_token
 from src.db.session import get_session
-from src.modules.auth.dependencies import CurrentAuth, require_csrf, validate_refresh_csrf
+from src.modules.auth.dependencies import CurrentAuth, require_csrf
 from src.modules.auth.schemas import LoginRequest, RegisterRequest, SessionRead
-from src.modules.auth.service import AuthSession, authenticate_user, create_session, register_user, revoke_session, rotate_session
+from src.modules.auth.service import AuthSession, RefreshReplayDetected, authenticate_user, create_session, register_user, revoke_session, rotate_session
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -49,16 +49,23 @@ async def login(payload: LoginRequest, response: Response, session: AsyncSession
 
 @router.post("/refresh", response_model=SessionRead)
 async def refresh(request: Request, response: Response, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> SessionRead:
-    refresh_value = validate_refresh_csrf(request, settings)
-    auth_session = await rotate_session(session, settings, refresh_value, new_csrf_token())
-    await session.commit()
+    refresh_value = request.cookies.get(settings.refresh_cookie_name)
+    if not refresh_value:
+        raise AppError("AUTH_REQUIRED", "Authentication is required", 401)
+    try:
+        auth_session = await rotate_session(session, settings, refresh_value, request.headers.get(settings.csrf_header_name), request.cookies.get(settings.csrf_cookie_name), new_csrf_token())
+        await session.commit()
+    except RefreshReplayDetected as exc:
+        await session.commit()
+        raise AppError(exc.code, exc.message, exc.status_code) from None
     set_session_cookies(response, settings, auth_session)
     return auth_session.response
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(response: Response, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> Response:
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def logout(auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> Response:
     await revoke_session(session, auth.session_id, auth.user.id)
     await session.commit()
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
     clear_session_cookies(response, settings)
     return response

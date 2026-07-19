@@ -55,7 +55,7 @@ class UserUpdateRequest(BaseModel):
         return value.strip() if value else value
 
     def has_changes(self) -> bool:
-        return bool(self.model_fields_set)
+        return any(getattr(self, field) is not None for field in self.model_fields_set)
 
 
 class SessionRead(BaseModel):

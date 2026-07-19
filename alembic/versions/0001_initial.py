@@ -8,7 +8,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("""
+    _execute("""
     CREATE TABLE users (id UUID NOT NULL, username VARCHAR(50) NOT NULL, username_normalized VARCHAR(50) NOT NULL, email VARCHAR(320) NOT NULL, email_normalized VARCHAR(320) NOT NULL, password_hash VARCHAR(255) NOT NULL, role VARCHAR(20) DEFAULT 'user' NOT NULL, avatar_media_id UUID, created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, updated_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, disabled_at TIMESTAMP WITH TIME ZONE, PRIMARY KEY (id), UNIQUE (username_normalized), UNIQUE (email_normalized));
     CREATE TABLE tags (id UUID NOT NULL, name VARCHAR(50) NOT NULL, name_normalized VARCHAR(50) NOT NULL, PRIMARY KEY (id), UNIQUE (name_normalized));
     CREATE TABLE media (id UUID NOT NULL, owner_id UUID NOT NULL, kind VARCHAR(20) NOT NULL, mime_type VARCHAR(100) NOT NULL, size_bytes BIGINT NOT NULL, storage_key VARCHAR(500) NOT NULL, status VARCHAR(20) DEFAULT 'pending' NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL, attached_at TIMESTAMP WITH TIME ZONE, deleted_at TIMESTAMP WITH TIME ZONE, PRIMARY KEY (id), UNIQUE (storage_key));
@@ -34,7 +34,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("""
+    _execute("""
+    ALTER TABLE users DROP CONSTRAINT users_avatar_media_id_fkey;
+    ALTER TABLE media DROP CONSTRAINT media_owner_id_fkey;
     DROP TABLE reports;
     DROP TABLE share_events;
     DROP TABLE post_likes;
@@ -47,3 +49,9 @@ def downgrade() -> None:
     DROP TABLE tags;
     DROP TABLE users;
     """)
+
+
+def _execute(statements: str) -> None:
+    for statement in statements.strip().split(";\n"):
+        if statement.strip():
+            op.execute(statement)

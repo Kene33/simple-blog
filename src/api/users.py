@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.errors import AppError
 from src.db.session import get_session
 from src.modules.auth.dependencies import CurrentAuth, get_current_auth, require_csrf
 from src.modules.auth.schemas import PublicUserProfile, UserProfile, UserUpdateRequest

@@ -1,3 +1,4 @@
+import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -18,6 +19,17 @@ class AuthSession:
     refresh: TokenData
     csrf_token: str
     response: SessionRead
+
+
+class RefreshReplayDetected(AppError):
+    pass
+
+
+DUMMY_PASSWORD_HASH = hash_password("not-a-real-password")
+
+
+def _is_expired(value: datetime) -> bool:
+    return value.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc) if value.tzinfo is None else value <= datetime.now(timezone.utc)
 
 
 def normalize_username(value: str) -> str:
@@ -47,7 +59,8 @@ async def register_user(session: AsyncSession, payload: RegisterRequest) -> User
 async def authenticate_user(session: AsyncSession, payload: LoginRequest) -> User:
     identifier = normalize_email(payload.identifier)
     user = await session.scalar(select(User).where(or_(User.username_normalized == identifier, User.email_normalized == identifier)))
-    if user is None or user.disabled_at is not None or not verify_password(payload.password, user.password_hash):
+    password_valid = verify_password(payload.password, user.password_hash if user and user.disabled_at is None else DUMMY_PASSWORD_HASH)
+    if user is None or user.disabled_at is not None or not password_valid:
         raise AppError("AUTH_INVALID", "Invalid credentials", 401)
     return user
 
@@ -61,23 +74,25 @@ async def create_session(session: AsyncSession, settings: Settings, user: User, 
     return AuthSession(access=access, refresh=refresh, csrf_token=csrf_token, response=SessionRead(user=user_summary(user), access_expires_at=access.expires_at, refresh_expires_at=refresh.expires_at))
 
 
-async def rotate_session(session: AsyncSession, settings: Settings, refresh_value: str, csrf_token: str) -> AuthSession:
+async def rotate_session(session: AsyncSession, settings: Settings, refresh_value: str, csrf_header: str | None, csrf_cookie: str | None, csrf_token: str) -> AuthSession:
     from src.core.security import decode_token
 
     try:
         payload = decode_token(settings, refresh_value, "refresh")
         session_id = uuid.UUID(payload["sid"])
         user_id = uuid.UUID(payload["sub"])
+        token_csrf = payload["csrf"]
     except (KeyError, ValueError):
         raise AppError("AUTH_INVALID", "Invalid refresh token", 401) from None
     refresh_session = await session.scalar(select(RefreshSession).where(RefreshSession.id == session_id, RefreshSession.user_id == user_id).with_for_update())
     now = datetime.now(timezone.utc)
-    if refresh_session is None or refresh_session.expires_at <= now or refresh_session.token_hash != token_hash(refresh_value):
+    if refresh_session is None or _is_expired(refresh_session.expires_at) or refresh_session.token_hash != token_hash(refresh_value):
         raise AppError("AUTH_INVALID", "Invalid refresh token", 401)
     if refresh_session.revoked_at is not None:
         await session.execute(update(RefreshSession).where(RefreshSession.user_id == user_id, RefreshSession.revoked_at.is_(None)).values(revoked_at=now))
-        await session.commit()
-        raise AppError("AUTH_INVALID", "Invalid refresh token", 401)
+        raise RefreshReplayDetected("AUTH_INVALID", "Invalid refresh token", 401)
+    if not csrf_header or not csrf_cookie or not secrets.compare_digest(csrf_header, csrf_cookie) or not secrets.compare_digest(csrf_header, token_csrf):
+        raise AppError("CSRF_FAILED", "CSRF validation failed", 403)
     user = await session.get(User, user_id)
     if user is None or user.disabled_at is not None:
         raise AppError("AUTH_INVALID", "Invalid refresh token", 401)

@@ -18,7 +18,7 @@ async def profile_for_user(session: AsyncSession, user: User, include_private: b
 async def find_public_user(session: AsyncSession, username: str) -> User:
     user = await session.scalar(select(User).where(User.username_normalized == normalize_username(username), User.disabled_at.is_(None)))
     if user is None:
-        raise AppError("USER_NOT_FOUND", "User not found", 404)
+        raise AppError("RESOURCE_NOT_FOUND", "User not found", 404)
     return user
 
 
@@ -44,7 +44,7 @@ async def update_user(session: AsyncSession, user: User, payload: UserUpdateRequ
         else:
             media = await session.scalar(select(Media).where(Media.id == payload.avatar_media_id, Media.owner_id == user.id, Media.kind == "image", Media.deleted_at.is_(None)))
             if media is None:
-                raise AppError("INVALID_AVATAR", "Avatar must be an active image owned by the user", 422)
+                raise AppError("VALIDATION_ERROR", "Avatar must be an active image owned by the user", 422)
             user.avatar_media_id = media.id
     await session.flush()
     return user

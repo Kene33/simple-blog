@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,7 +10,7 @@ class Settings(BaseSettings):
 
     app_name: str = "Simple Blog API"
     app_version: str = "0.1.0"
-    environment: str = "development"
+    environment: Literal["development", "test", "production"] = "development"
     host: str = "127.0.0.1"
     port: int = 4000
     reload: bool = True
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
-        if self.environment != "production":
+        if self.environment in {"development", "test"}:
             return self
         if self.jwt_secret_key == "dev-only-change-me" or len(self.jwt_secret_key) < 32:
             raise ValueError("JWT_SECRET_KEY must be a random secret of at least 32 characters in production")
