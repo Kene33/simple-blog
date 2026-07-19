@@ -1,9 +1,9 @@
 import base64
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import delete, select
+from sqlalchemy import String, cast, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.errors import AppError
@@ -57,7 +57,8 @@ async def write_tags(session: AsyncSession, post: Post, names: list[str]) -> Non
 
 
 async def create_post(session: AsyncSession, author: User, payload: PostCreateRequest) -> Post:
-    post = Post(author_id=author.id, title=payload.title, content=payload.content, category=payload.category)
+    now = datetime.now(timezone.utc)
+    post = Post(author_id=author.id, title=payload.title, content=payload.content, category=payload.category, created_at=now, updated_at=now)
     session.add(post)
     await session.flush()
     await write_tags(session, post, payload.tags)
@@ -106,7 +107,7 @@ async def list_posts(session: AsyncSession, *, author: str | None, category: str
         query = query.join(PostTag, PostTag.post_id == Post.id).join(Tag, Tag.id == PostTag.tag_id).where(Tag.name_normalized == tag.casefold())
     if cursor:
         created_at, post_id = decode_cursor(cursor)
-        query = query.where((Post.created_at < created_at) | ((Post.created_at == created_at) & (Post.id < post_id)))
+        query = query.where((Post.created_at < created_at) | ((Post.created_at == created_at) & (cast(Post.id, String) < str(post_id))))
     rows = (await session.scalars(query.limit(limit + 1))).all()
     next_cursor = encode_cursor(rows[limit - 1]) if len(rows) > limit else None
     return PostPage(items=[await serialize_post(session, post) for post in rows[:limit]], next_cursor=next_cursor)
