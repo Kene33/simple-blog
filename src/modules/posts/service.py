@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import String, cast, delete, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.errors import AppError
@@ -49,10 +50,16 @@ async def resolve_tags(session: AsyncSession, names: list[str]) -> list[Tag]:
     tags = list(existing.values())
     for name in names:
         if name not in existing:
-            tag = Tag(name=name, name_normalized=name)
-            session.add(tag)
+            try:
+                async with session.begin_nested():
+                    tag = Tag(name=name, name_normalized=name)
+                    session.add(tag)
+                    await session.flush()
+            except IntegrityError:
+                tag = await session.scalar(select(Tag).where(Tag.name_normalized == name))
+                if tag is None:
+                    raise
             tags.append(tag)
-    await session.flush()
     return tags
 
 

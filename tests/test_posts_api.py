@@ -23,6 +23,9 @@ async def test_post_crud_filters_pagination_and_ownership(client: AsyncClient) -
     assert feed.json()["next_cursor"]
     next_page = await client.get("/api/v1/posts", params={"tag": "PYTHON", "cursor": feed.json()["next_cursor"], "limit": 2})
     assert len(next_page.json()["items"]) == 1
+    mismatched_cursor = await client.get("/api/v1/posts", params={"tag": "fastapi", "cursor": feed.json()["next_cursor"], "limit": 2})
+    assert mismatched_cursor.status_code == 400
+    assert mismatched_cursor.json()["error"]["code"] == "INVALID_CURSOR"
 
     post_id = created[0]["id"]
     updated = await client.patch(f"/api/v1/posts/{post_id}", json={"title": "Updated"}, headers={"X-CSRF-Token": csrf})
