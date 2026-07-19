@@ -8,8 +8,8 @@ from src.core.config import Settings, get_settings
 from src.core.errors import AppError
 from src.db.session import get_session
 from src.modules.auth.dependencies import CurrentAuth, require_admin, require_csrf
-from src.modules.moderation.schemas import ReportCreateRequest, ReportPage, ReportRead, ReportUpdateRequest
-from src.modules.moderation.service import create_report, list_reports, resolve_report, serialize_reports
+from src.modules.moderation.schemas import ReportCount, ReportCreateRequest, ReportPage, ReportRead, ReportUpdateRequest
+from src.modules.moderation.service import count_open_reports, create_report, get_report, list_reports, resolve_report, serialize_reports
 
 router = APIRouter(prefix="/api/v1", tags=["moderation"])
 
@@ -30,8 +30,20 @@ async def list_admin(status: str = "open", cursor: str | None = None, limit: int
     return await list_reports(session, settings=settings, status=status, cursor=cursor, limit=min(max(limit, 1), 100))
 
 
+@router.get("/admin/reports/count", response_model=ReportCount)
+async def count(_: CurrentAuth = Depends(require_admin), session: AsyncSession = Depends(get_session)) -> ReportCount:
+    return await count_open_reports(session)
+
+
+@router.get("/admin/reports/{report_id}", response_model=ReportRead)
+async def detail(report_id: UUID, _: CurrentAuth = Depends(require_admin), session: AsyncSession = Depends(get_session)) -> ReportRead:
+    return (await serialize_reports(session, [await get_report(session, report_id)]))[0]
+
+
 @router.patch("/admin/reports/{report_id}", response_model=ReportRead)
-async def resolve(report_id: UUID, payload: ReportUpdateRequest, _: CurrentAuth = Depends(require_admin), session: AsyncSession = Depends(get_session)) -> ReportRead:
+async def resolve(report_id: UUID, payload: ReportUpdateRequest, _: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> ReportRead:
+    if _.user.role != "admin":
+        raise AppError("FORBIDDEN", "Administrator role is required", 403)
     report = await resolve_report(session, report_id, payload)
     await session.commit()
     await session.refresh(report)

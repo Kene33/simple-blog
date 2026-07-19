@@ -33,6 +33,14 @@ class ReportUpdateRequest(BaseModel):
         return self
 
 
+class ReportTarget(BaseModel):
+    kind: Literal["post", "comment"]
+    id: UUID
+    title: str | None = None
+    body: str | None = None
+    is_deleted: bool = False
+
+
 class ReportRead(BaseModel):
     id: UUID
     reporter: UserSummary
@@ -44,6 +52,11 @@ class ReportRead(BaseModel):
     resolution: str | None
     created_at: datetime
     resolved_at: datetime | None
+    target: ReportTarget | None = None
+
+
+class ReportCount(BaseModel):
+    open_count: int
 
 
 class ReportPage(BaseModel):

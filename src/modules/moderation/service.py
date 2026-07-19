@@ -5,15 +5,15 @@ import json
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
 from src.core.errors import AppError
-from src.db.models import Report, User
+from src.db.models import Comment, Post, Report, User
 from src.modules.auth.service import user_summary
 from src.modules.comments.service import get_comment
-from src.modules.moderation.schemas import ReportCreateRequest, ReportPage, ReportRead, ReportUpdateRequest
+from src.modules.moderation.schemas import ReportCount, ReportCreateRequest, ReportPage, ReportRead, ReportTarget, ReportUpdateRequest
 from src.modules.posts.service import get_post
 
 
@@ -61,7 +61,33 @@ async def serialize_reports(session: AsyncSession, reports: list[Report]) -> lis
     if not reports:
         return []
     reporters = {user.id: user for user in (await session.scalars(select(User).where(User.id.in_({report.reporter_id for report in reports})))).all()}
-    return [ReportRead(id=report.id, reporter=user_summary(reporters[report.reporter_id]), post_id=report.post_id, comment_id=report.comment_id, reason=report.reason, details=report.details, status=report.status, resolution=report.resolution, created_at=report.created_at, resolved_at=report.resolved_at) for report in reports]
+    post_ids = {report.post_id for report in reports if report.post_id is not None}
+    comment_ids = {report.comment_id for report in reports if report.comment_id is not None}
+    posts = {post.id: post for post in (await session.scalars(select(Post).where(Post.id.in_(post_ids)))).all()} if post_ids else {}
+    comments = {comment.id: comment for comment in (await session.scalars(select(Comment).where(Comment.id.in_(comment_ids)))).all()} if comment_ids else {}
+    result = []
+    for report in reports:
+        target = None
+        if report.post_id is not None and report.post_id in posts:
+            post = posts[report.post_id]
+            target = ReportTarget(kind="post", id=post.id, title=post.title, body=post.content, is_deleted=post.deleted_at is not None)
+        elif report.comment_id is not None and report.comment_id in comments:
+            comment = comments[report.comment_id]
+            target = ReportTarget(kind="comment", id=comment.id, body="[deleted]" if comment.deleted_at else comment.body, is_deleted=comment.deleted_at is not None)
+        result.append(ReportRead(id=report.id, reporter=user_summary(reporters[report.reporter_id]), post_id=report.post_id, comment_id=report.comment_id, reason=report.reason, details=report.details, status=report.status, resolution=report.resolution, created_at=report.created_at, resolved_at=report.resolved_at, target=target))
+    return result
+
+
+async def get_report(session: AsyncSession, report_id: UUID) -> Report:
+    report = await session.scalar(select(Report).where(Report.id == report_id))
+    if report is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Report not found", 404)
+    return report
+
+
+async def count_open_reports(session: AsyncSession) -> ReportCount:
+    count = await session.scalar(select(func.count()).select_from(Report).where(Report.status == "open"))
+    return ReportCount(open_count=count or 0)
 
 
 async def list_reports(session: AsyncSession, *, settings: Settings, status: str, cursor: str | None, limit: int) -> ReportPage:

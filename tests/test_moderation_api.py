@@ -36,7 +36,11 @@ async def test_admin_can_process_reports(client: AsyncClient) -> None:
     queue = await client.get("/api/v1/admin/reports")
     assert queue.status_code == 200
     assert queue.json()["items"][0]["id"] == report.json()["id"]
-    processed = await client.patch(f"/api/v1/admin/reports/{report.json()['id']}", json={"status": "resolved", "resolution": "Handled"})
+    assert (await client.get("/api/v1/admin/reports/count")).json()["open_count"] >= 1
+    detail = await client.get(f"/api/v1/admin/reports/{report.json()['id']}")
+    assert detail.status_code == 200
+    assert detail.json()["target"]["kind"] == "post"
+    processed = await client.patch(f"/api/v1/admin/reports/{report.json()['id']}", json={"status": "resolved", "resolution": "Handled"}, headers={"X-CSRF-Token": admin_csrf})
     assert processed.status_code == 200
     assert processed.json()["status"] == "resolved"
 

@@ -325,8 +325,24 @@ and limited to 2,000 characters.
   "status": "open",
   "resolution": null,
   "created_at": "2026-07-19T12:30:00Z",
-  "resolved_at": null
+  "resolved_at": null,
+  "target": {
+    "kind": "post",
+    "id": "uuid",
+    "title": "Reported post",
+    "body": "Post content",
+    "is_deleted": false
+  }
 }
+```
+
+`target` is a safe snapshot for admin UI. For a deleted comment its body is a
+tombstone and `is_deleted` is `true`.
+
+### `ReportCount`
+
+```json
+{"open_count": 3}
 ```
 
 ### `ReportUpdateRequest`

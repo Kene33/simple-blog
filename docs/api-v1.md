@@ -128,6 +128,8 @@ share count.
 | --- | --- | --- | --- | --- |
 | `POST` | `/reports` | Access cookie | Report exactly one post or comment | `201` |
 | `GET` | `/admin/reports` | Admin | List the moderation queue | `200` |
+| `GET` | `/admin/reports/count` | Admin | Count open reports for a navigation badge | `200` |
+| `GET` | `/admin/reports/{report_id}` | Admin | Read a report with a target snapshot | `200` |
 | `PATCH` | `/admin/reports/{report_id}` | Admin | Resolve or reject a report | `200` |
 
 Reports are separate resources. Content ownership remains with the posts or
