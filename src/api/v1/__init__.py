@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from src.api.auth import router as auth_router
 from src.api.comments import router as comments_router
 from src.api.drafts import router as drafts_router
+from src.api.interactions import bookmarks_router
 from src.api.interactions import router as interactions_router
 from src.api.media import router as media_router
 from src.api.moderation import router as moderation_router
@@ -14,6 +15,7 @@ router.include_router(auth_router)
 router.include_router(comments_router)
 router.include_router(drafts_router)
 router.include_router(interactions_router)
+router.include_router(bookmarks_router)
 router.include_router(media_router)
 router.include_router(moderation_router)
 router.include_router(posts_router)

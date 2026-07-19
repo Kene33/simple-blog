@@ -69,6 +69,7 @@ class PostRead(BaseModel):
     comment_count: int
     share_count: int
     liked_by_me: bool = False
+    bookmarked_by_me: bool = False
     created_at: datetime
     updated_at: datetime
 

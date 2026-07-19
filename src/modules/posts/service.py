@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
 from src.core.errors import AppError
-from src.db.models import Media, Post, PostLike, PostMedia, PostTag, Tag, User
+from src.db.models import Media, Post, PostBookmark, PostLike, PostMedia, PostTag, Tag, User
 from src.modules.auth.service import user_summary
 from src.modules.media.service import as_read, replace_post_media
 from src.modules.posts.schemas import DraftCreateRequest, DraftPage, DraftRead, DraftUpdateRequest, PostCreateRequest, PostPage, PostRead, PostUpdateRequest
@@ -206,8 +206,10 @@ async def serialize_posts(session: AsyncSession, posts: list[Post], viewer_id: U
     for post_id, media in (await session.execute(select(PostMedia.post_id, Media).join(Media, Media.id == PostMedia.media_id).where(PostMedia.post_id.in_(post_ids)).order_by(PostMedia.position))).all():
         media_by_post[post_id].append(media)
     liked_post_ids: set[UUID] = set()
+    bookmarked_post_ids: set[UUID] = set()
     if viewer_id is not None:
         liked_post_ids = set((await session.scalars(select(PostLike.post_id).where(PostLike.post_id.in_(post_ids), PostLike.user_id == viewer_id))).all())
+        bookmarked_post_ids = set((await session.scalars(select(PostBookmark.post_id).where(PostBookmark.post_id.in_(post_ids), PostBookmark.user_id == viewer_id))).all())
     return [
         PostRead(
             id=post.id,
@@ -221,6 +223,7 @@ async def serialize_posts(session: AsyncSession, posts: list[Post], viewer_id: U
             comment_count=post.comment_count,
             share_count=post.share_count,
             liked_by_me=post.id in liked_post_ids,
+            bookmarked_by_me=post.id in bookmarked_post_ids,
             created_at=post.created_at,
             updated_at=post.updated_at,
         )
