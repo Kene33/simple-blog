@@ -16,7 +16,16 @@ class Settings(BaseSettings):
     cors_origins: str = "http://127.0.0.1:4000,http://127.0.0.1:5500"
     database_url: str = "postgresql+asyncpg://blog:blog@localhost:5432/blog"
     jwt_secret_key: str = "dev-only-change-me"
+    jwt_algorithm: str = "HS256"
+    access_token_minutes: int = 15
+    refresh_token_days: int = 30
+    access_cookie_name: str = "access_token"
+    refresh_cookie_name: str = "refresh_token"
+    csrf_cookie_name: str = "csrf_token"
+    csrf_header_name: str = "X-CSRF-Token"
+    cookie_samesite: str = "lax"
     cookie_secure: bool = False
+    cookie_domain: str | None = None
     s3_endpoint_url: str = "http://localhost:9000"
     s3_bucket: str = "simple-blog-media"
 
