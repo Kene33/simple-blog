@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,6 +41,7 @@ async def update_user(session: AsyncSession, user: User, payload: UserUpdateRequ
         for field, value in values.items():
             setattr(user, field, value)
     if "avatar_media_id" in payload.model_fields_set:
+        previous_media = await session.get(Media, user.avatar_media_id) if user.avatar_media_id else None
         if payload.avatar_media_id is None:
             user.avatar_media_id = None
         else:
@@ -46,5 +49,10 @@ async def update_user(session: AsyncSession, user: User, payload: UserUpdateRequ
             if media is None:
                 raise AppError("VALIDATION_ERROR", "Avatar must be an active image owned by the user", 422)
             user.avatar_media_id = media.id
+            media.status = "attached"
+            media.attached_at = datetime.now(timezone.utc)
+        if previous_media is not None and previous_media.id != user.avatar_media_id:
+            previous_media.status = "uploaded"
+            previous_media.attached_at = None
     await session.flush()
     return user

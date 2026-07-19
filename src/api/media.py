@@ -8,7 +8,7 @@ from src.core.config import Settings, get_settings
 from src.core.errors import AppError
 from src.db.models import Media
 from src.db.session import get_session
-from src.modules.auth.dependencies import CurrentAuth, require_csrf
+from src.modules.auth.dependencies import CurrentAuth, get_optional_auth, require_csrf
 from src.modules.media.schemas import MediaPurpose, MediaRead
 from src.modules.media.service import as_read, delete_media, owned_media, upload_media
 from src.modules.media.storage import S3Storage
@@ -35,12 +35,12 @@ async def upload(file: UploadFile = File(...), purpose: MediaPurpose = Form(...)
 
 
 @router.get("/{media_id}")
-async def download(media_id: UUID, session: AsyncSession = Depends(get_session), storage: S3Storage = Depends(get_storage)) -> StreamingResponse:
+async def download(media_id: UUID, auth: CurrentAuth | None = Depends(get_optional_auth), session: AsyncSession = Depends(get_session), storage: S3Storage = Depends(get_storage)) -> StreamingResponse:
     media = await session.get(Media, media_id)
-    if media is None or media.deleted_at is not None:
+    if media is None or media.deleted_at is not None or media.status == "uploaded" and (auth is None or auth.user.id != media.owner_id):
         raise AppError("RESOURCE_NOT_FOUND", "Media not found", 404)
     result = await storage.get(media.storage_key)
-    return StreamingResponse(result["Body"].iter_chunks(), media_type=media.mime_type)
+    return StreamingResponse(result["Body"].iter_chunks(), media_type=media.mime_type, headers={"Content-Disposition": "attachment", "X-Content-Type-Options": "nosniff"})
 
 
 @router.delete("/{media_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)

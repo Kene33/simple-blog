@@ -45,6 +45,12 @@ async def get_current_auth(request: Request, session: AsyncSession = Depends(get
     return CurrentAuth(user=user, session_id=session_id, csrf_token=csrf_token)
 
 
+async def get_optional_auth(request: Request, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> CurrentAuth | None:
+    if not request.cookies.get(settings.access_cookie_name):
+        return None
+    return await get_current_auth(request, session, settings)
+
+
 async def require_csrf(request: Request, auth: CurrentAuth = Depends(get_current_auth), settings: Settings = Depends(get_settings)) -> CurrentAuth:
     header_token = request.headers.get(settings.csrf_header_name)
     cookie_token = request.cookies.get(settings.csrf_cookie_name)

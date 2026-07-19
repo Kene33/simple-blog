@@ -53,6 +53,12 @@ async def test_avatar_requires_avatar_upload(client: AsyncClient) -> None:
     updated = await client.patch("/api/v1/users/me", json={"avatar_media_id": avatar_media.json()["id"]}, headers={"X-CSRF-Token": csrf})
     assert updated.status_code == 200
     assert updated.json()["avatar_url"] == avatar_media.json()["url"]
+    assert (await client.get(avatar_media.json()["url"])).status_code == 200
+    anonymous = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        assert (await anonymous.get(avatar_media.json()["url"])).status_code == 200
+    finally:
+        await anonymous.aclose()
 
 
 @pytest.mark.asyncio
@@ -65,3 +71,15 @@ async def test_post_accepts_only_owned_post_uploads(client: AsyncClient) -> None
     assert post.status_code == 201
     assert post.json()["media"][0]["id"] == media_id
     assert (await client.delete(f"/api/v1/media/{media_id}", headers={"X-CSRF-Token": csrf})).status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_uploaded_media_is_private(client: AsyncClient) -> None:
+    csrf = await register(client)
+    upload = await client.post("/api/v1/media", data={"purpose": "post"}, files={"file": ("photo.png", PNG, "image/png")}, headers={"X-CSRF-Token": csrf})
+    assert upload.status_code == 201
+    anonymous = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        assert (await anonymous.get(upload.json()["url"])).status_code == 404
+    finally:
+        await anonymous.aclose()

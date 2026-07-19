@@ -25,6 +25,15 @@ class FakeStorage:
     async def delete(self, key: str) -> None:
         self.objects.pop(key, None)
 
+    async def get(self, key: str) -> dict[str, object]:
+        content, _ = self.objects[key]
+
+        class Body:
+            def iter_chunks(self) -> list[bytes]:
+                return [content]
+
+        return {"Body": Body()}
+
 
 @pytest.fixture
 def storage() -> FakeStorage:
