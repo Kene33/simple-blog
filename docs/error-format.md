@@ -34,6 +34,7 @@ that can be found in server logs.
 | HTTP | Code | Meaning |
 | --- | --- | --- |
 | `400` | `BAD_REQUEST` | Request shape or state is invalid outside field validation |
+| `400` | `INVALID_CURSOR` | Cursor is malformed, expired, or does not match the request |
 | `401` | `AUTH_REQUIRED` | No valid access session was provided |
 | `401` | `AUTH_INVALID` | Credentials or session token are invalid |
 | `403` | `FORBIDDEN` | The principal lacks the required permission |
