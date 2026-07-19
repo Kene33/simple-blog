@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
 from src.db.session import get_session
-from src.modules.auth.dependencies import CurrentAuth, optional_csrf, require_csrf
+from src.modules.auth.dependencies import CurrentAuth, get_current_auth, optional_csrf, require_csrf
 from src.modules.interactions.schemas import LikeRead, ShareCreateRequest, ShareRead
 from src.modules.interactions.service import bookmark_post, like_post, list_bookmarks, record_share, unbookmark_post, unlike_post
 from src.modules.posts.schemas import PostPage
@@ -50,5 +50,5 @@ async def share(post_id: UUID, payload: ShareCreateRequest, auth: CurrentAuth | 
 
 
 @bookmarks_router.get("", response_model=PostPage)
-async def list_saved(cursor: str | None = None, limit: int = 20, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PostPage:
+async def list_saved(cursor: str | None = None, limit: int = 20, auth: CurrentAuth = Depends(get_current_auth), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PostPage:
     return await list_bookmarks(session, settings=settings, user_id=auth.user.id, cursor=cursor, limit=min(max(limit, 1), 100))

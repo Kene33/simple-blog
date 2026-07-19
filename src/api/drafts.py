@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
 from src.db.session import get_session
-from src.modules.auth.dependencies import CurrentAuth, require_csrf
+from src.modules.auth.dependencies import CurrentAuth, get_current_auth, require_csrf
 from src.modules.posts.schemas import DraftCreateRequest, DraftPage, DraftRead, DraftUpdateRequest, PostRead
 from src.modules.posts.service import create_draft, delete_draft, get_draft, list_drafts, publish_draft, serialize_draft, serialize_post, update_draft
 
@@ -21,12 +21,12 @@ async def create(payload: DraftCreateRequest, auth: CurrentAuth = Depends(requir
 
 
 @router.get("", response_model=DraftPage)
-async def list_all(cursor: str | None = None, limit: int = 20, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> DraftPage:
+async def list_all(cursor: str | None = None, limit: int = 20, auth: CurrentAuth = Depends(get_current_auth), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> DraftPage:
     return await list_drafts(session, settings=settings, author_id=auth.user.id, cursor=cursor, limit=min(max(limit, 1), 100))
 
 
 @router.get("/{draft_id}", response_model=DraftRead)
-async def read(draft_id: UUID, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> DraftRead:
+async def read(draft_id: UUID, auth: CurrentAuth = Depends(get_current_auth), session: AsyncSession = Depends(get_session)) -> DraftRead:
     return await serialize_draft(session, await get_draft(session, draft_id, auth.user.id))
 
 

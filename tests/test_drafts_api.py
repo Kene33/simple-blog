@@ -41,9 +41,9 @@ async def test_draft_list_is_private_and_cursor_paginated(client: AsyncClient) -
     for index in range(3):
         response = await client.post("/api/v1/drafts", json={"title": f"Draft {index}"}, headers={"X-CSRF-Token": csrf})
         assert response.status_code == 201
-    page = await client.get("/api/v1/drafts", params={"limit": 2}, headers={"X-CSRF-Token": csrf})
+    page = await client.get("/api/v1/drafts", params={"limit": 2})
     assert page.status_code == 200
     assert len(page.json()["items"]) == 2
     assert page.json()["next_cursor"]
-    next_page = await client.get("/api/v1/drafts", params={"cursor": page.json()["next_cursor"], "limit": 2}, headers={"X-CSRF-Token": csrf})
+    next_page = await client.get("/api/v1/drafts", params={"cursor": page.json()["next_cursor"], "limit": 2})
     assert len(next_page.json()["items"]) == 1

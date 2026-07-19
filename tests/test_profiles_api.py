@@ -24,6 +24,9 @@ async def test_profile_fields_are_private_and_public_comments_are_paginated(clie
     assert public.status_code == 200
     assert public.json()["display_name"] == "Profile User"
     assert "email" not in public.json()
+    cleared = await client.patch("/api/v1/users/me", json={"display_name": None, "bio": None}, headers={"X-CSRF-Token": csrf})
+    assert cleared.status_code == 200
+    assert cleared.json()["display_name"] is None
     post_id = await create_post(client, csrf)
     comment = await client.post(f"/api/v1/posts/{post_id}/comments", json={"body": "Public reply"}, headers={"X-CSRF-Token": csrf})
     assert comment.status_code == 201

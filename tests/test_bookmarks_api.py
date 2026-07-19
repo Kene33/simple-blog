@@ -22,7 +22,7 @@ async def test_bookmark_is_idempotent_and_in_post_read(client: AsyncClient) -> N
     second = await client.put(f"/api/v1/posts/{post_id}/bookmark", headers={"X-CSRF-Token": csrf})
     assert first.status_code == second.status_code == 200
     assert (await client.get(f"/api/v1/posts/{post_id}")).json()["bookmarked_by_me"] is True
-    saved = await client.get("/api/v1/bookmarks", headers={"X-CSRF-Token": csrf})
+    saved = await client.get("/api/v1/bookmarks")
     assert [item["id"] for item in saved.json()["items"]] == [post_id]
     assert (await client.delete(f"/api/v1/posts/{post_id}/bookmark", headers={"X-CSRF-Token": csrf})).status_code == 204
     assert (await client.get(f"/api/v1/posts/{post_id}")).json()["bookmarked_by_me"] is False
@@ -34,15 +34,15 @@ async def test_bookmarks_are_private_and_paginated(client: AsyncClient) -> None:
     post_ids = [await create_post(client, csrf, f"Post {index}") for index in range(3)]
     for post_id in post_ids:
         assert (await client.put(f"/api/v1/posts/{post_id}/bookmark", headers={"X-CSRF-Token": csrf})).status_code == 200
-    page = await client.get("/api/v1/bookmarks", params={"limit": 2}, headers={"X-CSRF-Token": csrf})
+    page = await client.get("/api/v1/bookmarks", params={"limit": 2})
     assert len(page.json()["items"]) == 2
     assert page.json()["next_cursor"]
-    next_page = await client.get("/api/v1/bookmarks", params={"cursor": page.json()["next_cursor"], "limit": 2}, headers={"X-CSRF-Token": csrf})
+    next_page = await client.get("/api/v1/bookmarks", params={"cursor": page.json()["next_cursor"], "limit": 2})
     assert len(next_page.json()["items"]) == 1
 
     other = AsyncClient(transport=client._transport, base_url="http://testserver")
     try:
-        other_csrf = await register(other, "bookmarkother")
-        assert (await other.get("/api/v1/bookmarks", headers={"X-CSRF-Token": other_csrf})).json()["items"] == []
+        await register(other, "bookmarkother")
+        assert (await other.get("/api/v1/bookmarks")).json()["items"] == []
     finally:
         await other.aclose()
