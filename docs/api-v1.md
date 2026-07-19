@@ -57,11 +57,12 @@ using `(created_at, id)` as the tie-breaker.
 | Method | Path | Auth | Purpose | Success |
 | --- | --- | --- | --- | --- |
 | `POST` | `/media` | Access cookie | Validate and upload an image/video | `201` |
-| `GET` | `/media/{media_id}` | Public/owner policy | Read or redirect to media content | `200`/`302` |
+| `GET` | `/media/{media_id}` | Public/owner policy | Read media content | `200` |
 | `DELETE` | `/media/{media_id}` | Owner | Delete an unattached media object | `204` |
 
-`GET /media/{media_id}` returns binary content or redirects to the object-store
-content. It does not return `MediaRead` metadata; upload responses and embedded
+`GET /media/{media_id}` returns binary content. Unattached uploads are visible
+only to their owner; attached post media and selected avatars are public. It
+does not return `MediaRead` metadata; upload responses and embedded
 post/profile media use that schema.
 
 Post creation and update accept previously uploaded `media_ids`. The media
@@ -106,6 +107,9 @@ share count.
 Reports are separate resources. Content ownership remains with the posts or
 comments module; moderation invokes explicit service methods rather than
 writing another module's tables directly.
+
+`GET /admin/reports` accepts `status=open|resolved|rejected`, `cursor`, and
+`limit`. A report can be transitioned from `open` to `resolved` or `rejected`.
 
 ## Status and compatibility policy
 

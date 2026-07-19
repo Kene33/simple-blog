@@ -167,6 +167,7 @@ trust the original filename.
 {
   "id": "uuid",
   "kind": "image",
+  "purpose": "post",
   "mime_type": "image/jpeg",
   "size_bytes": 123456,
   "url": "/api/v1/media/uuid",
@@ -307,8 +308,8 @@ and limited to 2,000 characters.
 }
 ```
 
-`status` is required and is one of `open`, `reviewing`, `resolved`, or
-`rejected`. `resolution` is optional and limited to 2,000 characters.
+`status` is required and is one of `resolved` or `rejected`. `resolution` is
+optional and limited to 2,000 characters.
 
 ## Compatibility rules
 
