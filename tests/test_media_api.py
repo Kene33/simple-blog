@@ -38,3 +38,18 @@ async def test_upload_rejects_invalid_type_and_avatar_video(client: AsyncClient)
     video = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 64
     avatar = await client.post("/api/v1/media", data={"purpose": "avatar"}, files={"file": ("movie.mp4", video, "video/mp4")}, headers={"X-CSRF-Token": csrf})
     assert avatar.status_code == 415
+
+
+@pytest.mark.asyncio
+async def test_avatar_requires_avatar_upload(client: AsyncClient) -> None:
+    csrf = await register(client)
+    post_media = await client.post("/api/v1/media", data={"purpose": "post"}, files={"file": ("photo.png", PNG, "image/png")}, headers={"X-CSRF-Token": csrf})
+    assert post_media.status_code == 201
+    rejected = await client.patch("/api/v1/users/me", json={"avatar_media_id": post_media.json()["id"]}, headers={"X-CSRF-Token": csrf})
+    assert rejected.status_code == 422
+
+    avatar_media = await client.post("/api/v1/media", data={"purpose": "avatar"}, files={"file": ("avatar.png", PNG, "image/png")}, headers={"X-CSRF-Token": csrf})
+    assert avatar_media.status_code == 201
+    updated = await client.patch("/api/v1/users/me", json={"avatar_media_id": avatar_media.json()["id"]}, headers={"X-CSRF-Token": csrf})
+    assert updated.status_code == 200
+    assert updated.json()["avatar_url"] == avatar_media.json()["url"]

@@ -79,6 +79,7 @@ class Media(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     owner_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    purpose: Mapped[str] = mapped_column(String(20), nullable=False, default="post", server_default="post")
     kind: Mapped[str] = mapped_column(String(20), nullable=False)
     mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)

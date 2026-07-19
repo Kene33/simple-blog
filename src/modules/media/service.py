@@ -14,7 +14,7 @@ MIME_TYPES = {"image/jpeg": "image", "image/png": "image", "image/gif": "image",
 
 
 def as_read(media: Media) -> MediaRead:
-    return MediaRead(id=media.id, kind=media.kind, mime_type=media.mime_type, size_bytes=media.size_bytes, url=f"/api/v1/media/{media.id}", status=media.status, created_at=media.created_at)
+    return MediaRead(id=media.id, kind=media.kind, purpose=media.purpose, mime_type=media.mime_type, size_bytes=media.size_bytes, url=f"/api/v1/media/{media.id}", status=media.status, created_at=media.created_at)
 
 
 async def upload_media(session: AsyncSession, storage: S3Storage, owner_id: UUID, purpose: MediaPurpose, content: bytes) -> Media:
@@ -29,7 +29,7 @@ async def upload_media(session: AsyncSession, storage: S3Storage, owner_id: UUID
         raise AppError("MEDIA_TOO_LARGE", "Media exceeds its size limit", 413)
     key = storage.key_for(owner_id, detected)
     await storage.put(key, content, detected)
-    media = Media(owner_id=owner_id, kind=kind, mime_type=detected, size_bytes=len(content), storage_key=key, status="uploaded")
+    media = Media(owner_id=owner_id, purpose=purpose, kind=kind, mime_type=detected, size_bytes=len(content), storage_key=key, status="uploaded")
     session.add(media)
     try:
         await session.flush()
@@ -52,3 +52,13 @@ async def delete_media(session: AsyncSession, storage: S3Storage, media: Media) 
     await storage.delete(media.storage_key)
     media.status = "deleted"
     media.deleted_at = datetime.now(timezone.utc)
+
+
+async def cleanup_orphan_media(session: AsyncSession, storage: S3Storage, older_than: datetime) -> int:
+    candidates = (await session.scalars(select(Media).where(Media.status == "uploaded", Media.created_at < older_than, Media.deleted_at.is_(None)))).all()
+    for media in candidates:
+        await storage.delete(media.storage_key)
+        media.status = "deleted"
+        media.deleted_at = datetime.now(timezone.utc)
+    await session.flush()
+    return len(candidates)

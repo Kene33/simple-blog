@@ -12,6 +12,7 @@ MediaPurpose = Literal["avatar", "post"]
 class MediaRead(BaseModel):
     id: UUID
     kind: str
+    purpose: MediaPurpose
     mime_type: str
     size_bytes: int
     url: str

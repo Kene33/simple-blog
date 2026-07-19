@@ -42,7 +42,7 @@ async def update_user(session: AsyncSession, user: User, payload: UserUpdateRequ
         if payload.avatar_media_id is None:
             user.avatar_media_id = None
         else:
-            media = await session.scalar(select(Media).where(Media.id == payload.avatar_media_id, Media.owner_id == user.id, Media.kind == "image", Media.deleted_at.is_(None)))
+            media = await session.scalar(select(Media).where(Media.id == payload.avatar_media_id, Media.owner_id == user.id, Media.purpose == "avatar", Media.kind == "image", Media.status == "uploaded", Media.deleted_at.is_(None)))
             if media is None:
                 raise AppError("VALIDATION_ERROR", "Avatar must be an active image owned by the user", 422)
             user.avatar_media_id = media.id
