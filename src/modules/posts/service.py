@@ -6,7 +6,7 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -87,6 +87,25 @@ async def get_post(session: AsyncSession, post_id: UUID, owner_id: UUID | None =
     if post is None or owner_id is not None and post.author_id != owner_id:
         raise AppError("RESOURCE_NOT_FOUND", "Post not found", 404)
     return post
+
+
+async def change_post_counter(session: AsyncSession, post_id: UUID, counter: str, delta: int) -> int:
+    fields = {"comment_count": Post.comment_count, "like_count": Post.like_count, "share_count": Post.share_count}
+    field = fields.get(counter)
+    if field is None:
+        raise ValueError("Unsupported post counter")
+    condition = field > 0 if delta < 0 else True
+    await session.execute(update(Post).where(Post.id == post_id, condition).values({counter: field + delta}))
+    return await read_post_counter(session, post_id, counter)
+
+
+async def read_post_counter(session: AsyncSession, post_id: UUID, counter: str) -> int:
+    fields = {"comment_count": Post.comment_count, "like_count": Post.like_count, "share_count": Post.share_count}
+    field = fields.get(counter)
+    if field is None:
+        raise ValueError("Unsupported post counter")
+    value = await session.scalar(select(field).where(Post.id == post_id))
+    return value or 0
 
 
 async def update_post(session: AsyncSession, post: Post, author_id: UUID, payload: PostUpdateRequest) -> Post:

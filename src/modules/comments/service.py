@@ -5,15 +5,15 @@ import json
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
 from src.core.errors import AppError
-from src.db.models import Comment, Post, User
+from src.db.models import Comment, User
 from src.modules.auth.service import user_summary
 from src.modules.comments.schemas import CommentCreateRequest, CommentPage, CommentRead, CommentUpdateRequest
-from src.modules.posts.service import get_post
+from src.modules.posts.service import change_post_counter, get_post
 
 TOMBSTONE_BODY = "[deleted]"
 
@@ -53,7 +53,7 @@ async def create_comment(session: AsyncSession, post_id: UUID, author: User, pay
     comment = Comment(post_id=post_id, author_id=author.id, parent_id=payload.parent_id, body=payload.body, created_at=now, updated_at=now)
     session.add(comment)
     await session.flush()
-    await session.execute(update(Post).where(Post.id == post_id).values(comment_count=Post.comment_count + 1))
+    await change_post_counter(session, post_id, "comment_count", 1)
     return comment
 
 
@@ -77,7 +77,7 @@ async def update_comment(session: AsyncSession, comment: Comment, payload: Comme
 
 async def delete_comment(session: AsyncSession, comment: Comment) -> None:
     comment.deleted_at = datetime.now(timezone.utc)
-    await session.execute(update(Post).where(Post.id == comment.post_id, Post.comment_count > 0).values(comment_count=Post.comment_count - 1))
+    await change_post_counter(session, comment.post_id, "comment_count", -1)
 
 
 async def serialize_comments(session: AsyncSession, comments: list[Comment]) -> list[CommentRead]:
