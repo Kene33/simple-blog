@@ -1,4 +1,5 @@
 import asyncio
+from typing import BinaryIO
 from uuid import UUID, uuid4
 
 import boto3
@@ -21,6 +22,10 @@ class S3Storage:
     async def put(self, key: str, content: bytes, mime_type: str) -> None:
         await self.ensure_bucket()
         await asyncio.to_thread(self.client.put_object, Bucket=self.bucket, Key=key, Body=content, ContentType=mime_type)
+
+    async def put_file(self, key: str, stream: BinaryIO, mime_type: str) -> None:
+        await self.ensure_bucket()
+        await asyncio.to_thread(self.client.upload_fileobj, stream, self.bucket, key, ExtraArgs={"ContentType": mime_type})
 
     async def ensure_bucket(self) -> None:
         try:

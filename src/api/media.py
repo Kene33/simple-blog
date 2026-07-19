@@ -1,5 +1,7 @@
+from tempfile import SpooledTemporaryFile
 from uuid import UUID
 
+import filetype
 from fastapi import APIRouter, Depends, File, Form, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,14 +24,26 @@ def get_storage(settings: Settings = Depends(get_settings)) -> S3Storage:
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=MediaRead)
 async def upload(file: UploadFile = File(...), purpose: MediaPurpose = Form(...), auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session), storage: S3Storage = Depends(get_storage)) -> MediaRead:
-    max_size = 100 * 1024 * 1024
-    content = await file.read(max_size + 1)
-    try:
-        media = await upload_media(session, storage, auth.user.id, purpose, content)
-        await session.commit()
-    except Exception:
-        await session.rollback()
-        raise
+    max_size = 5 * 1024 * 1024 if purpose == "avatar" else 100 * 1024 * 1024
+    with SpooledTemporaryFile(max_size=1024 * 1024) as stream:
+        header = await file.read(8_192)
+        mime_type = filetype.guess_mime(header)
+        stream.write(header)
+        size_bytes = len(header)
+        if mime_type and mime_type.startswith("image/"):
+            max_size = min(max_size, 10 * 1024 * 1024)
+        while chunk := await file.read(64 * 1024):
+            size_bytes += len(chunk)
+            if size_bytes > max_size:
+                raise AppError("MEDIA_TOO_LARGE", "Media exceeds its size limit", 413)
+            stream.write(chunk)
+        stream.seek(0)
+        try:
+            media = await upload_media(session, storage, auth.user.id, purpose, stream, mime_type, size_bytes)
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
     await session.refresh(media)
     return as_read(media)
 

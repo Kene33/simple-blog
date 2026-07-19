@@ -31,6 +31,7 @@ async def test_post_crud_filters_pagination_and_ownership(client: AsyncClient) -
     updated = await client.patch(f"/api/v1/posts/{post_id}", json={"title": "Updated"}, headers={"X-CSRF-Token": csrf})
     assert updated.status_code == 200
     assert updated.json()["title"] == "Updated"
+    assert updated.json()["updated_at"] > created[0]["updated_at"]
     assert (await client.delete(f"/api/v1/posts/{post_id}", headers={"X-CSRF-Token": csrf})).status_code == 204
     assert (await client.get(f"/api/v1/posts/{post_id}")).status_code == 404
 

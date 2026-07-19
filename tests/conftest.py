@@ -22,6 +22,9 @@ class FakeStorage:
     async def put(self, key: str, content: bytes, mime_type: str) -> None:
         self.objects[key] = (content, mime_type)
 
+    async def put_file(self, key: str, stream: object, mime_type: str) -> None:
+        self.objects[key] = (stream.read(), mime_type)
+
     async def delete(self, key: str) -> None:
         self.objects.pop(key, None)
 

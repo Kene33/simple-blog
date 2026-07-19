@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
@@ -76,7 +76,9 @@ async def update_comment(session: AsyncSession, comment: Comment, payload: Comme
 
 
 async def delete_comment(session: AsyncSession, comment: Comment) -> None:
-    comment.deleted_at = datetime.now(timezone.utc)
+    result = await session.execute(update(Comment).where(Comment.id == comment.id, Comment.deleted_at.is_(None)).values(deleted_at=datetime.now(timezone.utc)))
+    if result.rowcount != 1:
+        raise AppError("RESOURCE_NOT_FOUND", "Comment not found", 404)
     await change_post_counter(session, comment.post_id, "comment_count", -1)
 
 

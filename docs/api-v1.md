@@ -42,7 +42,7 @@ choose the owner of a resource by sending a username or user ID.
 
 - `query`: full-text search input;
 - `search_in`: `all`, `title`, or `content`;
-- `tag`: repeatable normalized tag filter;
+- `tag`: normalized tag filter;
 - `category`: category filter;
 - `author`: public username filter;
 - `sort`: `newest` or `oldest`;

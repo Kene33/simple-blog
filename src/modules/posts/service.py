@@ -119,6 +119,7 @@ async def update_post(session: AsyncSession, post: Post, author_id: UUID, payloa
         await write_tags(session, post, payload.tags or [])
     if "media_ids" in payload.model_fields_set:
         await replace_post_media(session, post.id, author_id, payload.media_ids or [])
+    post.updated_at = datetime.now(timezone.utc)
     await session.flush()
     return post
 
