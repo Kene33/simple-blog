@@ -130,7 +130,7 @@ an explicit deployment step before the application accepts traffic.
 
 ## Current repository boundary
 
-The existing `src/api`, `src/database`, and `src/schemas` packages remain the
-legacy implementation until B1 and B2 build the new application foundation.
-This architecture document describes the target system; it does not claim that
-the target runtime has already been implemented.
+The existing `src/api`, `src/database`, and `src/schemas` packages are legacy
+code and are not imported by the new `app` runtime. The new runtime uses only
+PostgreSQL through SQLAlchemy and Alembic; the old SQLite files are not read or
+updated.
