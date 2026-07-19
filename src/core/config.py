@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     cookie_domain: str | None = None
     s3_endpoint_url: str = "http://localhost:9000"
     s3_bucket: str = "simple-blog-media"
+    s3_access_key: str = "minio"
+    s3_secret_key: str = "minio-password"
+    s3_region: str = "us-east-1"
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
