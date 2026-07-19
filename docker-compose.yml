@@ -1,0 +1,55 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: Simple Blog API
+      ENVIRONMENT: development
+      HOST: 0.0.0.0
+      PORT: 8000
+      RELOAD: "false"
+      LOG_LEVEL: INFO
+      CORS_ORIGINS: http://localhost:8000,http://localhost:5500
+      DATABASE_URL: postgresql+asyncpg://blog:blog@postgres:5432/blog
+      JWT_SECRET_KEY: change-me-in-development
+      COOKIE_SECURE: "false"
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_BUCKET: simple-blog-media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: blog
+      POSTGRES_USER: blog
+      POSTGRES_PASSWORD: blog
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blog -d blog"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio-password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  postgres_data:
+  minio_data:
