@@ -20,8 +20,8 @@ async def create(payload: PostCreateRequest, auth: CurrentAuth = Depends(require
 
 
 @router.get("", response_model=PostPage)
-async def list_feed(author: str | None = None, category: str | None = None, tag: str | None = None, cursor: str | None = None, limit: int = 20, session: AsyncSession = Depends(get_session)) -> PostPage:
-    return await list_posts(session, author=author, category=category, tag=tag, cursor=cursor, limit=min(max(limit, 1), 100))
+async def list_feed(author: str | None = None, category: str | None = None, tag: str | None = None, query: str | None = None, search_in: str = "all", sort: str = "newest", cursor: str | None = None, limit: int = 20, session: AsyncSession = Depends(get_session)) -> PostPage:
+    return await list_posts(session, author=author, category=category, tag=tag, query_text=query, search_in=search_in, sort=sort, cursor=cursor, limit=min(max(limit, 1), 100))
 
 
 @router.get("/{post_id}", response_model=PostRead)

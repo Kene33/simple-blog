@@ -37,8 +37,23 @@ class PostUpdateRequest(BaseModel):
     tags: list[str] | None = Field(default=None, max_length=10)
     media_ids: list[UUID] | None = Field(default=None, max_length=4)
 
+    @field_validator("title", "content", "category")
+    @classmethod
+    def strip_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            raise ValueError("Value must not be blank")
+        return value
+
+    @field_validator("tags")
+    @classmethod
+    def normalize_optional_tags(cls, values: list[str] | None) -> list[str] | None:
+        return PostCreateRequest.normalize_tags(values) if values is not None else None
+
     def has_changes(self) -> bool:
-        return bool(self.model_fields_set)
+        return any(getattr(self, field) is not None for field in self.model_fields_set)
 
 
 class PostRead(BaseModel):

@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import String, cast, delete, select
+from sqlalchemy import String, cast, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.errors import AppError
@@ -43,11 +43,15 @@ async def resolve_tags(session: AsyncSession, names: list[str]) -> list[Tag]:
 async def attach_media(session: AsyncSession, post: Post, owner_id: UUID, media_ids: list[UUID]) -> None:
     if not media_ids:
         return
-    media = (await session.scalars(select(Media).where(Media.id.in_(media_ids), Media.owner_id == owner_id, Media.deleted_at.is_(None)))).all()
+    media = (await session.scalars(select(Media).where(Media.id.in_(media_ids), Media.owner_id == owner_id, Media.status == "uploaded", Media.deleted_at.is_(None)))).all()
     if len(media) != len(media_ids) or len([item for item in media if item.kind == "video"]) > 1:
         raise AppError("VALIDATION_ERROR", "Media must be active, owned, and include at most one video", 422)
     for position, media_id in enumerate(media_ids):
         session.add(PostMedia(post_id=post.id, media_id=media_id, position=position))
+    now = datetime.now(timezone.utc)
+    for item in media:
+        item.status = "attached"
+        item.attached_at = now
 
 
 async def write_tags(session: AsyncSession, post: Post, names: list[str]) -> None:
@@ -84,7 +88,11 @@ async def update_post(session: AsyncSession, post: Post, author_id: UUID, payloa
     if "tags" in payload.model_fields_set:
         await write_tags(session, post, payload.tags or [])
     if "media_ids" in payload.model_fields_set:
+        previous_media = (await session.scalars(select(Media).join(PostMedia, PostMedia.media_id == Media.id).where(PostMedia.post_id == post.id))).all()
         await session.execute(delete(PostMedia).where(PostMedia.post_id == post.id))
+        for item in previous_media:
+            item.status = "uploaded"
+            item.attached_at = None
         await attach_media(session, post, author_id, payload.media_ids or [])
     await session.flush()
     return post
@@ -97,17 +105,32 @@ async def serialize_post(session: AsyncSession, post: Post) -> PostRead:
     return PostRead(id=post.id, author=user_summary(author), title=post.title, content=post.content, category=post.category or "", tags=list(tags), media=[{"id": item.id, "kind": item.kind, "mime_type": item.mime_type, "url": f"/api/v1/media/{item.id}"} for item in media], like_count=post.like_count, comment_count=post.comment_count, share_count=post.share_count, created_at=post.created_at, updated_at=post.updated_at)
 
 
-async def list_posts(session: AsyncSession, *, author: str | None, category: str | None, tag: str | None, cursor: str | None, limit: int) -> PostPage:
-    query = select(Post).where(Post.deleted_at.is_(None)).order_by(Post.created_at.desc(), Post.id.desc())
+async def list_posts(session: AsyncSession, *, author: str | None, category: str | None, tag: str | None, query_text: str | None, search_in: str, sort: str, cursor: str | None, limit: int) -> PostPage:
+    query = select(Post).where(Post.deleted_at.is_(None))
     if author:
         query = query.join(User, User.id == Post.author_id).where(User.username_normalized == author.casefold())
     if category:
         query = query.where(Post.category == category)
     if tag:
         query = query.join(PostTag, PostTag.post_id == Post.id).join(Tag, Tag.id == PostTag.tag_id).where(Tag.name_normalized == tag.casefold())
+    if query_text:
+        if search_in not in {"all", "title", "content"}:
+            raise AppError("VALIDATION_ERROR", "search_in must be all, title, or content", 422)
+        if session.bind and session.bind.dialect.name == "postgresql":
+            document = func.to_tsvector("simple", Post.title + " " + Post.content) if search_in == "all" else func.to_tsvector("simple", getattr(Post, search_in))
+            query = query.where(document.op("@@")(func.plainto_tsquery("simple", query_text)))
+        else:
+            pattern = f"%{query_text}%"
+            fields = [Post.title, Post.content] if search_in == "all" else [getattr(Post, search_in)]
+            query = query.where(or_(*(field.ilike(pattern) for field in fields)))
+    if sort not in {"newest", "oldest"}:
+        raise AppError("VALIDATION_ERROR", "sort must be newest or oldest", 422)
+    order = (Post.created_at.desc(), Post.id.desc()) if sort == "newest" else (Post.created_at.asc(), Post.id.asc())
     if cursor:
         created_at, post_id = decode_cursor(cursor)
-        query = query.where((Post.created_at < created_at) | ((Post.created_at == created_at) & (cast(Post.id, String) < str(post_id))))
-    rows = (await session.scalars(query.limit(limit + 1))).all()
+        compare = cast(Post.id, String) < str(post_id) if sort == "newest" else cast(Post.id, String) > str(post_id)
+        time_compare = Post.created_at < created_at if sort == "newest" else Post.created_at > created_at
+        query = query.where(time_compare | ((Post.created_at == created_at) & compare))
+    rows = (await session.scalars(query.order_by(*order).limit(limit + 1))).all()
     next_cursor = encode_cursor(rows[limit - 1]) if len(rows) > limit else None
     return PostPage(items=[await serialize_post(session, post) for post in rows[:limit]], next_cursor=next_cursor)

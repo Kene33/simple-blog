@@ -31,6 +31,10 @@ async def test_post_crud_filters_pagination_and_ownership(client: AsyncClient) -
     assert (await client.delete(f"/api/v1/posts/{post_id}", headers={"X-CSRF-Token": csrf})).status_code == 204
     assert (await client.get(f"/api/v1/posts/{post_id}")).status_code == 404
 
+    searched = await client.get("/api/v1/posts", params={"query": "Post", "search_in": "title", "sort": "oldest"})
+    assert searched.status_code == 200
+    assert [item["title"] for item in searched.json()["items"]] == ["Post 1", "Post 2"]
+
     other = AsyncClient(transport=client._transport, base_url="http://testserver")
     try:
         other_csrf = await register(other, "bob")
