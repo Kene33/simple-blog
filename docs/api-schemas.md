@@ -70,8 +70,11 @@ HttpOnly cookies and never appear in the response body. Logout returns `204`.
 {
   "id": "uuid",
   "username": "alice",
+  "display_name": "Alice",
+  "bio": "About Alice",
   "email": "alice@example.com",
   "avatar_url": null,
+  "cover_url": null,
   "role": "user",
   "posts_count": 0,
   "created_at": "2026-07-19T12:30:00Z",
@@ -82,13 +85,20 @@ HttpOnly cookies and never appear in the response body. Logout returns `204`.
 The email and role fields are returned only by `GET /users/me`; public profile
 responses omit them.
 
+Public profiles include `display_name`, `bio`, and `cover_url`, but never email
+or role. `UserUpdateRequest` also accepts `display_name`, `bio`, and
+`cover_media_id`.
+
 ### `UserUpdateRequest`
 
 ```json
 {
   "username": "alice_new",
   "email": "alice.new@example.com",
-  "avatar_media_id": "uuid"
+  "avatar_media_id": "uuid",
+  "cover_media_id": "uuid",
+  "display_name": "Alice",
+  "bio": "About Alice"
 }
 ```
 
@@ -176,7 +186,7 @@ Draft fields may be empty until the draft is published.
 `POST /media` uses `multipart/form-data` with:
 
 - `file`: required binary file;
-- `purpose`: required enum `avatar|post`.
+- `purpose`: required enum `avatar|post|cover`.
 
 The server determines the media kind from the validated MIME type and does not
 trust the original filename.

@@ -10,8 +10,8 @@ from src.modules.auth.service import normalize_email, normalize_username, user_s
 
 
 async def profile_for_user(session: AsyncSession, user: User, include_private: bool) -> UserProfile | PublicUserProfile:
-    posts_count = await session.scalar(select(func.count()).select_from(Post).where(Post.author_id == user.id, Post.deleted_at.is_(None)))
-    values = user_summary(user).model_dump() | {"posts_count": posts_count or 0, "created_at": user.created_at, "updated_at": user.updated_at}
+    posts_count = await session.scalar(select(func.count()).select_from(Post).where(Post.author_id == user.id, Post.status == "published", Post.deleted_at.is_(None)))
+    values = user_summary(user).model_dump() | {"display_name": user.display_name, "bio": user.bio, "cover_url": f"/api/v1/media/{user.cover_media_id}" if user.cover_media_id else None, "posts_count": posts_count or 0, "created_at": user.created_at, "updated_at": user.updated_at}
     if include_private:
         return UserProfile(**values, email=user.email, role=user.role)
     return PublicUserProfile(**values)
@@ -54,5 +54,23 @@ async def update_user(session: AsyncSession, user: User, payload: UserUpdateRequ
         if previous_media is not None and previous_media.id != user.avatar_media_id:
             previous_media.status = "uploaded"
             previous_media.attached_at = None
+    if "cover_media_id" in payload.model_fields_set:
+        previous_media = await session.get(Media, user.cover_media_id) if user.cover_media_id else None
+        if payload.cover_media_id is None:
+            user.cover_media_id = None
+        else:
+            media = await session.scalar(select(Media).where(Media.id == payload.cover_media_id, Media.owner_id == user.id, Media.purpose == "cover", Media.kind == "image", Media.status == "uploaded", Media.deleted_at.is_(None)))
+            if media is None:
+                raise AppError("VALIDATION_ERROR", "Cover must be an active image owned by the user", 422)
+            user.cover_media_id = media.id
+            media.status = "attached"
+            media.attached_at = datetime.now(timezone.utc)
+        if previous_media is not None and previous_media.id != user.cover_media_id:
+            previous_media.status = "uploaded"
+            previous_media.attached_at = None
+    if "display_name" in payload.model_fields_set:
+        user.display_name = payload.display_name
+    if "bio" in payload.model_fields_set:
+        user.bio = payload.bio
     await session.flush()
     return user

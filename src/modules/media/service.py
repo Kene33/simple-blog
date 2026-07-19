@@ -22,7 +22,7 @@ async def upload_media(session: AsyncSession, storage: S3Storage, owner_id: UUID
     if kind is None:
         raise AppError("MEDIA_UNSUPPORTED", "Unsupported media type", 415)
     limit = 5 * 1024 * 1024 if purpose == "avatar" else (10 * 1024 * 1024 if kind == "image" else 100 * 1024 * 1024)
-    if purpose == "avatar" and kind != "image":
+    if purpose in {"avatar", "cover"} and kind != "image":
         raise AppError("MEDIA_UNSUPPORTED", "Unsupported media purpose", 415)
     if size_bytes > limit:
         raise AppError("MEDIA_TOO_LARGE", "Media exceeds its size limit", 413)

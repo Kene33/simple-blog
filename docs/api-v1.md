@@ -24,6 +24,7 @@
 | `GET` | `/users/me` | Access cookie | Return the current user | `200` |
 | `PATCH` | `/users/me` | Access cookie | Update the current profile | `200` |
 | `GET` | `/users/{username}` | Public | Return a public profile | `200` |
+| `GET` | `/users/{username}/comments` | Public | List the user's visible comments | `200` |
 
 The authenticated principal comes from the access cookie. A client cannot
 choose the owner of a resource by sending a username or user ID.
@@ -79,7 +80,7 @@ only to their owner; attached post media and selected avatars are public. It
 does not return `MediaRead` metadata; upload responses and embedded
 post/profile media use that schema.
 
-Post creation and update accept previously uploaded `media_ids`. The media
+`purpose=cover` is an image upload used by a profile cover. Post creation and update accept previously uploaded `media_ids`. The media
 service verifies ownership and attachment limits before the post transaction
 commits.
 

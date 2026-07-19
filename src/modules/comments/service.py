@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
 from src.core.errors import AppError
-from src.db.models import Comment, User
+from src.db.models import Comment, Post, User
 from src.modules.auth.service import user_summary
 from src.modules.comments.schemas import CommentCreateRequest, CommentPage, CommentRead, CommentUpdateRequest
 from src.modules.posts.service import change_post_counter, get_post
@@ -107,4 +107,39 @@ async def list_comments(session: AsyncSession, *, settings: Settings, post_id: U
         except ValueError:
             raise AppError("INVALID_CURSOR", "Cursor is invalid", 400) from None
     next_cursor = _encode_cursor(rows[limit - 1], scope, settings) if len(rows) > limit else None
+    return CommentPage(items=await serialize_comments(session, rows[:limit]), next_cursor=next_cursor)
+
+
+def _user_scope(user_id: UUID) -> str:
+    return hashlib.sha256(f"user:{user_id}".encode()).hexdigest()
+
+
+def _encode_user_cursor(comment: Comment, settings: Settings, user_id: UUID) -> str:
+    payload = {"v": 1, "resource": "user_comments", "created_at": comment.created_at.isoformat(), "id": str(comment.id), "scope": _user_scope(user_id)}
+    encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
+    signature = hmac.new(settings.jwt_secret_key.encode(), encoded.encode(), hashlib.sha256).hexdigest()
+    return f"{encoded}.{signature}"
+
+
+def _decode_user_cursor(value: str, settings: Settings, user_id: UUID) -> tuple[datetime, UUID]:
+    try:
+        encoded, signature = value.split(".", 1)
+        expected = hmac.new(settings.jwt_secret_key.encode(), encoded.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            raise ValueError
+        payload = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
+        if payload["v"] != 1 or payload["resource"] != "user_comments" or payload["scope"] != _user_scope(user_id):
+            raise ValueError
+        return datetime.fromisoformat(payload["created_at"]), UUID(payload["id"])
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+        raise AppError("INVALID_CURSOR", "Cursor is invalid", 400) from None
+
+
+async def list_user_comments(session: AsyncSession, *, settings: Settings, user_id: UUID, cursor: str | None, limit: int) -> CommentPage:
+    query = select(Comment).join(Post, Post.id == Comment.post_id).where(Comment.author_id == user_id, Comment.deleted_at.is_(None), Post.status == "published", Post.deleted_at.is_(None))
+    if cursor:
+        created_at, comment_id = _decode_user_cursor(cursor, settings, user_id)
+        query = query.where((Comment.created_at < created_at) | ((Comment.created_at == created_at) & (Comment.id < comment_id)))
+    rows = (await session.scalars(query.order_by(Comment.created_at.desc(), Comment.id.desc()).limit(limit + 1))).all()
+    next_cursor = _encode_user_cursor(rows[limit - 1], settings, user_id) if len(rows) > limit else None
     return CommentPage(items=await serialize_comments(session, rows[:limit]), next_cursor=next_cursor)

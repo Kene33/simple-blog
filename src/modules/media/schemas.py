@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-MediaPurpose = Literal["avatar", "post"]
+MediaPurpose = Literal["avatar", "post", "cover"]
 
 
 class MediaRead(BaseModel):
