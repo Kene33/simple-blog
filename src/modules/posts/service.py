@@ -2,10 +2,11 @@ import base64
 import hashlib
 import hmac
 import json
+from collections import defaultdict
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import String, cast, delete, func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -104,10 +105,38 @@ async def update_post(session: AsyncSession, post: Post, author_id: UUID, payloa
 
 
 async def serialize_post(session: AsyncSession, post: Post) -> PostRead:
-    author = await session.get(User, post.author_id)
-    tags = (await session.scalars(select(Tag.name).join(PostTag, PostTag.tag_id == Tag.id).where(PostTag.post_id == post.id))).all()
-    media = (await session.scalars(select(Media).join(PostMedia, PostMedia.media_id == Media.id).where(PostMedia.post_id == post.id).order_by(PostMedia.position))).all()
-    return PostRead(id=post.id, author=user_summary(author), title=post.title, content=post.content, category=post.category or "", tags=list(tags), media=[as_read(item) for item in media], like_count=post.like_count, comment_count=post.comment_count, share_count=post.share_count, created_at=post.created_at, updated_at=post.updated_at)
+    return (await serialize_posts(session, [post]))[0]
+
+
+async def serialize_posts(session: AsyncSession, posts: list[Post]) -> list[PostRead]:
+    if not posts:
+        return []
+    post_ids = [post.id for post in posts]
+    author_ids = {post.author_id for post in posts}
+    authors = {user.id: user for user in (await session.scalars(select(User).where(User.id.in_(author_ids)))).all()}
+    tags_by_post: dict[UUID, list[str]] = defaultdict(list)
+    for post_id, tag_name in (await session.execute(select(PostTag.post_id, Tag.name).join(Tag, Tag.id == PostTag.tag_id).where(PostTag.post_id.in_(post_ids)).order_by(Tag.name_normalized))).all():
+        tags_by_post[post_id].append(tag_name)
+    media_by_post: dict[UUID, list[Media]] = defaultdict(list)
+    for post_id, media in (await session.execute(select(PostMedia.post_id, Media).join(Media, Media.id == PostMedia.media_id).where(PostMedia.post_id.in_(post_ids)).order_by(PostMedia.position))).all():
+        media_by_post[post_id].append(media)
+    return [
+        PostRead(
+            id=post.id,
+            author=user_summary(authors[post.author_id]),
+            title=post.title,
+            content=post.content,
+            category=post.category or "",
+            tags=tags_by_post[post.id],
+            media=[as_read(media) for media in media_by_post[post.id]],
+            like_count=post.like_count,
+            comment_count=post.comment_count,
+            share_count=post.share_count,
+            created_at=post.created_at,
+            updated_at=post.updated_at,
+        )
+        for post in posts
+    ]
 
 
 async def list_posts(session: AsyncSession, *, settings: Settings, author: str | None, category: str | None, tag: str | None, query_text: str | None, search_in: str, sort: str, cursor: str | None, limit: int) -> PostPage:
@@ -134,9 +163,9 @@ async def list_posts(session: AsyncSession, *, settings: Settings, author: str |
     scope = cursor_scope(author=author, category=category, tag=tag, query_text=query_text, search_in=search_in, sort=sort)
     if cursor:
         created_at, post_id = decode_cursor(cursor, scope, settings)
-        compare = cast(Post.id, String) < str(post_id) if sort == "newest" else cast(Post.id, String) > str(post_id)
+        compare = Post.id < post_id if sort == "newest" else Post.id > post_id
         time_compare = Post.created_at < created_at if sort == "newest" else Post.created_at > created_at
         query = query.where(time_compare | ((Post.created_at == created_at) & compare))
     rows = (await session.scalars(query.order_by(*order).limit(limit + 1))).all()
     next_cursor = encode_cursor(rows[limit - 1], scope, settings) if len(rows) > limit else None
-    return PostPage(items=[await serialize_post(session, post) for post in rows[:limit]], next_cursor=next_cursor)
+    return PostPage(items=await serialize_posts(session, rows[:limit]), next_cursor=next_cursor)
