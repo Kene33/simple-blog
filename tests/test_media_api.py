@@ -3,7 +3,6 @@ from httpx import AsyncClient
 
 from tests.conftest import FakeStorage
 
-
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 
 

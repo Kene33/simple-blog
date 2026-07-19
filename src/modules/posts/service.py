@@ -10,11 +10,11 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.errors import AppError
 from src.core.config import Settings
+from src.core.errors import AppError
 from src.db.models import Media, Post, PostLike, PostMedia, PostTag, Tag, User
-from src.modules.media.service import as_read, replace_post_media
 from src.modules.auth.service import user_summary
+from src.modules.media.service import as_read, replace_post_media
 from src.modules.posts.schemas import PostCreateRequest, PostPage, PostRead, PostUpdateRequest
 
 

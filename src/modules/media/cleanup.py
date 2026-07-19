@@ -1,10 +1,10 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 
+from src.core.config import get_settings
 from src.db.session import engine, session_factory
 from src.modules.media.service import cleanup_orphan_media
 from src.modules.media.storage import S3Storage
-from src.core.config import get_settings
 
 
 async def main() -> None:

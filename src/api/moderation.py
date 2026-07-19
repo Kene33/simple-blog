@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import Settings, get_settings
 from src.core.errors import AppError
 from src.db.session import get_session
-from src.core.config import Settings, get_settings
 from src.modules.auth.dependencies import CurrentAuth, require_admin, require_csrf
 from src.modules.moderation.schemas import ReportCreateRequest, ReportPage, ReportRead, ReportUpdateRequest
 from src.modules.moderation.service import create_report, list_reports, resolve_report, serialize_reports

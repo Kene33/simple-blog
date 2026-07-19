@@ -5,8 +5,8 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from src.core.config import Settings, get_settings
 from src.api.media import get_storage
+from src.core.config import Settings, get_settings
 from src.db.base import Base
 from src.db.session import get_session
 from src.main import create_app

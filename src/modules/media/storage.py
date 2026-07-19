@@ -2,8 +2,8 @@ import asyncio
 from uuid import UUID, uuid4
 
 import boto3
-from botocore.exceptions import ClientError
 from botocore.config import Config
+from botocore.exceptions import ClientError
 
 from src.core.config import Settings
 
