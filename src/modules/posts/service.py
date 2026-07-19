@@ -15,7 +15,7 @@ from src.core.errors import AppError
 from src.db.models import Media, Post, PostLike, PostMedia, PostTag, Tag, User
 from src.modules.auth.service import user_summary
 from src.modules.media.service import as_read, replace_post_media
-from src.modules.posts.schemas import PostCreateRequest, PostPage, PostRead, PostUpdateRequest
+from src.modules.posts.schemas import DraftCreateRequest, DraftPage, DraftRead, DraftUpdateRequest, PostCreateRequest, PostPage, PostRead, PostUpdateRequest
 
 
 def cursor_scope(*, author: str | None, category: str | None, tag: str | None, query_text: str | None, search_in: str, sort: str) -> str:
@@ -23,14 +23,14 @@ def cursor_scope(*, author: str | None, category: str | None, tag: str | None, q
     return hashlib.sha256(value).hexdigest()
 
 
-def encode_cursor(post: Post, scope: str, settings: Settings) -> str:
-    payload = {"v": 1, "resource": "posts", "created_at": post.created_at.isoformat(), "id": str(post.id), "scope": scope}
+def encode_cursor(post: Post, scope: str, settings: Settings, resource: str = "posts", timestamp: str = "created_at") -> str:
+    payload = {"v": 1, "resource": resource, "created_at": getattr(post, timestamp).isoformat(), "id": str(post.id), "scope": scope}
     encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
     signature = hmac.new(settings.jwt_secret_key.encode(), encoded.encode(), hashlib.sha256).hexdigest()
     return f"{encoded}.{signature}"
 
 
-def decode_cursor(value: str, scope: str, settings: Settings) -> tuple[datetime, UUID]:
+def decode_cursor(value: str, scope: str, settings: Settings, resource: str = "posts") -> tuple[datetime, UUID]:
     try:
         encoded, signature = value.split(".", 1)
         expected = hmac.new(settings.jwt_secret_key.encode(), encoded.encode(), hashlib.sha256).hexdigest()
@@ -38,7 +38,7 @@ def decode_cursor(value: str, scope: str, settings: Settings) -> tuple[datetime,
             raise ValueError
         padded = encoded + "=" * (-len(encoded) % 4)
         payload = json.loads(base64.urlsafe_b64decode(padded))
-        if payload["v"] != 1 or payload["resource"] != "posts" or payload["scope"] != scope:
+        if payload["v"] != 1 or payload["resource"] != resource or payload["scope"] != scope:
             raise ValueError
         return datetime.fromisoformat(payload["created_at"]), UUID(payload["id"])
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
@@ -73,7 +73,7 @@ async def write_tags(session: AsyncSession, post: Post, names: list[str]) -> Non
 
 async def create_post(session: AsyncSession, author: User, payload: PostCreateRequest) -> Post:
     now = datetime.now(timezone.utc)
-    post = Post(author_id=author.id, title=payload.title, content=payload.content, category=payload.category, created_at=now, updated_at=now)
+    post = Post(author_id=author.id, status="published", title=payload.title, content=payload.content, category=payload.category, created_at=now, updated_at=now)
     session.add(post)
     await session.flush()
     await write_tags(session, post, payload.tags)
@@ -82,8 +82,73 @@ async def create_post(session: AsyncSession, author: User, payload: PostCreateRe
     return post
 
 
+async def create_draft(session: AsyncSession, author: User, payload: DraftCreateRequest) -> Post:
+    now = datetime.now(timezone.utc)
+    draft = Post(author_id=author.id, status="draft", title=payload.title, content=payload.content, category=payload.category, created_at=now, updated_at=now)
+    session.add(draft)
+    await session.flush()
+    await write_tags(session, draft, payload.tags)
+    await replace_post_media(session, draft.id, author.id, payload.media_ids)
+    await session.flush()
+    return draft
+
+
+async def get_draft(session: AsyncSession, draft_id: UUID, owner_id: UUID) -> Post:
+    draft = await session.scalar(select(Post).where(Post.id == draft_id, Post.author_id == owner_id, Post.status == "draft", Post.deleted_at.is_(None)))
+    if draft is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Draft not found", 404)
+    return draft
+
+
+async def serialize_draft(session: AsyncSession, draft: Post) -> DraftRead:
+    post = (await serialize_posts(session, [draft]))[0]
+    return DraftRead(id=post.id, author=post.author, title=post.title, content=post.content, category=post.category, tags=post.tags, media=post.media, status="draft", created_at=post.created_at, updated_at=post.updated_at)
+
+
+async def list_drafts(session: AsyncSession, *, settings: Settings, author_id: UUID, cursor: str | None, limit: int) -> DraftPage:
+    scope = "drafts"
+    query = select(Post).where(Post.author_id == author_id, Post.status == "draft", Post.deleted_at.is_(None))
+    if cursor:
+        updated_at, draft_id = decode_cursor(cursor, scope, settings, resource="drafts")
+        query = query.where((Post.updated_at > updated_at) | ((Post.updated_at == updated_at) & (Post.id > draft_id)))
+    drafts = (await session.scalars(query.order_by(Post.updated_at, Post.id).limit(limit + 1))).all()
+    next_cursor = encode_cursor(drafts[limit - 1], scope, settings, resource="drafts", timestamp="updated_at") if len(drafts) > limit else None
+    return DraftPage(items=[await serialize_draft(session, draft) for draft in drafts[:limit]], next_cursor=next_cursor)
+
+
+async def update_draft(session: AsyncSession, draft: Post, author_id: UUID, payload: DraftUpdateRequest) -> Post:
+    if not payload.has_changes():
+        raise AppError("VALIDATION_ERROR", "At least one field must be provided", 422)
+    for field in ("title", "content", "category"):
+        if field in payload.model_fields_set:
+            setattr(draft, field, getattr(payload, field) or "")
+    if "tags" in payload.model_fields_set:
+        await write_tags(session, draft, payload.tags or [])
+    if "media_ids" in payload.model_fields_set:
+        await replace_post_media(session, draft.id, author_id, payload.media_ids or [])
+    draft.updated_at = datetime.now(timezone.utc)
+    await session.flush()
+    return draft
+
+
+async def publish_draft(session: AsyncSession, draft: Post) -> Post:
+    if not draft.title.strip() or not draft.content.strip() or not (draft.category or "").strip():
+        raise AppError("VALIDATION_ERROR", "Draft requires title, content, and category before publishing", 422)
+    draft.status = "published"
+    draft.updated_at = datetime.now(timezone.utc)
+    await session.flush()
+    return draft
+
+
+async def delete_draft(session: AsyncSession, draft: Post) -> None:
+    await replace_post_media(session, draft.id, draft.author_id, [])
+    draft.deleted_at = datetime.now(timezone.utc)
+    draft.updated_at = draft.deleted_at
+    await session.flush()
+
+
 async def get_post(session: AsyncSession, post_id: UUID, owner_id: UUID | None = None) -> Post:
-    post = await session.scalar(select(Post).where(Post.id == post_id, Post.deleted_at.is_(None)))
+    post = await session.scalar(select(Post).where(Post.id == post_id, Post.status == "published", Post.deleted_at.is_(None)))
     if post is None or owner_id is not None and post.author_id != owner_id:
         raise AppError("RESOURCE_NOT_FOUND", "Post not found", 404)
     return post
@@ -164,7 +229,7 @@ async def serialize_posts(session: AsyncSession, posts: list[Post], viewer_id: U
 
 
 async def list_posts(session: AsyncSession, *, settings: Settings, author: str | None, category: str | None, tag: str | None, query_text: str | None, search_in: str, sort: str, cursor: str | None, limit: int, viewer_id: UUID | None = None) -> PostPage:
-    query = select(Post).where(Post.deleted_at.is_(None))
+    query = select(Post).where(Post.status == "published", Post.deleted_at.is_(None))
     if author:
         query = query.join(User, User.id == Post.author_id).where(User.username_normalized == author.casefold())
     if category:

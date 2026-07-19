@@ -52,6 +52,20 @@ choose the owner of a resource by sending a username or user ID.
 Posts are returned newest-first by default. Every ordering is deterministic by
 using `(created_at, id)` as the tie-breaker.
 
+## Drafts
+
+| Method | Path | Auth | Purpose | Success |
+| --- | --- | --- | --- | --- |
+| `POST` | `/drafts` | Access cookie | Create a private draft | `201` |
+| `GET` | `/drafts` | Access cookie | List the current user's drafts | `200` |
+| `GET` | `/drafts/{draft_id}` | Owner | Read one draft | `200` |
+| `PATCH` | `/drafts/{draft_id}` | Owner | Update a draft | `200` |
+| `POST` | `/drafts/{draft_id}/publish` | Owner | Publish a valid draft | `200` |
+| `DELETE` | `/drafts/{draft_id}` | Owner | Delete a draft | `204` |
+
+Drafts are private and never appear in `GET /posts`. Publishing requires a
+non-empty title, content, and category.
+
 ## Media
 
 | Method | Path | Auth | Purpose | Success |
@@ -95,6 +109,17 @@ whole tree in one response.
 Like creation is idempotent because the database has one row per user/post
 pair. Sharing records an event and returns the canonical URL plus the current
 share count.
+
+## Bookmarks
+
+| Method | Path | Auth | Purpose | Success |
+| --- | --- | --- | --- | --- |
+| `PUT` | `/posts/{post_id}/bookmark` | Access cookie | Add a bookmark | `200` |
+| `DELETE` | `/posts/{post_id}/bookmark` | Access cookie | Remove a bookmark | `204` |
+| `GET` | `/bookmarks` | Access cookie | List the user's bookmarked posts | `200` |
+
+`PostRead` includes `bookmarked_by_me`. Bookmark listing uses the standard
+`items` and `next_cursor` response.
 
 ## Reports and moderation
 

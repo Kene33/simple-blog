@@ -141,6 +141,7 @@ provided. Ownership is checked from the authenticated principal.
   "comment_count": 0,
   "share_count": 0,
   "liked_by_me": false,
+  "bookmarked_by_me": false,
   "created_at": "2026-07-19T12:30:00Z",
   "updated_at": "2026-07-19T12:30:00Z"
 }
@@ -148,6 +149,25 @@ provided. Ownership is checked from the authenticated principal.
 
 `liked_by_me` is computed from the authenticated user and is `false` for an
 anonymous request. It is not persisted in the `posts` table.
+
+### `DraftRead`
+
+```json
+{
+  "id": "uuid",
+  "author": {"id": "uuid", "username": "alice", "avatar_url": null},
+  "title": "Unfinished post",
+  "content": "Draft content",
+  "category": "technology",
+  "tags": ["python"],
+  "media": [],
+  "status": "draft",
+  "created_at": "2026-07-19T12:30:00Z",
+  "updated_at": "2026-07-19T12:30:00Z"
+}
+```
+
+Draft fields may be empty until the draft is published.
 
 ## Media schemas
 
