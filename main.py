@@ -1,7 +1,9 @@
 import uvicorn
 
+from app.core.config import get_settings
 from app.main import app
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", reload=True, host="127.0.0.1", port=4000)
+    settings = get_settings()
+    uvicorn.run("main:app", reload=settings.reload, host=settings.host, port=settings.port)

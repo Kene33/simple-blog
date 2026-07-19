@@ -2,3 +2,4 @@ aiosqlite
 uvicorn
 fastapi
 pydantic
+pydantic-settings
