@@ -39,3 +39,9 @@ async def test_admin_can_process_reports(client: AsyncClient) -> None:
     processed = await client.patch(f"/api/v1/admin/reports/{report.json()['id']}", json={"status": "resolved", "resolution": "Handled"})
     assert processed.status_code == 200
     assert processed.json()["status"] == "resolved"
+
+
+@pytest.mark.asyncio
+async def test_regular_user_cannot_access_admin_queue(client: AsyncClient) -> None:
+    await register(client, "regularuser")
+    assert (await client.get("/api/v1/admin/reports")).status_code == 403

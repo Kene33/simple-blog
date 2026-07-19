@@ -43,3 +43,4 @@ async def test_shares_support_anonymous_and_authenticated_events(client: AsyncCl
     assert native.status_code == 201
     assert native.json()["share_count"] == 2
     assert native.json()["canonical_url"].endswith(f"/posts/{post_id}")
+    assert (await client.post(f"/api/v1/posts/{post_id}/shares", json={"channel": "copy"})).status_code == 403
