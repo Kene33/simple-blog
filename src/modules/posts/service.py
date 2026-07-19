@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.errors import AppError
 from src.core.config import Settings
-from src.db.models import Media, Post, PostMedia, PostTag, Tag, User
+from src.db.models import Media, Post, PostLike, PostMedia, PostTag, Tag, User
 from src.modules.media.service import as_read, replace_post_media
 from src.modules.auth.service import user_summary
 from src.modules.posts.schemas import PostCreateRequest, PostPage, PostRead, PostUpdateRequest
@@ -104,11 +104,11 @@ async def update_post(session: AsyncSession, post: Post, author_id: UUID, payloa
     return post
 
 
-async def serialize_post(session: AsyncSession, post: Post) -> PostRead:
-    return (await serialize_posts(session, [post]))[0]
+async def serialize_post(session: AsyncSession, post: Post, viewer_id: UUID | None = None) -> PostRead:
+    return (await serialize_posts(session, [post], viewer_id))[0]
 
 
-async def serialize_posts(session: AsyncSession, posts: list[Post]) -> list[PostRead]:
+async def serialize_posts(session: AsyncSession, posts: list[Post], viewer_id: UUID | None = None) -> list[PostRead]:
     if not posts:
         return []
     post_ids = [post.id for post in posts]
@@ -120,6 +120,9 @@ async def serialize_posts(session: AsyncSession, posts: list[Post]) -> list[Post
     media_by_post: dict[UUID, list[Media]] = defaultdict(list)
     for post_id, media in (await session.execute(select(PostMedia.post_id, Media).join(Media, Media.id == PostMedia.media_id).where(PostMedia.post_id.in_(post_ids)).order_by(PostMedia.position))).all():
         media_by_post[post_id].append(media)
+    liked_post_ids: set[UUID] = set()
+    if viewer_id is not None:
+        liked_post_ids = set((await session.scalars(select(PostLike.post_id).where(PostLike.post_id.in_(post_ids), PostLike.user_id == viewer_id))).all())
     return [
         PostRead(
             id=post.id,
@@ -132,6 +135,7 @@ async def serialize_posts(session: AsyncSession, posts: list[Post]) -> list[Post
             like_count=post.like_count,
             comment_count=post.comment_count,
             share_count=post.share_count,
+            liked_by_me=post.id in liked_post_ids,
             created_at=post.created_at,
             updated_at=post.updated_at,
         )
@@ -139,7 +143,7 @@ async def serialize_posts(session: AsyncSession, posts: list[Post]) -> list[Post
     ]
 
 
-async def list_posts(session: AsyncSession, *, settings: Settings, author: str | None, category: str | None, tag: str | None, query_text: str | None, search_in: str, sort: str, cursor: str | None, limit: int) -> PostPage:
+async def list_posts(session: AsyncSession, *, settings: Settings, author: str | None, category: str | None, tag: str | None, query_text: str | None, search_in: str, sort: str, cursor: str | None, limit: int, viewer_id: UUID | None = None) -> PostPage:
     query = select(Post).where(Post.deleted_at.is_(None))
     if author:
         query = query.join(User, User.id == Post.author_id).where(User.username_normalized == author.casefold())
@@ -168,4 +172,4 @@ async def list_posts(session: AsyncSession, *, settings: Settings, author: str |
         query = query.where(time_compare | ((Post.created_at == created_at) & compare))
     rows = (await session.scalars(query.order_by(*order).limit(limit + 1))).all()
     next_cursor = encode_cursor(rows[limit - 1], scope, settings) if len(rows) > limit else None
-    return PostPage(items=await serialize_posts(session, rows[:limit]), next_cursor=next_cursor)
+    return PostPage(items=await serialize_posts(session, rows[:limit], viewer_id), next_cursor=next_cursor)

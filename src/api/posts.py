@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
 from src.db.session import get_session
-from src.modules.auth.dependencies import CurrentAuth, require_csrf
+from src.modules.auth.dependencies import CurrentAuth, get_optional_auth, require_csrf
 from src.modules.posts.schemas import PostCreateRequest, PostPage, PostRead, PostUpdateRequest
 from src.modules.posts.service import create_post, get_post, list_posts, serialize_post, update_post
 
@@ -21,13 +21,13 @@ async def create(payload: PostCreateRequest, auth: CurrentAuth = Depends(require
 
 
 @router.get("", response_model=PostPage)
-async def list_feed(author: str | None = None, category: str | None = None, tag: str | None = None, query: str | None = None, search_in: str = "all", sort: str = "newest", cursor: str | None = None, limit: int = 20, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PostPage:
-    return await list_posts(session, settings=settings, author=author, category=category, tag=tag, query_text=query, search_in=search_in, sort=sort, cursor=cursor, limit=min(max(limit, 1), 100))
+async def list_feed(author: str | None = None, category: str | None = None, tag: str | None = None, query: str | None = None, search_in: str = "all", sort: str = "newest", cursor: str | None = None, limit: int = 20, auth: CurrentAuth | None = Depends(get_optional_auth), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PostPage:
+    return await list_posts(session, settings=settings, author=author, category=category, tag=tag, query_text=query, search_in=search_in, sort=sort, cursor=cursor, limit=min(max(limit, 1), 100), viewer_id=auth.user.id if auth else None)
 
 
 @router.get("/{post_id}", response_model=PostRead)
-async def read(post_id: UUID, session: AsyncSession = Depends(get_session)) -> PostRead:
-    return await serialize_post(session, await get_post(session, post_id))
+async def read(post_id: UUID, auth: CurrentAuth | None = Depends(get_optional_auth), session: AsyncSession = Depends(get_session)) -> PostRead:
+    return await serialize_post(session, await get_post(session, post_id), auth.user.id if auth else None)
 
 
 @router.patch("/{post_id}", response_model=PostRead)
