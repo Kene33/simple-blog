@@ -1,5 +1,6 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.health import router as health_router
 from app.core.config import Settings, get_settings
@@ -25,7 +26,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.add_middleware(RequestIdMiddleware)
     application.add_exception_handler(AppError, app_error_handler)
-    application.add_exception_handler(HTTPException, http_exception_handler)
+    application.add_exception_handler(StarletteHTTPException, http_exception_handler)
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
     application.add_exception_handler(Exception, unhandled_exception_handler)
     application.include_router(health_router)
