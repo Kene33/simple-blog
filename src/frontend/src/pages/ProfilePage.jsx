@@ -59,18 +59,24 @@ export function ProfilePage({ username }) {
   const loadMorePosts = async () => {
     if (!postCursor) return;
     setLoadingMore(true);
-    const page = await api.posts({ author: target, cursor: postCursor });
-    setPosts((current) => [...current, ...page.items]);
-    setPostCursor(page.next_cursor);
-    setLoadingMore(false);
+    try {
+      const page = await api.posts({ author: target, cursor: postCursor });
+      setPosts((current) => [...current, ...page.items]);
+      setPostCursor(page.next_cursor);
+    } finally {
+      setLoadingMore(false);
+    }
   };
   const loadMoreAnswers = async () => {
     if (!answerCursor) return;
     setLoadingMore(true);
-    const page = await api.userComments(target, { cursor: answerCursor });
-    setAnswers((current) => [...current, ...page.items]);
-    setAnswerCursor(page.next_cursor);
-    setLoadingMore(false);
+    try {
+      const page = await api.userComments(target, { cursor: answerCursor });
+      setAnswers((current) => [...current, ...page.items]);
+      setAnswerCursor(page.next_cursor);
+    } finally {
+      setLoadingMore(false);
+    }
   };
   const updatePost = (id, next) => setPosts((current) => current.map((post) => (post.id === id ? next(post) : post)));
   const toggleLike = async (post) => {
