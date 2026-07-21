@@ -56,6 +56,7 @@ export async function request(path, options = {}, retry = true) {
   if (response.status === 401 && retry && path !== "/auth/refresh") {
     const refresh = await send("/auth/refresh", { method: "POST" });
     if (refresh.ok) return request(path, options, false);
+    window.dispatchEvent(new Event("simple:auth-lost"));
   }
   return parse(response);
 }

@@ -23,6 +23,9 @@ export function SessionProvider({ children }) {
 
   useEffect(() => {
     refreshMe().catch(() => setUser(null));
+    const clear = () => setUser(null);
+    window.addEventListener("simple:auth-lost", clear);
+    return () => window.removeEventListener("simple:auth-lost", clear);
   }, []);
 
   const value = useMemo(() => ({
