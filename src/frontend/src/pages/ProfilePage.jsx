@@ -9,7 +9,7 @@ import { useSession } from "../session";
 import "../styles/profile.css";
 
 export function ProfilePage({ username }) {
-  const { user: currentUser } = useSession();
+  const { user: currentUser, refreshMe } = useSession();
   const { navigate } = useRouter();
   const own = !username || username === currentUser?.username;
   const target = username || currentUser?.username;
@@ -24,7 +24,7 @@ export function ProfilePage({ username }) {
   const [state, setState] = useState("loading");
   const [loadingMore, setLoadingMore] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ display_name: "", bio: "" });
+  const [form, setForm] = useState({ username: "", email: "", display_name: "", bio: "", profile_visibility: "public", posts_visibility: "public", comments_visibility: "public" });
   const [uploading, setUploading] = useState("");
   const [profileError, setProfileError] = useState("");
 
@@ -44,7 +44,7 @@ export function ProfilePage({ username }) {
         const postPage = postResult.status === "fulfilled" ? postResult.value : { items: [], next_cursor: null };
         const commentPage = commentResult.status === "fulfilled" ? commentResult.value : { items: [], next_cursor: null };
         setProfile(data);
-        setForm({ display_name: data.display_name || "", bio: data.bio || "" });
+        setForm({ username: data.username || "", email: data.email || "", display_name: data.display_name || "", bio: data.bio || "", profile_visibility: data.profile_visibility || "public", posts_visibility: data.posts_visibility || "public", comments_visibility: data.comments_visibility || "public" });
         setPosts(postPage.items);
         setAnswers(commentPage.items);
         setPostCursor(postPage.next_cursor);
@@ -69,9 +69,14 @@ export function ProfilePage({ username }) {
     event.preventDefault();
     setProfileError("");
     try {
-      const updated = await api.updateMe(form);
+      const privacyReady = ["profile_visibility", "posts_visibility", "comments_visibility"].every((key) => key in profile);
+      const payload = { username: form.username, email: form.email, display_name: form.display_name, bio: form.bio };
+      if (privacyReady) Object.assign(payload, { profile_visibility: form.profile_visibility, posts_visibility: form.posts_visibility, comments_visibility: form.comments_visibility });
+      const updated = await api.updateMe(payload);
       setProfile(updated);
+      await refreshMe();
       setEditing(false);
+      if (updated.username !== target) navigate("/me");
     } catch (cause) {
       setProfileError(cause.message || "Не удалось сохранить профиль");
     }
@@ -135,7 +140,7 @@ export function ProfilePage({ username }) {
       <div className="profile-cover" style={profile.cover_url ? { backgroundImage: `url(${profile.cover_url})` } : undefined}>{own && <button className="cover-upload" onClick={() => coverInput.current?.click()}>Изменить обложку</button>}</div>
       <div className="profile-info"><span className="profile-avatar">{profile.avatar_url ? <img src={profile.avatar_url} alt="" /> : profile.username.slice(0, 2).toUpperCase()}</span>{own && <button className="outline-button edit-profile" onClick={() => setEditing(!editing)}><Settings size={16} /> Редактировать профиль</button>}<h1>{profile.display_name || profile.username}</h1><span className="handle">@{profile.username}</span><p>{profile.bio || "Расскажите немного о себе в настройках профиля."}</p><div className="profile-meta"><span><CalendarDays size={15} /> С нами с {new Date(profile.created_at).toLocaleDateString("ru-RU", { month: "long", year: "numeric" })}</span><b>{profile.posts_count} публикаций</b></div></div>
     </section>
-    {editing && <form className="profile-edit" onSubmit={save}>{profileError && <div className="form-error" role="alert">{profileError}</div>}<label>Отображаемое имя<input value={form.display_name} onChange={(event) => setForm({ ...form, display_name: event.target.value })} maxLength="80" /></label><label>О себе<textarea value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} maxLength="500" /></label><button className="primary">Сохранить</button></form>}
+    {editing && <form className="profile-edit" onSubmit={save}>{profileError && <div className="form-error" role="alert">{profileError}</div>}<label>Username<input value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} minLength="3" maxLength="30" pattern="[A-Za-z0-9_]+" required /></label><label>Email<input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} type="email" required /><small>Никогда не показывается в публичном профиле.</small></label><label>Отображаемое имя<input value={form.display_name} onChange={(event) => setForm({ ...form, display_name: event.target.value })} maxLength="80" /></label><label>О себе<textarea value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} maxLength="500" /></label><fieldset className="privacy-settings" disabled={!["profile_visibility", "posts_visibility", "comments_visibility"].every((key) => key in profile)}><legend>Приватность</legend><small>{["profile_visibility", "posts_visibility", "comments_visibility"].every((key) => key in profile) ? "Выберите, что видно другим пользователям." : "Станет доступно после обновления backend."}</small>{[["profile_visibility", "Профиль"], ["posts_visibility", "Публикации"], ["comments_visibility", "Комментарии"]].map(([key, label]) => <label className="privacy-row" key={key}>{label}<select value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })}><option value="public">Видно всем</option><option value="private">Только мне</option></select></label>)}</fieldset><button className="primary">Сохранить</button></form>}
     {own && <section className="profile-private"><span>Email <b>{profile.email}</b>{uploading && <small>{uploading}</small>}</span><input ref={avatarInput} className="visually-hidden" type="file" accept="image/*" onChange={(event) => uploadProfileImage(event, "avatar")} /><input ref={coverInput} className="visually-hidden" type="file" accept="image/*" onChange={(event) => uploadProfileImage(event, "cover")} /><button className="outline-button" onClick={() => avatarInput.current?.click()}><Camera size={16} /> Изменить avatar</button></section>}
     <nav className="profile-tabs"><button className={tab === "posts" ? "selected" : ""} onClick={() => setTab("posts")}>Публикации</button><button className={tab === "answers" ? "selected" : ""} onClick={() => setTab("answers")}>Ответы</button></nav>
     {tab === "posts" ? <>{posts.length ? posts.map((post) => <PostCard key={post.id} post={post} onLike={toggleLike} onBookmark={toggleBookmark} onShare={share} />) : <div className="card-state">Публикаций пока нет</div>}{postCursor && <button className="outline-button load-more" disabled={loadingMore} onClick={loadMorePosts}>Показать ещё</button>}</> : <>{answers.length ? <section className="answers-list">{answers.map((comment) => <article className="answer" key={comment.id}><span className="avatar">{profile.username.slice(0, 2).toUpperCase()}</span><div><b>Ответ в публикации</b><p>{comment.is_deleted ? "Комментарий удалён автором" : comment.body}</p></div></article>)}</section> : <div className="card-state">Ответов пока нет</div>}{answerCursor && <button className="outline-button load-more" disabled={loadingMore} onClick={loadMoreAnswers}>Показать ещё</button>}</>}

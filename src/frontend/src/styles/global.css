@@ -47,6 +47,7 @@ button { cursor: pointer; }
 :root[data-theme="dark"] .create-form select,
 :root[data-theme="dark"] .profile-edit input,
 :root[data-theme="dark"] .profile-edit textarea,
+:root[data-theme="dark"] .profile-edit select,
 :root[data-theme="dark"] .comment-form textarea,
 :root[data-theme="dark"] .comment-inline-form textarea,
 :root[data-theme="dark"] .report-details textarea,
