@@ -86,6 +86,8 @@ export const api = {
   userComments: (username, params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null)); return request(`/users/${username}/comments${query.size ? `?${query}` : ""}`); },
   comments: (postId, params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null)); return request(`/posts/${postId}/comments${query.size ? `?${query}` : ""}`); },
   createComment: (postId, data) => request(`/posts/${postId}/comments`, { method: "POST", body: JSON.stringify(data) }),
+  updateComment: (id, data) => request(`/comments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteComment: (id) => request(`/comments/${id}`, { method: "DELETE" }),
   report: (data) => request("/reports", { method: "POST", body: JSON.stringify(data) }),
   reportCount: () => request("/admin/reports/count"),
   reports: (params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null)); return request(`/admin/reports${query.size ? `?${query}` : ""}`); },
