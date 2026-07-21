@@ -90,6 +90,10 @@ export const api = {
     return request(`/posts${query.size ? `?${query}` : ""}`);
   },
   post: (id) => request(`/posts/${id}`),
+  createLink: (data) => request("/links", { method: "POST", body: JSON.stringify(data) }),
+  myLinks: (params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== "" && value != null)); return request(`/me/links${query.size ? `?${query}` : ""}`); },
+  folders: () => request("/me/folders"),
+  createFolder: (data) => request("/me/folders", { method: "POST", body: JSON.stringify(data) }),
   like: (id) => request(`/posts/${id}/like`, { method: "PUT" }),
   unlike: (id) => request(`/posts/${id}/like`, { method: "DELETE" }),
   bookmark: (id) => request(`/posts/${id}/bookmark`, { method: "PUT" }),
