@@ -31,9 +31,12 @@ export function ProfilePage({ username }) {
     if (!target) return;
     let cancelled = false;
     setState("loading");
-    Promise.all([own ? api.me() : api.user(target), api.posts({ author: target }), api.userComments(target)])
-      .then(([data, postPage, commentPage]) => {
+    (own ? api.me() : api.user(target))
+      .then(async (data) => {
+        const [postResult, commentResult] = await Promise.allSettled([api.posts({ author: target }), api.userComments(target)]);
         if (cancelled) return;
+        const postPage = postResult.status === "fulfilled" ? postResult.value : { items: [], next_cursor: null };
+        const commentPage = commentResult.status === "fulfilled" ? commentResult.value : { items: [], next_cursor: null };
         setProfile(data);
         setForm({ display_name: data.display_name || "", bio: data.bio || "" });
         setPosts(postPage.items);
@@ -118,6 +121,6 @@ export function ProfilePage({ username }) {
     {editing && <form className="profile-edit" onSubmit={save}><label>Отображаемое имя<input value={form.display_name} onChange={(event) => setForm({ ...form, display_name: event.target.value })} maxLength="80" /></label><label>О себе<textarea value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} maxLength="500" /></label><button className="primary">Сохранить</button></form>}
     {own && <section className="profile-private"><span>Email <b>{profile.email}</b>{uploading && <small>{uploading}</small>}</span><input ref={avatarInput} className="visually-hidden" type="file" accept="image/*" onChange={(event) => uploadProfileImage(event, "avatar")} /><input ref={coverInput} className="visually-hidden" type="file" accept="image/*" onChange={(event) => uploadProfileImage(event, "cover")} /><button className="outline-button" onClick={() => avatarInput.current?.click()}><Camera size={16} /> Изменить avatar</button></section>}
     <nav className="profile-tabs"><button className={tab === "posts" ? "selected" : ""} onClick={() => setTab("posts")}>Публикации</button><button className={tab === "answers" ? "selected" : ""} onClick={() => setTab("answers")}>Ответы</button></nav>
-    {tab === "posts" ? <>{posts.map((post) => <PostCard key={post.id} post={post} onLike={toggleLike} onBookmark={toggleBookmark} onShare={share} />)}{postCursor && <button className="outline-button load-more" disabled={loadingMore} onClick={loadMorePosts}>Показать ещё</button>}</> : <><section className="answers-list">{answers.map((comment) => <article className="answer" key={comment.id}><span className="avatar">{profile.username.slice(0, 2).toUpperCase()}</span><div><b>Ответ в публикации</b><p>{comment.is_deleted ? "Комментарий удалён автором" : comment.body}</p></div></article>)}</section>{answerCursor && <button className="outline-button load-more" disabled={loadingMore} onClick={loadMoreAnswers}>Показать ещё</button>}</>}
+    {tab === "posts" ? <>{posts.length ? posts.map((post) => <PostCard key={post.id} post={post} onLike={toggleLike} onBookmark={toggleBookmark} onShare={share} />) : <div className="card-state">Публикаций пока нет</div>}{postCursor && <button className="outline-button load-more" disabled={loadingMore} onClick={loadMorePosts}>Показать ещё</button>}</> : <>{answers.length ? <section className="answers-list">{answers.map((comment) => <article className="answer" key={comment.id}><span className="avatar">{profile.username.slice(0, 2).toUpperCase()}</span><div><b>Ответ в публикации</b><p>{comment.is_deleted ? "Комментарий удалён автором" : comment.body}</p></div></article>)}</section> : <div className="card-state">Ответов пока нет</div>}{answerCursor && <button className="outline-button load-more" disabled={loadingMore} onClick={loadMoreAnswers}>Показать ещё</button>}</>}
   </section></AppShell>;
 }
