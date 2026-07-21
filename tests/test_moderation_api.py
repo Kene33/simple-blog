@@ -128,3 +128,51 @@ async def test_moderator_resolves_report_hides_target_bans_author_and_admin_rest
     finally:
         await author.aclose()
         await admin.aclose()
+
+
+@pytest.mark.asyncio
+async def test_banned_author_and_post_remain_public(client: AsyncClient) -> None:
+    admin_csrf = await register(client, "visibilityadmin")
+    author = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        author_csrf = await register(author, "visiblebanned")
+        post = await author.post("/api/v1/posts", json={"title": "Visible", "content": "content", "category": "tech"}, headers={"X-CSRF-Token": author_csrf})
+        async with client._transport.app.state.session_factory() as session:
+            admin = await session.scalar(select(User).where(User.username_normalized == "visibilityadmin"))
+            target = await session.scalar(select(User).where(User.username_normalized == "visiblebanned"))
+            admin.role = "admin"
+            await session.commit()
+        banned = await client.patch(f"/api/v1/admin/users/{target.id}/moderation", json={"action": "ban", "reason": "spam"}, headers={"X-CSRF-Token": admin_csrf})
+        assert banned.status_code == 200
+        public_post = await client.get(f"/api/v1/posts/{post.json()['id']}")
+        assert public_post.status_code == 200
+        assert public_post.json()["author"]["status"] == "banned"
+        assert public_post.json()["author"]["is_banned"] is True
+    finally:
+        await author.aclose()
+
+
+@pytest.mark.asyncio
+async def test_admin_deletes_account_without_deleting_old_post(client: AsyncClient) -> None:
+    admin_csrf = await register(client, "deleteadmin")
+    target = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        target_csrf = await register(target, "deletedauthor")
+        post = await target.post("/api/v1/posts", json={"title": "Retained", "content": "content", "category": "tech"}, headers={"X-CSRF-Token": target_csrf})
+        async with client._transport.app.state.session_factory() as session:
+            admin = await session.scalar(select(User).where(User.username_normalized == "deleteadmin"))
+            victim = await session.scalar(select(User).where(User.username_normalized == "deletedauthor"))
+            admin.role = "admin"
+            await session.commit()
+        assert (await client.delete(f"/api/v1/admin/users/{admin.id}", headers={"X-CSRF-Token": admin_csrf})).status_code == 403
+        deleted = await client.delete(f"/api/v1/admin/users/{victim.id}", headers={"X-CSRF-Token": admin_csrf})
+        assert deleted.status_code == 204
+        retained = await client.get(f"/api/v1/posts/{post.json()['id']}")
+        assert retained.status_code == 200
+        assert retained.json()["author"]["is_deleted"] is True
+        assert retained.json()["author"]["avatar_url"] is None
+        assert (await client.get("/api/v1/users/deletedauthor")).status_code == 404
+        actions = await client.get("/api/v1/admin/moderation-actions")
+        assert any(action["action"] == "user_delete" for action in actions.json()["items"])
+    finally:
+        await target.aclose()

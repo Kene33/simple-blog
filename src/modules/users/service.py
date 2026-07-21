@@ -20,7 +20,7 @@ async def profile_for_user(session: AsyncSession, user: User, include_private: b
 
 
 async def find_public_user(session: AsyncSession, username: str) -> User:
-    user = await session.scalar(select(User).where(User.username_normalized == normalize_username(username), User.profile_visibility == "public", User.disabled_at.is_(None)))
+    user = await session.scalar(select(User).where(User.username_normalized == normalize_username(username), User.profile_visibility == "public", User.status != "deleted"))
     if user is None:
         raise AppError("RESOURCE_NOT_FOUND", "User not found", 404)
     return user

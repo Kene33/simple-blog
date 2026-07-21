@@ -158,6 +158,7 @@ share count.
 | `GET` | `/admin/users` | Staff | Find users by username or email | `200` |
 | `PATCH` | `/admin/users/{user_id}/moderation` | Staff + CSRF | Ban, unban, mute, or unmute a user | `200` |
 | `PATCH` | `/admin/users/{user_id}/role` | Admin + CSRF | Set `user` or `moderator` role | `200` |
+| `DELETE` | `/admin/users/{user_id}` | Admin + CSRF | Anonymize an account while retaining authored content | `204` |
 | `PATCH` | `/admin/posts/{post_id}/hide` | Admin + CSRF | Hide a post | `204` |
 | `PATCH` | `/admin/posts/{post_id}/restore` | Admin + CSRF | Restore a hidden post | `204` |
 | `PATCH` | `/admin/comments/{comment_id}/hide` | Admin + CSRF | Hide a comment | `204` |
@@ -172,9 +173,15 @@ Staff means `admin` or `moderator`. A moderator can approve categories, process
 reports, and ban ordinary users with a reason. Only admins can assign roles,
 mute users, unban users, restore content, and read moderation audit logs.
 
+`GET /admin/users` accepts `banned=true|false`, `muted=true|false`, and `limit`.
 `GET /admin/reports` accepts `status=open|resolved|rejected`, `cursor`, and
 `limit`. A report can be transitioned from `open` to `resolved` or `rejected`;
 `hide_target` and `ban_author` may be sent with a resolved report.
+
+Post, comment, and profile authors include `status=active|banned|deleted`,
+`is_banned`, and `is_deleted`. Banned authors and their published posts remain
+public. Deleted authors are shown as `Deleted user` without avatar or profile;
+moderation reasons are never included in public author data.
 
 ## Status and compatibility policy
 

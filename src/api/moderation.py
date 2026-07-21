@@ -8,6 +8,7 @@ from src.core.config import Settings, get_settings
 from src.core.errors import AppError
 from src.db.session import get_session
 from src.modules.auth.dependencies import CurrentAuth, require_admin, require_csrf, require_staff
+from src.modules.auth.service import user_summary
 from src.modules.moderation.schemas import (
     AdminUserRead,
     ContentModerationRequest,
@@ -25,6 +26,7 @@ from src.modules.moderation.service import (
     change_user_role,
     count_open_reports,
     create_report,
+    delete_user,
     get_report,
     hide_comment,
     hide_post,
@@ -83,8 +85,8 @@ async def resolve(report_id: UUID, payload: ReportUpdateRequest, auth: CurrentAu
 
 
 @router.get("/admin/users", response_model=list[AdminUserRead])
-async def users(query: str | None = None, limit: int = 20, _: CurrentAuth = Depends(require_staff), session: AsyncSession = Depends(get_session)) -> list[AdminUserRead]:
-    return await list_users(session, query, min(max(limit, 1), 100))
+async def users(query: str | None = None, banned: bool | None = None, muted: bool | None = None, limit: int = 20, _: CurrentAuth = Depends(require_staff), session: AsyncSession = Depends(get_session)) -> list[AdminUserRead]:
+    return await list_users(session, query, min(max(limit, 1), 100), banned, muted)
 
 
 @router.patch("/admin/users/{user_id}/moderation", response_model=AdminUserRead)
@@ -93,7 +95,7 @@ async def moderate(user_id: UUID, payload: UserModerationRequest, auth: CurrentA
         raise AppError("FORBIDDEN", "Moderator role is required", 403)
     user = await moderate_user(session, auth.user, user_id, payload)
     await session.commit()
-    return AdminUserRead(id=user.id, username=user.username, avatar_url=f"/api/v1/media/{user.avatar_media_id}" if user.avatar_media_id else None, email=user.email, role=user.role, disabled_at=user.disabled_at, muted_until=user.muted_until, moderation_reason=user.moderation_reason)
+    return AdminUserRead(**user_summary(user).model_dump(), email=user.email, role=user.role, disabled_at=user.disabled_at, muted_until=user.muted_until, moderation_reason=user.moderation_reason)
 
 
 @router.patch("/admin/users/{user_id}/role", response_model=AdminUserRead)
@@ -102,7 +104,16 @@ async def role(user_id: UUID, payload: UserRoleRequest, auth: CurrentAuth = Depe
         raise AppError("FORBIDDEN", "Administrator role is required", 403)
     user = await change_user_role(session, auth.user, user_id, payload)
     await session.commit()
-    return AdminUserRead(id=user.id, username=user.username, avatar_url=f"/api/v1/media/{user.avatar_media_id}" if user.avatar_media_id else None, email=user.email, role=user.role, disabled_at=user.disabled_at, muted_until=user.muted_until, moderation_reason=user.moderation_reason)
+    return AdminUserRead(**user_summary(user).model_dump(), email=user.email, role=user.role, disabled_at=user.disabled_at, muted_until=user.muted_until, moderation_reason=user.moderation_reason)
+
+
+@router.delete("/admin/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def remove_user(user_id: UUID, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+    if auth.user.role != "admin":
+        raise AppError("FORBIDDEN", "Administrator role is required", 403)
+    await delete_user(session, auth.user, user_id)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch("/admin/posts/{post_id}/hide", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)

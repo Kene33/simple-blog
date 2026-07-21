@@ -19,6 +19,7 @@ class User(Base):
     email_normalized: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="user", server_default="user")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", server_default="active")
     avatar_media_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("media.id", ondelete="SET NULL"), nullable=True)
     cover_media_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("media.id", ondelete="SET NULL"), nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(80), nullable=True)

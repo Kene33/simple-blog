@@ -40,6 +40,9 @@ class UserSummary(BaseModel):
     id: UUID
     username: str
     avatar_url: str | None = None
+    status: Literal["active", "banned", "deleted"]
+    is_banned: bool
+    is_deleted: bool
 
 
 class UserProfile(UserSummary):

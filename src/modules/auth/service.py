@@ -41,7 +41,8 @@ def normalize_email(value: str) -> str:
 
 
 def user_summary(user: User) -> UserSummary:
-    return UserSummary(id=user.id, username=user.username, avatar_url=f"/api/v1/media/{user.avatar_media_id}" if user.avatar_media_id else None)
+    deleted = user.status == "deleted"
+    return UserSummary(id=user.id, username="Deleted user" if deleted else user.username, avatar_url=None if deleted else (f"/api/v1/media/{user.avatar_media_id}" if user.avatar_media_id else None), status=user.status, is_banned=user.status == "banned", is_deleted=deleted)
 
 
 async def register_user(session: AsyncSession, payload: RegisterRequest) -> User:

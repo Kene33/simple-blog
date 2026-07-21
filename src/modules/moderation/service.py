@@ -5,12 +5,12 @@ import json
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
 from src.core.errors import AppError
-from src.db.models import Comment, ModerationAction, Post, RefreshSession, Report, User
+from src.db.models import Comment, ModerationAction, PasswordResetToken, Post, PostBookmark, PostLike, RefreshSession, Report, ShareEvent, User
 from src.modules.auth.service import user_summary
 from src.modules.comments.service import get_comment
 from src.modules.moderation.schemas import (
@@ -141,13 +141,21 @@ async def resolve_report(session: AsyncSession, report_id: UUID, payload: Report
     return report
 
 
-async def list_users(session: AsyncSession, query_text: str | None, limit: int) -> list[AdminUserRead]:
+async def list_users(session: AsyncSession, query_text: str | None, limit: int, banned: bool | None = None, muted: bool | None = None) -> list[AdminUserRead]:
     query = select(User)
     if query_text:
         pattern = f"%{query_text.strip().casefold()}%"
         query = query.where(User.username_normalized.ilike(pattern) | User.email_normalized.ilike(pattern))
+    if banned is True:
+        query = query.where(User.status == "banned")
+    elif banned is False:
+        query = query.where(User.status != "banned")
+    if muted is True:
+        query = query.where(User.muted_until.is_not(None), User.muted_until > func.now())
+    elif muted is False:
+        query = query.where((User.muted_until.is_(None)) | (User.muted_until <= func.now()))
     users = (await session.scalars(query.order_by(User.username_normalized).limit(limit))).all()
-    return [AdminUserRead(id=user.id, username=user.username, avatar_url=f"/api/v1/media/{user.avatar_media_id}" if user.avatar_media_id else None, email=user.email, role=user.role, disabled_at=user.disabled_at, muted_until=user.muted_until, moderation_reason=user.moderation_reason) for user in users]
+    return [AdminUserRead(**user_summary(user).model_dump(), email=user.email, role=user.role, disabled_at=user.disabled_at, muted_until=user.muted_until, moderation_reason=user.moderation_reason) for user in users]
 
 
 async def moderate_user(session: AsyncSession, actor: User, user_id: UUID, payload: UserModerationRequest) -> User:
@@ -161,10 +169,12 @@ async def moderate_user(session: AsyncSession, actor: User, user_id: UUID, paylo
     now = datetime.now(timezone.utc)
     if payload.action == "ban":
         user.disabled_at = now
+        user.status = "banned"
         user.muted_until = None
         await session.execute(update(RefreshSession).where(RefreshSession.user_id == user.id, RefreshSession.revoked_at.is_(None)).values(revoked_at=now))
     elif payload.action == "unban":
         user.disabled_at = None
+        user.status = "active"
     elif payload.action == "mute":
         if payload.muted_until <= now:
             raise AppError("VALIDATION_ERROR", "Mute expiry must be in the future", 422)
@@ -175,6 +185,36 @@ async def moderate_user(session: AsyncSession, actor: User, user_id: UUID, paylo
     await log_action(session, actor, f"user_{payload.action}", "user", user.id, payload.reason)
     await session.flush()
     return user
+
+
+async def delete_user(session: AsyncSession, actor: User, user_id: UUID) -> None:
+    user = await session.scalar(select(User).where(User.id == user_id).with_for_update())
+    if user is None:
+        raise AppError("RESOURCE_NOT_FOUND", "User not found", 404)
+    if user.id == actor.id or user.role == "admin":
+        raise AppError("FORBIDDEN", "Administrators cannot delete this user", 403)
+    now = datetime.now(timezone.utc)
+    await session.execute(delete(RefreshSession).where(RefreshSession.user_id == user.id))
+    await session.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id))
+    await session.execute(delete(PostLike).where(PostLike.user_id == user.id))
+    await session.execute(delete(PostBookmark).where(PostBookmark.user_id == user.id))
+    await session.execute(delete(ShareEvent).where(ShareEvent.user_id == user.id))
+    user.username = f"deleted-{str(user.id).replace('-', '')[:20]}"
+    user.username_normalized = user.username
+    user.email = f"deleted-{user.id}@deleted.invalid"
+    user.email_normalized = user.email
+    user.password_hash = "deleted"
+    user.avatar_media_id = None
+    user.cover_media_id = None
+    user.display_name = None
+    user.bio = None
+    user.profile_visibility = "private"
+    user.status = "deleted"
+    user.disabled_at = now
+    user.muted_until = None
+    user.moderation_reason = None
+    await log_action(session, actor, "user_delete", "user", user.id, "Account deleted")
+    await session.flush()
 
 
 async def change_user_role(session: AsyncSession, actor: User, user_id: UUID, payload: UserRoleRequest) -> User:
