@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Eye, X } from "lucide-react";
 import { AppShell } from "../components/AppShell";
-import { Link } from "../lib/router";
+import { Link, useRouter } from "../lib/router";
 import { api } from "../lib/api";
 import { useSession } from "../session";
 import "../styles/moderation.css";
@@ -9,7 +9,8 @@ import "../styles/moderation.css";
 const reasonLabels = { spam: "Спам", harassment: "Оскорбления", illegal: "Незаконный контент", other: "Другое" };
 
 export function ModerationPage() {
-  const { isAdmin } = useSession();
+  const { user, loading, isAdmin } = useSession();
+  const { navigate } = useRouter();
   const [reports, setReports] = useState([]);
   const [status, setStatus] = useState("open");
   const [cursor, setCursor] = useState(null);
@@ -19,6 +20,7 @@ export function ModerationPage() {
   const [state, setState] = useState("loading");
 
   useEffect(() => {
+    if (!isAdmin) return;
     let cancelled = false;
     setState("loading");
     Promise.all([api.reports({ status, cursor }), api.reportCount()])
@@ -31,7 +33,7 @@ export function ModerationPage() {
       })
       .catch(() => !cancelled && setState("error"));
     return () => { cancelled = true; };
-  }, [status, cursor]);
+  }, [status, cursor, isAdmin]);
 
   const changeStatus = (event) => {
     setReports([]);
@@ -47,6 +49,8 @@ export function ModerationPage() {
     setOpenCount(count.open_count);
   };
 
+  if (loading) return <AppShell title="Модерация"><div className="card-state">Проверяем доступ…</div></AppShell>;
+  if (!user) return <AppShell title="Модерация"><div className="card-state"><b>Войдите, чтобы открыть модерацию</b><button className="outline-button" onClick={() => navigate("/login")}>Войти</button></div></AppShell>;
   if (!isAdmin) return <AppShell title="Модерация"><div className="card-state"><b>Нет доступа</b><span>Эта страница доступна только администраторам.</span></div></AppShell>;
 
   return <AppShell title="Модерация"><section className="moderation-page">
