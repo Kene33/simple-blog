@@ -113,7 +113,7 @@ not changed through this schema.
 {
   "title": "First post",
   "content": "Post content",
-  "category": "technology",
+  "category_id": "uuid",
   "tags": ["python", "fastapi"],
   "media_ids": []
 }
@@ -122,6 +122,7 @@ not changed through this schema.
 - `title`: required, 1–200 characters.
 - `content`: required, 1–10,000 characters.
 - `category`: required, 1–50 characters.
+- exactly one of `category_id` or `category_request_id` is required.
 - `tags`: required array, at most 10 normalized tags, each 1–30 characters.
 - `media_ids`: required array, at most 4 IDs and at most one video.
 - `author_id`, `username`, timestamps and counters are server-owned and are not
@@ -144,7 +145,9 @@ provided. Ownership is checked from the authenticated principal.
   },
   "title": "First post",
   "content": "Post content",
-  "category": "technology",
+  "category": {"id": "uuid", "name": "technology", "status": "approved"},
+  "category_request": null,
+  "status": "published",
   "tags": ["python", "fastapi"],
   "media": [],
   "like_count": 0,

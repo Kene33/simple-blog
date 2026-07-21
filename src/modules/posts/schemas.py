@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.modules.auth.schemas import UserSummary
 from src.modules.media.schemas import MediaRead
@@ -10,7 +10,9 @@ from src.modules.media.schemas import MediaRead
 class PostCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     content: str = Field(min_length=1, max_length=10_000)
-    category: str = Field(min_length=1, max_length=50)
+    category_id: UUID | None = None
+    category_request_id: UUID | None = None
+    category: str | None = Field(default=None, min_length=1, max_length=50)
     tags: list[str] = Field(default_factory=list, max_length=10)
     media_ids: list[UUID] = Field(default_factory=list, max_length=4)
 
@@ -30,10 +32,18 @@ class PostCreateRequest(BaseModel):
             raise ValueError("Tags must be unique non-empty strings up to 30 characters")
         return normalized
 
+    @model_validator(mode="after")
+    def validate_category(self) -> "PostCreateRequest":
+        if sum(value is not None for value in (self.category_id, self.category_request_id, self.category)) != 1:
+            raise ValueError("Exactly one category selection is required")
+        return self
+
 
 class PostUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     content: str | None = Field(default=None, min_length=1, max_length=10_000)
+    category_id: UUID | None = None
+    category_request_id: UUID | None = None
     category: str | None = Field(default=None, min_length=1, max_length=50)
     tags: list[str] | None = Field(default=None, max_length=10)
     media_ids: list[UUID] | None = Field(default=None, max_length=4)
@@ -54,7 +64,15 @@ class PostUpdateRequest(BaseModel):
         return PostCreateRequest.normalize_tags(values) if values is not None else None
 
     def has_changes(self) -> bool:
-        return any(getattr(self, field) is not None for field in self.model_fields_set)
+        return bool(self.model_fields_set)
+
+    @model_validator(mode="after")
+    def validate_category(self) -> "PostUpdateRequest":
+        fields = self.model_fields_set
+        if {"category_id", "category_request_id", "category"} & fields:
+            if sum(value is not None for value in (self.category_id, self.category_request_id, self.category)) != 1:
+                raise ValueError("Exactly one category selection is required")
+        return self
 
 
 class PostRead(BaseModel):
@@ -62,7 +80,9 @@ class PostRead(BaseModel):
     author: UserSummary
     title: str
     content: str
-    category: str
+    category: "CategoryRead | None"
+    category_request: "CategoryRequestRead | None" = None
+    status: str
     tags: list[str]
     media: list[MediaRead] = Field(default_factory=list)
     like_count: int
@@ -77,7 +97,9 @@ class PostRead(BaseModel):
 class DraftCreateRequest(BaseModel):
     title: str = Field(default="", max_length=200)
     content: str = Field(default="", max_length=10_000)
-    category: str = Field(default="", max_length=50)
+    category_id: UUID | None = None
+    category_request_id: UUID | None = None
+    category: str | None = Field(default=None, min_length=1, max_length=50)
     tags: list[str] = Field(default_factory=list, max_length=10)
     media_ids: list[UUID] = Field(default_factory=list, max_length=4)
 
@@ -91,11 +113,19 @@ class DraftCreateRequest(BaseModel):
     def normalize_tags(cls, values: list[str]) -> list[str]:
         return PostCreateRequest.normalize_tags(values)
 
+    @model_validator(mode="after")
+    def validate_category(self) -> "DraftCreateRequest":
+        if sum(value is not None for value in (self.category_id, self.category_request_id, self.category)) != 1:
+            raise ValueError("Exactly one category selection is required")
+        return self
+
 
 class DraftUpdateRequest(BaseModel):
     title: str | None = Field(default=None, max_length=200)
     content: str | None = Field(default=None, max_length=10_000)
-    category: str | None = Field(default=None, max_length=50)
+    category_id: UUID | None = None
+    category_request_id: UUID | None = None
+    category: str | None = Field(default=None, min_length=1, max_length=50)
     tags: list[str] | None = Field(default=None, max_length=10)
     media_ids: list[UUID] | None = Field(default=None, max_length=4)
 
@@ -112,16 +142,26 @@ class DraftUpdateRequest(BaseModel):
     def has_changes(self) -> bool:
         return bool(self.model_fields_set)
 
+    @model_validator(mode="after")
+    def validate_category(self) -> "DraftUpdateRequest":
+        fields = self.model_fields_set
+        if {"category_id", "category_request_id", "category"} & fields:
+            if sum(value is not None for value in (self.category_id, self.category_request_id, self.category)) != 1:
+                raise ValueError("Exactly one category selection is required")
+        return self
+
 
 class DraftRead(BaseModel):
     id: UUID
     author: UserSummary
     title: str
     content: str
-    category: str
+    category: "CategoryRead | None"
+    category_request: "CategoryRequestRead | None" = None
     tags: list[str]
     media: list[MediaRead] = Field(default_factory=list)
     status: str
+    category_resolution: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -134,3 +174,16 @@ class DraftPage(BaseModel):
 class PostPage(BaseModel):
     items: list[PostRead]
     next_cursor: str | None = None
+
+
+class CategoryRead(BaseModel):
+    id: UUID
+    name: str
+    status: str
+
+
+class CategoryRequestRead(BaseModel):
+    id: UUID
+    name: str
+    status: str
+    resolution: str | None = None

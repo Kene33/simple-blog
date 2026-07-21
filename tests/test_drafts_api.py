@@ -11,7 +11,7 @@ async def register(client: AsyncClient, username: str) -> str:
 @pytest.mark.asyncio
 async def test_draft_crud_publish_and_isolation(client: AsyncClient) -> None:
     csrf = await register(client, "draftowner")
-    created = await client.post("/api/v1/drafts", json={"title": "", "content": "unfinished"}, headers={"X-CSRF-Token": csrf})
+    created = await client.post("/api/v1/drafts", json={"title": "", "content": "unfinished", "category": "tech"}, headers={"X-CSRF-Token": csrf})
     assert created.status_code == 201
     draft = created.json()
     assert draft["status"] == "draft"
@@ -30,7 +30,7 @@ async def test_draft_crud_publish_and_isolation(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_draft_requires_required_fields_to_publish(client: AsyncClient) -> None:
     csrf = await register(client, "incomplete")
-    draft = await client.post("/api/v1/drafts", json={"title": "Only title"}, headers={"X-CSRF-Token": csrf})
+    draft = await client.post("/api/v1/drafts", json={"title": "Only title", "category": "tech"}, headers={"X-CSRF-Token": csrf})
     response = await client.post(f"/api/v1/drafts/{draft.json()['id']}/publish", headers={"X-CSRF-Token": csrf})
     assert response.status_code == 422
 
@@ -39,7 +39,7 @@ async def test_draft_requires_required_fields_to_publish(client: AsyncClient) ->
 async def test_draft_list_is_private_and_cursor_paginated(client: AsyncClient) -> None:
     csrf = await register(client, "draftlist")
     for index in range(3):
-        response = await client.post("/api/v1/drafts", json={"title": f"Draft {index}"}, headers={"X-CSRF-Token": csrf})
+        response = await client.post("/api/v1/drafts", json={"title": f"Draft {index}", "category": "tech"}, headers={"X-CSRF-Token": csrf})
         assert response.status_code == 201
     page = await client.get("/api/v1/drafts", params={"limit": 2})
     assert page.status_code == 200

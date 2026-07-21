@@ -53,6 +53,22 @@ choose the owner of a resource by sending a username or user ID.
 Posts are returned newest-first by default. Every ordering is deterministic by
 using `(created_at, id)` as the tie-breaker.
 
+## Categories
+
+| Method | Path | Auth | Purpose | Success |
+| --- | --- | --- | --- | --- |
+| `GET` | `/categories` | Public | List approved categories | `200` |
+| `POST` | `/category-requests` | Access cookie | Propose a category | `201` |
+| `GET` | `/me/category-requests` | Access cookie | List own category requests | `200` |
+| `GET` | `/admin/category-requests` | Admin | List requests by status | `200` |
+| `PATCH` | `/admin/category-requests/{request_id}` | Admin + CSRF | Approve or reject a request | `200` |
+
+Post and draft writes accept one category selection: `category_id` for an
+approved category or `category_request_id` for a pending proposal. A post with
+a pending proposal has `status=pending_category` and is not public. Approval
+publishes it; rejection moves it to `needs_category_change` in the author's
+drafts.
+
 ## Drafts
 
 | Method | Path | Auth | Purpose | Success |

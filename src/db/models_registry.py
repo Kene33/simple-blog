@@ -1,6 +1,8 @@
-from src.db.models import Comment, Media, Post, PostBookmark, PostLike, PostMedia, PostTag, RefreshSession, Report, ShareEvent, Tag, User
+from src.db.models import Category, CategoryRequest, Comment, Media, Post, PostBookmark, PostLike, PostMedia, PostTag, RefreshSession, Report, ShareEvent, Tag, User
 
 __all__ = [
+    "Category",
+    "CategoryRequest",
     "Comment",
     "Media",
     "Post",

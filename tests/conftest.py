@@ -8,6 +8,7 @@ from sqlalchemy.pool import StaticPool
 from src.api.media import get_storage
 from src.core.config import Settings, get_settings
 from src.db.base import Base
+from src.db.models import Category
 from src.db.session import get_session
 from src.main import create_app
 
@@ -49,6 +50,9 @@ async def client(storage: FakeStorage) -> AsyncIterator[AsyncClient]:
     session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
+    async with session_factory() as session:
+        session.add(Category(name="tech", name_normalized="tech", status="approved"))
+        await session.commit()
     settings = Settings(reload=False, jwt_secret_key="test-secret-that-is-long-enough-for-auth", database_url="sqlite+aiosqlite://")
     application = create_app(settings)
 

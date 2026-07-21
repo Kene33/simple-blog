@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from src.api.auth import router as auth_router
+from src.api.categories import router as categories_router
 from src.api.comments import router as comments_router
 from src.api.drafts import router as drafts_router
 from src.api.interactions import bookmarks_router
@@ -13,6 +14,7 @@ from src.api.users import router as users_router
 router = APIRouter()
 router.include_router(auth_router)
 router.include_router(comments_router)
+router.include_router(categories_router)
 router.include_router(drafts_router)
 router.include_router(interactions_router)
 router.include_router(bookmarks_router)

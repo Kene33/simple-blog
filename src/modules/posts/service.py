@@ -12,8 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
 from src.core.errors import AppError
-from src.db.models import Media, Post, PostBookmark, PostLike, PostMedia, PostTag, Tag, User
+from src.db.models import Category, CategoryRequest, Media, Post, PostBookmark, PostLike, PostMedia, PostTag, Tag, User
 from src.modules.auth.service import user_summary
+from src.modules.categories.service import as_category, as_request, category_request_for, resolve_category_selection
 from src.modules.media.service import as_read, replace_post_media
 from src.modules.posts.schemas import DraftCreateRequest, DraftPage, DraftRead, DraftUpdateRequest, PostCreateRequest, PostPage, PostRead, PostUpdateRequest
 
@@ -73,7 +74,8 @@ async def write_tags(session: AsyncSession, post: Post, names: list[str]) -> Non
 
 async def create_post(session: AsyncSession, author: User, payload: PostCreateRequest) -> Post:
     now = datetime.now(timezone.utc)
-    post = Post(author_id=author.id, status="published", title=payload.title, content=payload.content, category=payload.category, created_at=now, updated_at=now)
+    category, request = await resolve_category_selection(session, category_id=payload.category_id, category_request_id=payload.category_request_id, category_name=payload.category)
+    post = Post(author_id=author.id, status="pending_category" if request else "published", title=payload.title, content=payload.content, category=category.name, category_id=category.id, category_request_id=request.id if request else None, created_at=now, updated_at=now)
     session.add(post)
     await session.flush()
     await write_tags(session, post, payload.tags)
@@ -84,7 +86,8 @@ async def create_post(session: AsyncSession, author: User, payload: PostCreateRe
 
 async def create_draft(session: AsyncSession, author: User, payload: DraftCreateRequest) -> Post:
     now = datetime.now(timezone.utc)
-    draft = Post(author_id=author.id, status="draft", title=payload.title, content=payload.content, category=payload.category, created_at=now, updated_at=now)
+    category, request = await resolve_category_selection(session, category_id=payload.category_id, category_request_id=payload.category_request_id, category_name=payload.category)
+    draft = Post(author_id=author.id, status="draft", title=payload.title, content=payload.content, category=category.name, category_id=category.id, category_request_id=request.id if request else None, created_at=now, updated_at=now)
     session.add(draft)
     await session.flush()
     await write_tags(session, draft, payload.tags)
@@ -94,7 +97,7 @@ async def create_draft(session: AsyncSession, author: User, payload: DraftCreate
 
 
 async def get_draft(session: AsyncSession, draft_id: UUID, owner_id: UUID) -> Post:
-    draft = await session.scalar(select(Post).where(Post.id == draft_id, Post.author_id == owner_id, Post.status == "draft", Post.deleted_at.is_(None)))
+    draft = await session.scalar(select(Post).where(Post.id == draft_id, Post.author_id == owner_id, Post.status.in_(("draft", "needs_category_change")), Post.deleted_at.is_(None)))
     if draft is None:
         raise AppError("RESOURCE_NOT_FOUND", "Draft not found", 404)
     return draft
@@ -102,12 +105,13 @@ async def get_draft(session: AsyncSession, draft_id: UUID, owner_id: UUID) -> Po
 
 async def serialize_draft(session: AsyncSession, draft: Post) -> DraftRead:
     post = (await serialize_posts(session, [draft]))[0]
-    return DraftRead(id=post.id, author=post.author, title=post.title, content=post.content, category=post.category, tags=post.tags, media=post.media, status="draft", created_at=post.created_at, updated_at=post.updated_at)
+    request, _ = await category_request_for(session, draft.category_request_id)
+    return DraftRead(id=post.id, author=post.author, title=post.title, content=post.content, category=post.category, category_request=post.category_request, tags=post.tags, media=post.media, status=draft.status, category_resolution=request.resolution if request else None, created_at=post.created_at, updated_at=post.updated_at)
 
 
 async def list_drafts(session: AsyncSession, *, settings: Settings, author_id: UUID, cursor: str | None, limit: int) -> DraftPage:
     scope = "drafts"
-    query = select(Post).where(Post.author_id == author_id, Post.status == "draft", Post.deleted_at.is_(None))
+    query = select(Post).where(Post.author_id == author_id, Post.status.in_(("draft", "needs_category_change")), Post.deleted_at.is_(None))
     if cursor:
         updated_at, draft_id = decode_cursor(cursor, scope, settings, resource="drafts")
         query = query.where((Post.updated_at > updated_at) | ((Post.updated_at == updated_at) & (Post.id > draft_id)))
@@ -119,9 +123,15 @@ async def list_drafts(session: AsyncSession, *, settings: Settings, author_id: U
 async def update_draft(session: AsyncSession, draft: Post, author_id: UUID, payload: DraftUpdateRequest) -> Post:
     if not payload.has_changes():
         raise AppError("VALIDATION_ERROR", "At least one field must be provided", 422)
-    for field in ("title", "content", "category"):
+    for field in ("title", "content"):
         if field in payload.model_fields_set:
             setattr(draft, field, getattr(payload, field) or "")
+    if {"category_id", "category_request_id", "category"} & payload.model_fields_set:
+        category, request = await resolve_category_selection(session, category_id=payload.category_id, category_request_id=payload.category_request_id, category_name=payload.category)
+        draft.category = category.name
+        draft.category_id = category.id
+        draft.category_request_id = request.id if request else None
+        draft.status = "draft"
     if "tags" in payload.model_fields_set:
         await write_tags(session, draft, payload.tags or [])
     if "media_ids" in payload.model_fields_set:
@@ -132,9 +142,20 @@ async def update_draft(session: AsyncSession, draft: Post, author_id: UUID, payl
 
 
 async def publish_draft(session: AsyncSession, draft: Post) -> Post:
-    if not draft.title.strip() or not draft.content.strip() or not (draft.category or "").strip():
+    if not draft.title.strip() or not draft.content.strip() or draft.category_id is None:
         raise AppError("VALIDATION_ERROR", "Draft requires title, content, and category before publishing", 422)
-    draft.status = "published"
+    category = await session.get(Category, draft.category_id)
+    request, _ = await category_request_for(session, draft.category_request_id)
+    if category is None:
+        raise AppError("VALIDATION_ERROR", "Draft category is missing", 422)
+    if request is not None:
+        if request.status != "pending":
+            raise AppError("RESOURCE_CONFLICT", "Category request is no longer pending", 409)
+        draft.status = "pending_category"
+    elif category.status == "approved":
+        draft.status = "published"
+    else:
+        raise AppError("RESOURCE_CONFLICT", "Category is no longer approved", 409)
     draft.updated_at = datetime.now(timezone.utc)
     await session.flush()
     return draft
@@ -148,8 +169,13 @@ async def delete_draft(session: AsyncSession, draft: Post) -> None:
 
 
 async def get_post(session: AsyncSession, post_id: UUID, owner_id: UUID | None = None) -> Post:
-    post = await session.scalar(select(Post).where(Post.id == post_id, Post.status == "published", Post.deleted_at.is_(None)))
-    if post is None or owner_id is not None and post.author_id != owner_id:
+    query = select(Post).where(Post.id == post_id, Post.deleted_at.is_(None))
+    if owner_id is None:
+        query = query.where(Post.status == "published")
+    else:
+        query = query.where(Post.author_id == owner_id)
+    post = await session.scalar(query)
+    if post is None:
         raise AppError("RESOURCE_NOT_FOUND", "Post not found", 404)
     return post
 
@@ -176,10 +202,16 @@ async def read_post_counter(session: AsyncSession, post_id: UUID, counter: str) 
 async def update_post(session: AsyncSession, post: Post, author_id: UUID, payload: PostUpdateRequest) -> Post:
     if not payload.has_changes():
         raise AppError("VALIDATION_ERROR", "At least one field must be provided", 422)
-    for field in ("title", "content", "category"):
+    for field in ("title", "content"):
         value = getattr(payload, field)
         if value is not None:
             setattr(post, field, value.strip())
+    if {"category_id", "category_request_id", "category"} & payload.model_fields_set:
+        category, request = await resolve_category_selection(session, category_id=payload.category_id, category_request_id=payload.category_request_id, category_name=payload.category)
+        post.category = category.name
+        post.category_id = category.id
+        post.category_request_id = request.id if request else None
+        post.status = "pending_category" if request else "published"
     if "tags" in payload.model_fields_set:
         await write_tags(session, post, payload.tags or [])
     if "media_ids" in payload.model_fields_set:
@@ -199,6 +231,8 @@ async def serialize_posts(session: AsyncSession, posts: list[Post], viewer_id: U
     post_ids = [post.id for post in posts]
     author_ids = {post.author_id for post in posts}
     authors = {user.id: user for user in (await session.scalars(select(User).where(User.id.in_(author_ids)))).all()}
+    categories = {category.id: category for category in (await session.scalars(select(Category).where(Category.id.in_({post.category_id for post in posts if post.category_id is not None})))).all()}
+    requests = {request.id: request for request in (await session.scalars(select(CategoryRequest).where(CategoryRequest.id.in_({post.category_request_id for post in posts if post.category_request_id is not None})))).all()}
     tags_by_post: dict[UUID, list[str]] = defaultdict(list)
     for post_id, tag_name in (await session.execute(select(PostTag.post_id, Tag.name).join(Tag, Tag.id == PostTag.tag_id).where(PostTag.post_id.in_(post_ids)).order_by(Tag.name_normalized))).all():
         tags_by_post[post_id].append(tag_name)
@@ -216,7 +250,9 @@ async def serialize_posts(session: AsyncSession, posts: list[Post], viewer_id: U
             author=user_summary(authors[post.author_id]),
             title=post.title,
             content=post.content,
-            category=post.category or "",
+            category=as_category(categories.get(post.category_id)),
+            category_request=as_request(requests.get(post.category_request_id), categories.get(post.category_id)),
+            status=post.status,
             tags=tags_by_post[post.id],
             media=[as_read(media) for media in media_by_post[post.id]],
             like_count=post.like_count,
