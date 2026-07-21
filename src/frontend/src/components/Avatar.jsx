@@ -1,4 +1,8 @@
+export const isDeletedUser = (user) => user?.is_deleted || user?.status === "deleted" || !user?.username;
+export const isBannedUser = (user) => user?.is_banned || user?.status === "banned" || Boolean(user?.disabled_at);
+
 export function Avatar({ user }) {
-  const initials = user?.username?.slice(0, 2).toUpperCase() || "?";
-  return <span className="avatar">{user?.avatar_url ? <img src={user.avatar_url} alt="" /> : initials}</span>;
+  const deleted = isDeletedUser(user);
+  const initials = user?.username?.slice(0, 2).toUpperCase() || "";
+  return <span className={`avatar${deleted ? " avatar-deleted" : ""}`}>{!deleted && (user?.avatar_url ? <img src={user.avatar_url} alt="" /> : initials)}</span>;
 }
