@@ -4,3 +4,6 @@ button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 .boot { display: grid; min-height: 100vh; place-items: center; font-weight: 700; }
 .rail-empty { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.feed-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+.feed-filters input, .feed-filters select { min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: #fafbfe; padding: 10px; outline: 0; }
+@media (max-width: 700px) { .feed-filters { grid-template-columns: 1fr; } }
