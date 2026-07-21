@@ -68,8 +68,8 @@ using `(created_at, id)` as the tie-breaker.
 | `GET` | `/categories` | Public | List approved categories | `200` |
 | `POST` | `/category-requests` | Access cookie | Propose a category | `201` |
 | `GET` | `/me/category-requests` | Access cookie | List own category requests | `200` |
-| `GET` | `/admin/category-requests` | Admin | List requests by status | `200` |
-| `PATCH` | `/admin/category-requests/{request_id}` | Admin + CSRF | Approve or reject a request | `200` |
+| `GET` | `/admin/category-requests` | Staff | List requests by status | `200` |
+| `PATCH` | `/admin/category-requests/{request_id}` | Staff + CSRF | Approve or reject a request | `200` |
 
 Post and draft writes accept one category selection: `category_id` for an
 approved category or `category_request_id` for a pending proposal. A post with
@@ -151,19 +151,30 @@ share count.
 | Method | Path | Auth | Purpose | Success |
 | --- | --- | --- | --- | --- |
 | `POST` | `/reports` | Access cookie | Report exactly one post or comment | `201` |
-| `GET` | `/admin/reports` | Admin | List the moderation queue | `200` |
-| `GET` | `/admin/reports/count` | Admin | Count open reports for a navigation badge | `200` |
-| `GET` | `/admin/reports/{report_id}` | Admin | Read a report with a target snapshot | `200` |
-| `PATCH` | `/admin/reports/{report_id}` | Admin | Resolve or reject a report | `200` |
-| `GET` | `/admin/users` | Admin | Find users by username or email | `200` |
-| `PATCH` | `/admin/users/{user_id}/moderation` | Admin + CSRF | Ban, unban, mute, or unmute a user | `200` |
+| `GET` | `/admin/reports` | Staff | List the moderation queue | `200` |
+| `GET` | `/admin/reports/count` | Staff | Count open reports for a navigation badge | `200` |
+| `GET` | `/admin/reports/{report_id}` | Staff | Read a report with a target snapshot | `200` |
+| `PATCH` | `/admin/reports/{report_id}` | Staff + CSRF | Resolve or reject a report | `200` |
+| `GET` | `/admin/users` | Staff | Find users by username or email | `200` |
+| `PATCH` | `/admin/users/{user_id}/moderation` | Staff + CSRF | Ban, unban, mute, or unmute a user | `200` |
+| `PATCH` | `/admin/users/{user_id}/role` | Admin + CSRF | Set `user` or `moderator` role | `200` |
+| `PATCH` | `/admin/posts/{post_id}/hide` | Admin + CSRF | Hide a post | `204` |
+| `PATCH` | `/admin/posts/{post_id}/restore` | Admin + CSRF | Restore a hidden post | `204` |
+| `PATCH` | `/admin/comments/{comment_id}/hide` | Admin + CSRF | Hide a comment | `204` |
+| `PATCH` | `/admin/comments/{comment_id}/restore` | Admin + CSRF | Restore a hidden comment | `204` |
+| `GET` | `/admin/moderation-actions` | Admin | List moderation audit actions | `200` |
 
 Reports are separate resources. Content ownership remains with the posts or
 comments module; moderation invokes explicit service methods rather than
 writing another module's tables directly.
 
+Staff means `admin` or `moderator`. A moderator can approve categories, process
+reports, and ban ordinary users with a reason. Only admins can assign roles,
+mute users, unban users, restore content, and read moderation audit logs.
+
 `GET /admin/reports` accepts `status=open|resolved|rejected`, `cursor`, and
-`limit`. A report can be transitioned from `open` to `resolved` or `rejected`.
+`limit`. A report can be transitioned from `open` to `resolved` or `rejected`;
+`hide_target` and `ban_author` may be sent with a resolved report.
 
 ## Status and compatibility policy
 

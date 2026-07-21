@@ -80,3 +80,9 @@ async def require_admin(auth: CurrentAuth = Depends(get_current_auth)) -> Curren
     if auth.user.role != "admin":
         raise AppError("FORBIDDEN", "Administrator role is required", 403)
     return auth
+
+
+async def require_staff(auth: CurrentAuth = Depends(get_current_auth)) -> CurrentAuth:
+    if auth.user.role not in {"admin", "moderator"}:
+        raise AppError("FORBIDDEN", "Moderator role is required", 403)
+    return auth

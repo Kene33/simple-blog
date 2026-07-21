@@ -10,10 +10,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
 from src.core.errors import AppError
-from src.db.models import Comment, Post, RefreshSession, Report, User
+from src.db.models import Comment, ModerationAction, Post, RefreshSession, Report, User
 from src.modules.auth.service import user_summary
 from src.modules.comments.service import get_comment
-from src.modules.moderation.schemas import AdminUserRead, ReportCount, ReportCreateRequest, ReportPage, ReportRead, ReportTarget, ReportUpdateRequest, UserModerationRequest
+from src.modules.moderation.schemas import (
+    AdminUserRead,
+    ModerationActionPage,
+    ModerationActionRead,
+    ReportCount,
+    ReportCreateRequest,
+    ReportPage,
+    ReportRead,
+    ReportTarget,
+    ReportUpdateRequest,
+    UserModerationRequest,
+    UserRoleRequest,
+)
 from src.modules.posts.service import get_post
 
 
@@ -30,6 +42,10 @@ async def create_report(session: AsyncSession, reporter: User, payload: ReportCr
     session.add(report)
     await session.flush()
     return report
+
+
+async def log_action(session: AsyncSession, actor: User, action: str, target_type: str, target_id: UUID, reason: str | None = None) -> None:
+    session.add(ModerationAction(actor_id=actor.id, action=action, target_type=target_type, target_id=target_id, reason=reason))
 
 
 def _scope(status: str) -> str:
@@ -140,6 +156,8 @@ async def moderate_user(session: AsyncSession, actor: User, user_id: UUID, paylo
         raise AppError("RESOURCE_NOT_FOUND", "User not found", 404)
     if user.id == actor.id or user.role == "admin":
         raise AppError("FORBIDDEN", "Administrators cannot moderate this user", 403)
+    if actor.role == "moderator" and (payload.action != "ban" or user.role != "user" or not payload.reason):
+        raise AppError("FORBIDDEN", "Moderator can only ban users with a reason", 403)
     now = datetime.now(timezone.utc)
     if payload.action == "ban":
         user.disabled_at = now
@@ -154,5 +172,123 @@ async def moderate_user(session: AsyncSession, actor: User, user_id: UUID, paylo
     else:
         user.muted_until = None
     user.moderation_reason = payload.reason
+    await log_action(session, actor, f"user_{payload.action}", "user", user.id, payload.reason)
     await session.flush()
     return user
+
+
+async def change_user_role(session: AsyncSession, actor: User, user_id: UUID, payload: UserRoleRequest) -> User:
+    user = await session.scalar(select(User).where(User.id == user_id).with_for_update())
+    if user is None:
+        raise AppError("RESOURCE_NOT_FOUND", "User not found", 404)
+    if user.id == actor.id or user.role == "admin":
+        raise AppError("FORBIDDEN", "Administrators cannot change this role", 403)
+    old_role = user.role
+    user.role = payload.role
+    await log_action(session, actor, "user_role", "user", user.id, f"{old_role}->{payload.role}: {payload.reason}")
+    await session.flush()
+    return user
+
+
+async def hide_post(session: AsyncSession, actor: User, post_id: UUID, reason: str) -> Post:
+    post = await session.scalar(select(Post).where(Post.id == post_id).with_for_update())
+    if post is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Post not found", 404)
+    if post.deleted_at is None:
+        post.deleted_at = datetime.now(timezone.utc)
+    await log_action(session, actor, "post_hide", "post", post.id, reason)
+    await session.flush()
+    return post
+
+
+async def restore_post(session: AsyncSession, actor: User, post_id: UUID, reason: str) -> Post:
+    post = await session.scalar(select(Post).where(Post.id == post_id).with_for_update())
+    if post is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Post not found", 404)
+    post.deleted_at = None
+    await log_action(session, actor, "post_restore", "post", post.id, reason)
+    await session.flush()
+    return post
+
+
+async def hide_comment(session: AsyncSession, actor: User, comment_id: UUID, reason: str) -> Comment:
+    comment = await session.scalar(select(Comment).where(Comment.id == comment_id).with_for_update())
+    if comment is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Comment not found", 404)
+    if comment.deleted_at is None:
+        comment.deleted_at = datetime.now(timezone.utc)
+    await log_action(session, actor, "comment_hide", "comment", comment.id, reason)
+    await session.flush()
+    return comment
+
+
+async def restore_comment(session: AsyncSession, actor: User, comment_id: UUID, reason: str) -> Comment:
+    comment = await session.scalar(select(Comment).where(Comment.id == comment_id).with_for_update())
+    if comment is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Comment not found", 404)
+    comment.deleted_at = None
+    await log_action(session, actor, "comment_restore", "comment", comment.id, reason)
+    await session.flush()
+    return comment
+
+
+async def apply_report_actions(session: AsyncSession, actor: User, report: Report, payload: ReportUpdateRequest) -> None:
+    reason = payload.resolution or "Report resolved"
+    target_author_id: UUID | None = None
+    if report.post_id is not None:
+        post = await session.get(Post, report.post_id)
+        if post:
+            target_author_id = post.author_id
+            if payload.hide_target:
+                await hide_post(session, actor, post.id, reason)
+    elif report.comment_id is not None:
+        comment = await session.get(Comment, report.comment_id)
+        if comment:
+            target_author_id = comment.author_id
+            if payload.hide_target:
+                await hide_comment(session, actor, comment.id, reason)
+    if payload.ban_author and target_author_id is not None:
+        await moderate_user(session, actor, target_author_id, UserModerationRequest(action="ban", reason=reason))
+
+
+def _action_scope(actor_id: UUID | None, action: str | None) -> str:
+    return hashlib.sha256(json.dumps({"actor_id": str(actor_id) if actor_id else None, "action": action}, sort_keys=True).encode()).hexdigest()
+
+
+def _encode_action_cursor(action: ModerationAction, scope: str, settings: Settings) -> str:
+    payload = {"v": 1, "resource": "moderation_actions", "created_at": action.created_at.isoformat(), "id": str(action.id), "scope": scope}
+    encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
+    signature = hmac.new(settings.jwt_secret_key.encode(), encoded.encode(), hashlib.sha256).hexdigest()
+    return f"{encoded}.{signature}"
+
+
+def _decode_action_cursor(value: str, scope: str, settings: Settings) -> tuple[datetime, UUID]:
+    try:
+        encoded, signature = value.split(".", 1)
+        expected = hmac.new(settings.jwt_secret_key.encode(), encoded.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            raise ValueError
+        payload = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
+        if payload["v"] != 1 or payload["resource"] != "moderation_actions" or payload["scope"] != scope:
+            raise ValueError
+        return datetime.fromisoformat(payload["created_at"]), UUID(payload["id"])
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+        raise AppError("INVALID_CURSOR", "Cursor is invalid", 400) from None
+
+
+async def list_actions(session: AsyncSession, *, settings: Settings, actor_id: UUID | None, action: str | None, cursor: str | None, limit: int) -> ModerationActionPage:
+    scope = _action_scope(actor_id, action)
+    query = select(ModerationAction)
+    if actor_id:
+        query = query.where(ModerationAction.actor_id == actor_id)
+    if action:
+        query = query.where(ModerationAction.action == action)
+    if cursor:
+        created_at, action_id = _decode_action_cursor(cursor, scope, settings)
+        query = query.where((ModerationAction.created_at < created_at) | ((ModerationAction.created_at == created_at) & (ModerationAction.id < action_id)))
+    rows = (await session.scalars(query.order_by(ModerationAction.created_at.desc(), ModerationAction.id.desc()).limit(limit + 1))).all()
+    actor_ids = {row.actor_id for row in rows[:limit]}
+    actors = {user.id: user for user in (await session.scalars(select(User).where(User.id.in_(actor_ids)))).all()} if actor_ids else {}
+    items = [ModerationActionRead(id=row.id, actor=user_summary(actors[row.actor_id]), action=row.action, target_type=row.target_type, target_id=row.target_id, reason=row.reason, created_at=row.created_at) for row in rows[:limit]]
+    next_cursor = _encode_action_cursor(rows[limit - 1], scope, settings) if len(rows) > limit else None
+    return ModerationActionPage(items=items, next_cursor=next_cursor)

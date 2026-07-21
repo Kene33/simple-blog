@@ -7,9 +7,10 @@ from src.core.config import Settings, get_settings
 from src.core.errors import AppError
 from src.db.models import Category
 from src.db.session import get_session
-from src.modules.auth.dependencies import CurrentAuth, get_current_auth, require_admin, require_csrf, require_unmuted_csrf
+from src.modules.auth.dependencies import CurrentAuth, get_current_auth, require_csrf, require_staff, require_unmuted_csrf
 from src.modules.categories.schemas import CategoryRequestCreate, CategoryRequestPage, CategoryRequestUpdate
 from src.modules.categories.service import as_request, create_category_request, list_admin_requests, list_categories, list_own_requests, resolve_category_request
+from src.modules.moderation.service import log_action
 from src.modules.posts.schemas import CategoryRead, CategoryRequestRead
 
 router = APIRouter(prefix="/api/v1", tags=["categories"])
@@ -33,14 +34,17 @@ async def list_mine(auth: CurrentAuth = Depends(get_current_auth), session: Asyn
 
 
 @router.get("/admin/category-requests", response_model=CategoryRequestPage)
-async def list_admin(status: str = "pending", cursor: str | None = None, limit: int = 20, _: CurrentAuth = Depends(require_admin), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> CategoryRequestPage:
+async def list_admin(status: str = "pending", cursor: str | None = None, limit: int = 20, _: CurrentAuth = Depends(require_staff), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> CategoryRequestPage:
     return await list_admin_requests(session, settings=settings, status=status, cursor=cursor, limit=min(max(limit, 1), 100))
 
 
 @router.patch("/admin/category-requests/{request_id}", response_model=CategoryRequestRead)
 async def resolve(request_id: UUID, payload: CategoryRequestUpdate, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> CategoryRequestRead:
-    if auth.user.role != "admin":
-        raise AppError("FORBIDDEN", "Administrator role is required", 403)
+    if auth.user.role not in {"admin", "moderator"}:
+        raise AppError("FORBIDDEN", "Moderator role is required", 403)
+    if auth.user.role == "moderator" and not payload.resolution:
+        raise AppError("VALIDATION_ERROR", "Resolution is required", 422)
     request = await resolve_category_request(session, request_id, payload)
+    await log_action(session, auth.user, f"category_{payload.status}", "category_request", request.id, payload.resolution)
     await session.commit()
     return as_request(request, await session.get(Category, request.category_id))

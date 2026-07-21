@@ -25,6 +25,8 @@ class ReportCreateRequest(BaseModel):
 class ReportUpdateRequest(BaseModel):
     status: Literal["resolved", "rejected"]
     resolution: str | None = Field(default=None, max_length=2_000)
+    hide_target: bool = False
+    ban_author: bool = False
 
     @model_validator(mode="after")
     def strip_resolution(self) -> "ReportUpdateRequest":
@@ -82,3 +84,27 @@ class AdminUserRead(UserSummary):
 class ReportPage(BaseModel):
     items: list[ReportRead]
     next_cursor: str | None = None
+
+
+class UserRoleRequest(BaseModel):
+    role: Literal["user", "moderator"]
+    reason: str = Field(min_length=1, max_length=2_000)
+
+
+class ModerationActionRead(BaseModel):
+    id: UUID
+    actor: UserSummary
+    action: str
+    target_type: str
+    target_id: UUID
+    reason: str | None
+    created_at: datetime
+
+
+class ModerationActionPage(BaseModel):
+    items: list[ModerationActionRead]
+    next_cursor: str | None = None
+
+
+class ContentModerationRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=2_000)
