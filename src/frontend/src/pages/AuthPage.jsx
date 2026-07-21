@@ -28,7 +28,7 @@ export function AuthPage({ mode }) {
 
   const set = (key) => (event) => setForm((value) => ({ ...value, [key]: event.target.value }));
   return <div className="auth-page">
-    <div className="auth-aside"><Brand compact /><div><h1>{isLogin ? "С возвращением" : "Создайте свой профиль"}</h1><p>{isLogin ? "Продолжайте обсуждения там, где остановились." : "Публикуйте мысли и находите людей со схожими интересами."}</p></div></div>
+    <div className="auth-aside"><Brand compact /><div><h1>{isLogin ? "С возвращением" : "Создайте свой профиль"}</h1><p>{isLogin ? "Вернитесь к своим ссылкам, папкам и аналитике." : "Сохраняйте ссылки, раскладывайте их по папкам и отслеживайте переходы."}</p></div></div>
     <section className="auth-card">
       <Link to="/" className="back-link"><ArrowLeft size={17} /> К ссылкам</Link>
       <h2>{isLogin ? "Вход" : "Регистрация"}</h2>
