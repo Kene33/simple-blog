@@ -1,4 +1,4 @@
-export const isDeletedUser = (user) => user?.is_deleted || user?.status === "deleted" || !user?.username;
+export const isDeletedUser = (user) => user?.is_deleted || user?.status === "deleted" || user?.username === "Deleted user" || user?.email?.endsWith("@deleted.invalid") || !user?.username;
 export const isBannedUser = (user) => user?.is_banned || user?.status === "banned" || Boolean(user?.disabled_at);
 
 export function Avatar({ user }) {
