@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bookmark, CircleUserRound, House, LogIn, LogOut, Menu, Moon, PenLine, Plus, Search, ShieldCheck, Sun, X } from "lucide-react";
 import { Brand } from "./Brand";
+import { Avatar } from "./Avatar";
 import { api } from "../lib/api";
 import { Link, useRouter } from "../lib/router";
 import { useSession } from "../session";
@@ -42,7 +43,7 @@ function Sidebar({ theme, onThemeToggle }) {
     <Link to={user ? "/posts/new" : "/login"} className="primary create-button"><Plus size={21} /> {user ? "Новый пост" : "Войти"}</Link>
     <ThemeButton theme={theme} onToggle={onThemeToggle} />
     <div className="sidebar-account">
-      {user ? <><Link to="/me" className="account-row"><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><span><b>{user.display_name || user.username}</b><em>@{user.username}</em></span></Link><button className="account-logout" onClick={signOut}><LogOut size={15} /> Выйти</button></> : <Link to="/login" className="account-row"><span className="account-login"><LogIn size={21} /></span><span><b>Войти</b><em>или создать аккаунт</em></span></Link>}
+      {user ? <><Link to="/me" className="account-row"><Avatar user={user} /><span><b>{user.display_name || user.username}</b><em>@{user.username}</em></span></Link><button className="account-logout" onClick={signOut}><LogOut size={15} /> Выйти</button></> : <Link to="/login" className="account-row"><span className="account-login"><LogIn size={21} /></span><span><b>Войти</b><em>или создать аккаунт</em></span></Link>}
     </div>
   </aside>;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Flag, Pencil, Send, Trash2 } from "lucide-react";
 import { AppShell } from "../components/AppShell";
+import { Avatar } from "../components/Avatar";
 import { PostCard } from "../components/PostCard";
 import { ReportModal } from "../components/ReportModal";
 import { api } from "../lib/api";
@@ -34,7 +35,7 @@ function Comment({ comment, replies, replyState, currentUser, onReply, onUpdate,
   }
 
   return <article className={`comment ${comment.is_deleted ? "deleted" : ""}`}>
-    <span className="avatar">{comment.author.username.slice(0, 2).toUpperCase()}</span>
+    <Avatar user={comment.author} />
     <div>
       <b>{comment.author.username}</b>
       {comment.is_deleted ? <small>Комментарий удалён автором</small> : editing ? <form className="comment-inline-form" onSubmit={submitEdit}><textarea value={text} onChange={(event) => setText(event.target.value)} maxLength="2000" autoFocus /><button>Сохранить</button><button type="button" onClick={() => setEditing(false)}>Отмена</button></form> : <small>{comment.body}</small>}
@@ -220,7 +221,7 @@ export function PostPage({ postId }) {
       {post.author.id === user?.id && <div className="post-owner-actions"><button className="outline-button" onClick={() => navigate(`/posts/${post.id}/edit`)}><Pencil size={15} /> Редактировать</button><button className="danger-button" onClick={removePost}><Trash2 size={15} /> Удалить</button></div>}
       <section className="comments-card">
         <header><h2>Комментарии <span>{post.comment_count}</span></h2><button className="report-link" onClick={() => user ? setReportTarget({ postId: post.id }) : navigate("/login")}><Flag size={15} /> Жалоба</button></header>
-        {user && <form className="comment-form" onSubmit={(event) => { event.preventDefault(); addComment(null, body); }}><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Добавить комментарий" maxLength="2000" /><button className="primary" aria-label="Отправить комментарий"><Send size={17} /> Отправить</button></form>}
+        {user && <form className="comment-form" onSubmit={(event) => { event.preventDefault(); addComment(null, body); }}><Avatar user={user} /><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Добавить комментарий" maxLength="2000" /><button className="primary" aria-label="Отправить комментарий"><Send size={17} /> Отправить</button></form>}
         {error && <div className="form-error">{error}</div>}
         <div className="comment-list">{rootComments.map((comment) => <Comment key={comment.id} comment={comment} replies={replyState.groups.get(comment.id) || []} replyState={replyState} currentUser={user} onReply={addComment} onUpdate={updateComment} onDelete={removeComment} onReport={(commentId) => user ? setReportTarget({ commentId }) : navigate("/login")} onLogin={() => navigate("/login")} onLoadReplies={loadReplies} onToggleReplies={(id) => setExpandedReplies((items) => ({ ...items, [id]: !items[id] }))} />)}</div>
         {commentCursor && <button className="outline-button load-more" disabled={loadingComments} onClick={loadMoreComments}>{loadingComments ? "Загружаем…" : "Показать ещё комментарии"}</button>}
