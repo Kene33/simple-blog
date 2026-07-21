@@ -8,7 +8,7 @@ import { useSession } from "../session";
 const links = [
   ["/", "Лента", House],
   ["/search", "Поиск", Search],
-  ["/posts/new", "Ссылка", PenLine]
+  ["/posts/new", "Создать", PenLine]
 ];
 
 function NavLink({ to, label, Icon, badge }) {
@@ -28,10 +28,10 @@ function Sidebar() {
     <nav className="sidebar-nav">
       {links.map(([to, label, Icon]) => <NavLink key={to} to={to} label={label} Icon={Icon} />)}
       {user && <NavLink to="/me" label="Профиль" Icon={CircleUserRound} />}
-      {user && <NavLink to="/bookmarks" label="Папки" Icon={Bookmark} />}
+      {user && <NavLink to="/bookmarks" label="Закладки" Icon={Bookmark} />}
       {isAdmin && <NavLink to="/moderation" label="Модерация" Icon={ShieldCheck} badge={reportCount} />}
     </nav>
-    <Link to="/posts/new" className="primary create-button"><Plus size={21} /> Новая ссылка</Link>
+    <Link to="/posts/new" className="primary create-button"><Plus size={21} /> Новый пост</Link>
     <div className="sidebar-account">
       <small>Режим прототипа</small>
       {user ? <Link to="/me" className="account-row"><span className="avatar">{accountName.slice(0, 2).toUpperCase()}</span><span><b>{user.display_name || user.email}</b><em>{user.email}</em></span></Link> : <Link to="/login" className="account-row"><span className="account-login"><LogIn size={21} /></span><span><b>Войти</b><em>или создать аккаунт</em></span></Link>}
