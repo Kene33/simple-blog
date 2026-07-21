@@ -6,7 +6,7 @@ import { Link, useRouter } from "../lib/router";
 import { useSession } from "../session";
 
 const links = [
-  ["/", "Лента", House],
+  ["/", "Ссылки", House],
   ["/search", "Поиск", Search],
   ["/links/new", "Ссылка", PenLine]
 ];
@@ -39,7 +39,7 @@ function Sidebar() {
   </aside>;
 }
 
-export function AppShell({ children, title = "Лента", right }) {
+export function AppShell({ children, title = "Ссылки", right }) {
   const { navigate } = useRouter();
   return <div className="app-shell">
     <Sidebar />
@@ -47,7 +47,7 @@ export function AppShell({ children, title = "Лента", right }) {
     <main className="main-content">{children}</main>
     {right && <aside className="right-rail">{right}</aside>}
     <nav className="mobile-nav">
-      <button onClick={() => navigate("/")} aria-label="Лента"><House /></button>
+      <button onClick={() => navigate("/")} aria-label="Ссылки"><House /></button>
       <button className="mobile-create" onClick={() => navigate("/links/new")} aria-label="Новая ссылка"><Plus /></button>
       <button onClick={() => navigate("/me")} aria-label="Профиль"><CircleUserRound /></button>
     </nav>

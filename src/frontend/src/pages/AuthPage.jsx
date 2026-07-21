@@ -30,7 +30,7 @@ export function AuthPage({ mode }) {
   return <div className="auth-page">
     <div className="auth-aside"><Brand compact /><div><h1>{isLogin ? "С возвращением" : "Создайте свой профиль"}</h1><p>{isLogin ? "Продолжайте обсуждения там, где остановились." : "Публикуйте мысли и находите людей со схожими интересами."}</p></div></div>
     <section className="auth-card">
-      <Link to="/" className="back-link"><ArrowLeft size={17} /> К ленте</Link>
+      <Link to="/" className="back-link"><ArrowLeft size={17} /> К ссылкам</Link>
       <h2>{isLogin ? "Вход" : "Регистрация"}</h2>
       <p>{isLogin ? "Введите данные аккаунта" : "Это займёт меньше минуты"}</p>
       <form onSubmit={submit} noValidate>
