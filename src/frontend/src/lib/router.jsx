@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const RouterContext = createContext(null);
+const currentLocation = () => ({ pathname: window.location.pathname, search: window.location.search, hash: window.location.hash });
 
 export function RouterProvider({ children }) {
-  const [location, setLocation] = useState(() => window.location);
+  const [location, setLocation] = useState(currentLocation);
 
   useEffect(() => {
-    const update = () => setLocation(window.location);
+    const update = () => setLocation(currentLocation());
     window.addEventListener("popstate", update);
     return () => window.removeEventListener("popstate", update);
   }, []);
@@ -16,7 +17,7 @@ export function RouterProvider({ children }) {
     navigate(to) {
       if (to === `${window.location.pathname}${window.location.search}${window.location.hash}`) return;
       window.history.pushState({}, "", to);
-      setLocation(window.location);
+      setLocation(currentLocation());
       window.scrollTo({ top: 0, behavior: "instant" });
     }
   }), [location]);
