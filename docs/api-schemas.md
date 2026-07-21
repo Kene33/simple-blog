@@ -82,12 +82,13 @@ HttpOnly cookies and never appear in the response body. Logout returns `204`.
 }
 ```
 
-The email and role fields are returned only by `GET /users/me`; public profile
-responses omit them.
+The email, role, and visibility fields are returned only by `GET /users/me`;
+public profile responses omit them.
 
 Public profiles include `display_name`, `bio`, and `cover_url`, but never email
-or role. `UserUpdateRequest` also accepts `display_name`, `bio`, and
-`cover_media_id`.
+or role. `UserUpdateRequest` also accepts `display_name`, `bio`, `cover_media_id`,
+`profile_visibility`, `posts_visibility`, and `comments_visibility`. Each
+visibility field accepts `public` or `private`.
 
 ### `UserUpdateRequest`
 
@@ -98,7 +99,10 @@ or role. `UserUpdateRequest` also accepts `display_name`, `bio`, and
   "avatar_media_id": "uuid",
   "cover_media_id": "uuid",
   "display_name": "Alice",
-  "bio": "About Alice"
+  "bio": "About Alice",
+  "profile_visibility": "public",
+  "posts_visibility": "public",
+  "comments_visibility": "public"
 }
 ```
 
@@ -121,7 +125,6 @@ not changed through this schema.
 
 - `title`: required, 1–200 characters.
 - `content`: required, 1–10,000 characters.
-- `category`: required, 1–50 characters.
 - exactly one of `category_id` or `category_request_id` is required.
 - `tags`: required array, at most 10 normalized tags, each 1–30 characters.
 - `media_ids`: required array, at most 4 IDs and at most one video.
@@ -171,10 +174,12 @@ anonymous request. It is not persisted in the `posts` table.
   "author": {"id": "uuid", "username": "alice", "avatar_url": null},
   "title": "Unfinished post",
   "content": "Draft content",
-  "category": "technology",
+  "category": {"id": "uuid", "name": "technology", "status": "approved"},
+  "category_request": null,
   "tags": ["python"],
   "media": [],
   "status": "draft",
+  "category_resolution": null,
   "created_at": "2026-07-19T12:30:00Z",
   "updated_at": "2026-07-19T12:30:00Z"
 }

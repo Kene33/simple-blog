@@ -29,6 +29,12 @@
 The authenticated principal comes from the access cookie. A client cannot
 choose the owner of a resource by sending a username or user ID.
 
+`profile_visibility=private` makes the public profile return `404`.
+`posts_visibility=private` hides the user's posts from public feeds, search,
+and profile counts; the owner still has access. `comments_visibility=private`
+hides the user's comments from the public profile comments endpoint. Email is
+never returned by a public profile.
+
 ## Posts and feed
 
 | Method | Path | Auth | Purpose | Success |
@@ -104,7 +110,7 @@ commits.
 
 | Method | Path | Auth | Purpose | Success |
 | --- | --- | --- | --- | --- |
-| `GET` | `/posts/{post_id}/comments` | Public | List comments for a post or parent | `200` |
+| `GET` | `/posts/{post_id}/comments` | Public/owner | List comments for a post or parent | `200` |
 | `POST` | `/posts/{post_id}/comments` | Access cookie | Create a root comment or reply | `201` |
 | `GET` | `/comments/{comment_id}` | Public | Return one comment | `200` |
 | `PATCH` | `/comments/{comment_id}` | Owner | Edit a comment | `200` |
