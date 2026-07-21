@@ -22,6 +22,13 @@ button { cursor: pointer; }
 .user-row > button, .user-actions > button { width: 112px; justify-content: center; }
 .user-row { grid-template-columns: minmax(0, 1fr) minmax(220px, 360px) !important; }
 .user-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.user-action-menu { position: relative; justify-self: end; }
+.user-action-menu summary { list-style: none; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; font-size: 12px; font-weight: 800; }
+.user-action-menu summary::-webkit-details-marker { display: none; }
+.user-action-list { position: absolute; z-index: 3; top: calc(100% + 6px); right: 0; display: grid; min-width: 150px; gap: 3px; padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 12px 28px #22283b26; }
+.user-action-list button { padding: 8px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--text); text-align: left; font-size: 12px; font-weight: 700; }
+.user-action-list button:hover { background: var(--surface-soft); color: var(--accent); }
+.user-action-list .danger-text { color: #d93126; }
 .user-list-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
 .user-list-tabs button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 12px; font-weight: 800; }
 .user-list-tabs button.selected { background: var(--text); color: var(--surface); }
