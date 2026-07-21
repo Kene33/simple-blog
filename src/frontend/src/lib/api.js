@@ -76,6 +76,8 @@ export const api = {
   unbookmark: (id) => request(`/posts/${id}/bookmark`, { method: "DELETE" }),
   share: (id, channel) => request(`/posts/${id}/shares`, { method: "POST", body: JSON.stringify({ channel }) }),
   createPost: (data) => request("/posts", { method: "POST", body: JSON.stringify(data) }),
+  updatePost: (id, data) => request(`/posts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deletePost: (id) => request(`/posts/${id}`, { method: "DELETE" }),
   createDraft: (data) => request("/drafts", { method: "POST", body: JSON.stringify(data) }),
   uploadMedia: (file, purpose = "post") => {
     const body = new FormData(); body.append("file", file); body.append("purpose", purpose);
