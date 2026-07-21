@@ -23,7 +23,7 @@ async function parse(response) {
   const payload = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    const message = payload?.message || payload?.detail || "Не удалось выполнить запрос";
+    const message = payload?.error?.message || payload?.message || payload?.detail || "Не удалось выполнить запрос";
     throw new ApiError(message, response.status, payload);
   }
 
