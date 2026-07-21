@@ -55,7 +55,7 @@ export function FeedPage() {
     setResult(item);
   };
 
-  return <AppShell title="Ссылки" right={<RightRail />}><section className="feed-page"><header className="page-title"><div><h1>Ссылки</h1><p>Короткие ссылки и аналитика Simple</p></div><button className="round-button" onClick={() => load()} aria-label="Обновить"><RefreshCw size={20} /></button></header>
+  return <AppShell title="Лента" right={<RightRail />}><section className="feed-page"><header className="page-title"><div><h1>Лента</h1><p>Короткие ссылки и аналитика Simple</p></div><button className="round-button" onClick={() => load()} aria-label="Обновить"><RefreshCw size={20} /></button></header>
     <form className="composer link-composer" onSubmit={create}><span className="avatar">{user ? (user.display_name || user.email).slice(0, 2).toUpperCase() : "S"}</span><input value={form.url} onChange={(event) => setForm({ ...form, url: event.target.value })} placeholder="Вставьте длинную ссылку" required /><input value={form.label} onChange={(event) => setForm({ ...form, label: event.target.value })} placeholder="Название" maxLength="120" /><button className="primary">Сократить</button></form>
     {result && <div className="filter-toggle"><Check size={18} /> Готово <b>{result.short_url}</b><button onClick={() => copy(result)}><Copy size={16} /></button></div>}
     {error && <div className="form-error" role="alert">{error}</div>}
