@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { Bookmark, CircleUserRound, Compass, House, LogIn, Menu, PenLine, Plus, Search, ShieldCheck } from "lucide-react";
 import { Brand } from "./Brand";
+import { api } from "../lib/api";
 import { Link, useRouter } from "../lib/router";
 import { useSession } from "../session";
 
@@ -9,22 +11,24 @@ const links = [
   ["/posts/new", "Создать", PenLine]
 ];
 
-function NavLink({ to, label, Icon }) {
+function NavLink({ to, label, Icon, badge }) {
   const { location } = useRouter();
   return <Link to={to} className={`nav-link ${location.pathname === to ? "active" : ""}`}>
-    <Icon size={22} strokeWidth={2} /> <span>{label}</span>
+    <Icon size={22} strokeWidth={2} /> <span>{label}</span>{badge ? <b className="nav-badge">{badge}</b> : null}
   </Link>;
 }
 
 function Sidebar() {
   const { user, isAdmin } = useSession();
+  const [reportCount, setReportCount] = useState(0);
+  useEffect(() => { if (isAdmin) api.reportCount().then((data) => setReportCount(data.open_count)).catch(() => setReportCount(0)); }, [isAdmin]);
   return <aside className="sidebar">
     <Brand />
     <nav className="sidebar-nav">
       {links.map(([to, label, Icon]) => <NavLink key={to} to={to} label={label} Icon={Icon} />)}
       {user && <NavLink to="/me" label="Профиль" Icon={CircleUserRound} />}
       {user && <NavLink to="/bookmarks" label="Закладки" Icon={Bookmark} />}
-      {isAdmin && <NavLink to="/moderation" label="Модерация" Icon={ShieldCheck} />}
+      {isAdmin && <NavLink to="/moderation" label="Модерация" Icon={ShieldCheck} badge={reportCount} />}
     </nav>
     <Link to="/posts/new" className="primary create-button"><Plus size={21} /> Новый пост</Link>
     <div className="sidebar-account">
