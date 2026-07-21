@@ -27,6 +27,7 @@ export function ModerationPage() {
   const [openCount, setOpenCount] = useState(null);
   const [selected, setSelected] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
+  const [muteDuration, setMuteDuration] = useState("24h");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [state, setState] = useState("loading");
@@ -70,7 +71,14 @@ export function ModerationPage() {
     const needsReason = action === "ban" || action === "mute";
     if (needsReason && !text) return setError("Укажите причину действия.");
     try {
-      const payload = type === "role" ? { role: action, reason: "Изменение роли" } : action === "mute" ? { action, reason: text, muted_until: new Date(Date.now() + 86400000).toISOString() } : { action, ...(text ? { reason: text } : {}) };
+      if (type === "delete") {
+        await api.deleteUser(item.id);
+        setUsers((current) => current.filter((entry) => entry.id !== item.id));
+        setPendingAction(null);
+        return;
+      }
+      const durationMs = { "1h": 3600000, "24h": 86400000, "7d": 604800000, "30d": 2592000000 }[muteDuration];
+      const payload = type === "role" ? { role: action, reason: "Изменение роли" } : action === "mute" ? { action, reason: text, muted_until: new Date(Date.now() + durationMs).toISOString() } : { action, ...(text ? { reason: text } : {}) };
       const updated = type === "role" ? await api.setUserRole(item.id, payload) : await api.moderateUser(item.id, payload);
       setUsers((current) => current.map((entry) => entry.id === item.id ? updated : entry));
       setReason("");
@@ -79,7 +87,7 @@ export function ModerationPage() {
       setError(cause.message || "Не удалось изменить пользователя");
     }
   };
-  const openUserAction = (item, action, type = "moderation") => { setError(""); setReason(""); setPendingAction({ item, action, type }); };
+  const openUserAction = (item, action, type = "moderation") => { setError(""); setReason(""); setMuteDuration("24h"); setPendingAction({ item, action, type }); };
   const restoreTarget = async () => {
     const text = reason.trim() || "Восстановлено администратором";
     try {
@@ -99,10 +107,10 @@ export function ModerationPage() {
     <header className="moderation-heading"><div><h1>Модерация</h1><p>{openCount ?? "—"} открытых жалоб</p></div>{tab === "reports" && <select value={status} onChange={(event) => setStatus(event.target.value)}><option value="open">Открытые</option><option value="resolved">Решённые</option><option value="rejected">Отклонённые</option></select>}</header>
     <div className="moderation-tabs">{tabs.filter((item) => isAdmin || item !== "actions").map((item) => <TabButton key={item} value={item} active={tab} onClick={setTab}>{item === "reports" ? "Жалобы" : item === "categories" ? "Категории" : item === "users" ? "Пользователи" : "Аудит"}</TabButton>)}</div>
     {error && <div className="form-error" role="alert">{error}</div>}
-    {tab === "users" && <><div className="moderation-tools"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="username или email" /></div><div className="user-list-tabs"><button className={userView === "all" ? "selected" : ""} onClick={() => setUserView("all")}>Все пользователи</button><button className={userView === "banned" ? "selected" : ""} onClick={() => setUserView("banned")}>Заблокированные</button></div></>}
+    {tab === "users" && <><div className="moderation-tools"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="username или email" /></div><div className="user-list-tabs"><button className={userView === "all" ? "selected" : ""} onClick={() => setUserView("all")}>Все пользователи</button><button className={userView === "banned" ? "selected" : ""} onClick={() => setUserView("banned")}>Заблокированные</button><button className={userView === "muted" ? "selected" : ""} onClick={() => setUserView("muted")}>Замученные</button></div></>}
     {state === "loading" ? <div className="card-state">Загружаем…</div> : tab === "reports" ? <Reports reports={reports} open={open} /> : tab === "categories" ? <Categories items={categories} decide={decideCategory} /> : tab === "users" ? <Users items={users} view={userView} currentUser={user} isAdmin={isAdmin} openAction={openUserAction} /> : <Actions items={actions} />}
     {selected && <ReportModal report={selected} reason={reason} setReason={setReason} isAdmin={isAdmin} onClose={() => setSelected(null)} onReject={() => resolve("rejected")} onResolve={() => resolve("resolved")} onHide={() => resolve("resolved", { hide_target: true })} onBan={() => resolve("resolved", { ban_author: true })} onHideBan={() => resolve("resolved", { hide_target: true, ban_author: true })} onRestore={restoreTarget} />}
-    {pendingAction && <UserActionModal action={pendingAction} reason={reason} setReason={setReason} onClose={() => setPendingAction(null)} onConfirm={confirmUserAction} />}
+    {pendingAction && <UserActionModal action={pendingAction} reason={reason} setReason={setReason} muteDuration={muteDuration} setMuteDuration={setMuteDuration} onClose={() => setPendingAction(null)} onConfirm={confirmUserAction} />}
   </section></AppShell>;
 }
 
@@ -115,8 +123,8 @@ function Categories({ items, decide }) {
 }
 
 function Users({ items, view, currentUser, isAdmin, openAction }) {
-  const visible = view === "banned" ? items.filter((item) => item.disabled_at) : items;
-  return <div className="reports-table">{visible.map((item) => <div className="user-row" key={item.id}><span><b>@{item.username}</b><small><b>Роль:</b> {item.role}</small><small><b>Почта:</b> {item.email}</small>{view === "banned" && <small><b>Причина:</b> {item.moderation_reason || "не указана"}</small>}</span><details className="user-action-menu"><summary>Действия</summary><div className="user-action-list">{view === "banned" ? isAdmin && <button onClick={() => openAction(item, "unban")}>Разбан</button> : <>{item.id !== currentUser?.id && <button className="danger-text" onClick={() => openAction(item, "ban")}>Бан</button>}{isAdmin && <button onClick={() => openAction(item, "unban")}>Разбан</button>}{isAdmin && <button onClick={() => openAction(item, "mute")}>Мут 24ч</button>}{isAdmin && <button onClick={() => openAction(item, "unmute")}>Снять мут</button>}{isAdmin && <button onClick={() => openAction(item, item.role === "moderator" ? "user" : "moderator", "role")}>{item.role === "moderator" ? "Снять модера" : "Сделать модером"}</button>}</>}</div></details></div>)}{!visible.length && <div className="empty-row">{view === "banned" ? "Заблокированных пользователей нет" : "Пользователи не найдены"}</div>}</div>;
+  const visible = view === "banned" ? items.filter((item) => item.disabled_at) : view === "muted" ? items.filter((item) => item.muted_until && new Date(item.muted_until) > new Date()) : items;
+  return <div className="reports-table">{visible.map((item) => <div className="user-row" key={item.id}><span><b>@{item.username}</b><small><b>Роль:</b> {item.role}</small><small><b>Почта:</b> {item.email}</small>{view === "banned" && <small><b>Причина:</b> {item.moderation_reason || "не указана"}</small>}{view === "muted" && <small><b>До:</b> {new Date(item.muted_until).toLocaleString("ru-RU")}</small>}</span><details className="user-action-menu"><summary>Действия</summary><div className="user-action-list">{view === "banned" ? isAdmin && <button onClick={() => openAction(item, "unban")}>Разбан</button> : view === "muted" ? isAdmin && <><button onClick={() => openAction(item, "mute")}>Дать мут</button><button onClick={() => openAction(item, "unmute")}>Снять мут</button></> : <>{item.id !== currentUser?.id && <button className="danger-text" onClick={() => openAction(item, "ban")}>Бан</button>}{isAdmin && <button onClick={() => openAction(item, "unban")}>Разбан</button>}{isAdmin && <button onClick={() => openAction(item, "mute")}>Дать мут</button>}{isAdmin && <button onClick={() => openAction(item, "unmute")}>Снять мут</button>}{isAdmin && <button onClick={() => openAction(item, item.role === "moderator" ? "user" : "moderator", "role")}>{item.role === "moderator" ? "Снять модера" : "Сделать модером"}</button>}{isAdmin && item.id !== currentUser?.id && <button className="danger-text" onClick={() => openAction(item, "delete", "delete")}>Удалить пользователя</button>}</>}</div></details></div>)}{!visible.length && <div className="empty-row">{view === "banned" ? "Заблокированных пользователей нет" : view === "muted" ? "Замученных пользователей нет" : "Пользователи не найдены"}</div>}</div>;
 }
 
 function Actions({ items }) {
@@ -127,8 +135,8 @@ function ReportModal({ report, reason, setReason, isAdmin, onClose, onReject, on
   return <div className="modal-backdrop" role="presentation"><section className="moderation-modal" role="dialog" aria-modal="true"><button className="modal-close" onClick={onClose} aria-label="Закрыть"><X /></button><small>ЖАЛОБА НА {(report.target?.kind || "объект").toUpperCase()}</small><h2>#{report.id.slice(0, 8)}</h2><p><b>{reasonLabels[report.reason] || report.reason}</b> · @{report.reporter.username}</p><blockquote>{report.target?.title || report.target?.body || "Объект жалобы недоступен"}</blockquote><label className="report-reason"><ShieldAlert size={16} /> Причина<input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Что сделал модератор" /></label><footer><button className="outline-button" onClick={onReject}>Отклонить</button>{isAdmin && report.target?.is_deleted && <button className="outline-button" onClick={onRestore}>Восстановить</button>}<button className="outline-button" onClick={onResolve}>Решить</button><button className="danger-button" onClick={onHide}>Скрыть</button><button className="danger-button" onClick={onBan}>Бан автора</button><button className="danger-button" onClick={onHideBan}>Скрыть + бан</button></footer></section></div>;
 }
 
-function UserActionModal({ action, reason, setReason, onClose, onConfirm }) {
-  const labels = { ban: "Заблокировать", unban: "Разблокировать", mute: "Ограничить на 24 часа", unmute: "Снять ограничение", user: "Снять модератора", moderator: "Сделать модератором" };
+function UserActionModal({ action, reason, setReason, muteDuration, setMuteDuration, onClose, onConfirm }) {
+  const labels = { ban: "Заблокировать", unban: "Разблокировать", mute: "Ограничить пользователя", unmute: "Снять ограничение", user: "Снять модератора", moderator: "Сделать модератором", delete: "Удалить пользователя" };
   const needsReason = action.action === "ban" || action.action === "mute";
-  return <div className="modal-backdrop" role="presentation"><section className="moderation-modal" role="dialog" aria-modal="true" aria-label="Подтверждение действия"><button className="modal-close" onClick={onClose} aria-label="Закрыть"><X /></button><small>ДЕЙСТВИЕ С ПОЛЬЗОВАТЕЛЕМ</small><h2>{labels[action.action]}</h2><p>Пользователь: <b>@{action.item.username}</b></p>{needsReason && <label className="report-reason"><ShieldAlert size={16} /> Причина<input autoFocus value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Опишите причину" /></label>}<footer><button className="outline-button" onClick={onClose}>Отмена</button><button className={action.action === "ban" ? "danger-button" : "primary compact"} onClick={onConfirm}>Подтвердить</button></footer></section></div>;
+  return <div className="modal-backdrop" role="presentation"><section className="moderation-modal" role="dialog" aria-modal="true" aria-label="Подтверждение действия"><button className="modal-close" onClick={onClose} aria-label="Закрыть"><X /></button><small>ДЕЙСТВИЕ С ПОЛЬЗОВАТЕЛЕМ</small><h2>{labels[action.action]}</h2><p>Пользователь: <b>@{action.item.username}</b></p>{action.action === "delete" && <p className="form-error">Это действие необратимо.</p>}{action.action === "mute" && <label className="report-reason">Срок<select value={muteDuration} onChange={(event) => setMuteDuration(event.target.value)}><option value="1h">1 час</option><option value="24h">24 часа</option><option value="7d">7 дней</option><option value="30d">30 дней</option></select></label>}{needsReason && <label className="report-reason"><ShieldAlert size={16} /> Причина<input autoFocus value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Опишите причину" /></label>}<footer><button className="outline-button" onClick={onClose}>Отмена</button><button className={action.action === "ban" || action.action === "delete" ? "danger-button" : "primary compact"} onClick={onConfirm}>Подтвердить</button></footer></section></div>;
 }

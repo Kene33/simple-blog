@@ -100,6 +100,7 @@ export const api = {
   resolveReport: (id, data) => request(`/admin/reports/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   adminUsers: (params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null && value !== "")); return request(`/admin/users${query.size ? `?${query}` : ""}`); },
   moderateUser: (id, data) => request(`/admin/users/${id}/moderation`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteUser: (id) => request(`/admin/users/${id}`, { method: "DELETE" }),
   setUserRole: (id, data) => request(`/admin/users/${id}/role`, { method: "PATCH", body: JSON.stringify(data) }),
   moderationActions: (params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null && value !== "")); return request(`/admin/moderation-actions${query.size ? `?${query}` : ""}`); },
   adminCategoryRequests: (params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null)); return request(`/admin/category-requests${query.size ? `?${query}` : ""}`); },
