@@ -54,6 +54,8 @@ async def test_profile_post_and_comment_visibility(client: AsyncClient) -> None:
     assert private_posts.status_code == 200
     assert private_posts.json()["posts_visibility"] == "private"
     assert (await client.get("/api/v1/posts", params={"author": "privateuser"})).json()["items"]
+    assert (await client.get(f"/api/v1/posts/{post_id}/comments")).status_code == 200
+    assert (await client.get(f"/api/v1/comments/{comment.json()['id']}")).status_code == 200
 
     guest = AsyncClient(transport=client._transport, base_url="http://testserver")
     try:
