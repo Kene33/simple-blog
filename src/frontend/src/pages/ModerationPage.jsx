@@ -32,7 +32,7 @@ export function ModerationPage() {
         setOpenCount(count.open_count);
         setState("ready");
       })
-      .catch(() => !cancelled && setState("error"));
+      .catch(() => { if (!cancelled) { setReports([]); setNextCursor(null); setState("error"); } });
     return () => { cancelled = true; };
   }, [status, cursor, isAdmin]);
 
