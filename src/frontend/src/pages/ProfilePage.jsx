@@ -28,9 +28,11 @@ export function ProfilePage({ username }) {
 
   useEffect(() => {
     if (!target) return;
+    let cancelled = false;
     setState("loading");
     Promise.all([own ? api.me() : api.user(target), api.posts({ author: target }), api.userComments(target)])
       .then(([data, postPage, commentPage]) => {
+        if (cancelled) return;
         setProfile(data);
         setForm({ display_name: data.display_name || "", bio: data.bio || "" });
         setPosts(postPage.items);
@@ -39,7 +41,12 @@ export function ProfilePage({ username }) {
         setAnswerCursor(commentPage.next_cursor);
         setState("ready");
       })
-      .catch(() => setState("error"));
+      .catch(() => {
+        if (!cancelled) setState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [target, own]);
 
   const save = async (event) => {
