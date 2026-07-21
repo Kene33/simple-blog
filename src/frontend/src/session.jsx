@@ -38,8 +38,11 @@ export function SessionProvider({ children }) {
       return refreshMe();
     },
     async logout() {
-      await api.logout();
-      setUser(null);
+      try {
+        await api.logout();
+      } finally {
+        setUser(null);
+      }
     },
     refreshMe
   }), [user, loading]);
