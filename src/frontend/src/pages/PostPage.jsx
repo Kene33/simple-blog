@@ -38,7 +38,7 @@ function Comment({ comment, replies, replyState, currentUser, onReply, onUpdate,
   return <article className={`comment ${comment.is_deleted ? "deleted" : ""}`}>
     <Avatar user={comment.author} />
     <div>
-      <b>{comment.author.username}</b>
+      <b>{comment.author?.display_name || comment.author?.username || "Удалённый аккаунт"}</b>
       {comment.is_deleted ? <small>Комментарий удалён автором</small> : editing ? <form className="comment-inline-form" onSubmit={submitEdit}><textarea value={text} onChange={(event) => setText(event.target.value)} maxLength="2000" autoFocus /><button>Сохранить</button><button type="button" onClick={() => setEditing(false)}>Отмена</button></form> : <small>{comment.body}{edited && <em className="comment-edited">изменено</em>}</small>}
       {!comment.is_deleted && <div className="comment-actions"><button onClick={() => currentUser ? setReply(!reply) : onLogin()}>Ответить</button>{own && <><button onClick={() => setEditing(true)}>Изменить</button><button onClick={() => onDelete(comment.id)}>Удалить</button></>}<button onClick={() => onReport(comment.id)}>Пожаловаться</button></div>}
       {reply && <form className="comment-inline-form" onSubmit={submitReply}><textarea name="body" placeholder="Написать ответ" maxLength="2000" autoFocus /><button>Ответить</button><button type="button" onClick={() => setReply(false)}>Отмена</button></form>}
