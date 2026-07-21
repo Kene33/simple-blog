@@ -4,6 +4,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.errors import AppError
+from src.core.security import hash_password, verify_password
 from src.db.models import Media, Post, User
 from src.modules.auth.schemas import PublicUserProfile, UserProfile, UserUpdateRequest
 from src.modules.auth.service import normalize_email, normalize_username, user_summary
@@ -76,5 +77,11 @@ async def update_user(session: AsyncSession, user: User, payload: UserUpdateRequ
     for field in ("profile_visibility", "posts_visibility", "comments_visibility"):
         if field in payload.model_fields_set:
             setattr(user, field, getattr(payload, field))
+    if "new_password" in payload.model_fields_set:
+        if not payload.current_password or not payload.new_password:
+            raise AppError("VALIDATION_ERROR", "Current and new password are required", 422)
+        if not verify_password(payload.current_password, user.password_hash):
+            raise AppError("AUTH_INVALID", "Current password is invalid", 401)
+        user.password_hash = hash_password(payload.new_password)
     await session.flush()
     return user

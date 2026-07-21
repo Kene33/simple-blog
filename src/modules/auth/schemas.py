@@ -75,6 +75,8 @@ class UserUpdateRequest(BaseModel):
     profile_visibility: Literal["public", "private"] | None = None
     posts_visibility: Literal["public", "private"] | None = None
     comments_visibility: Literal["public", "private"] | None = None
+    current_password: str | None = Field(default=None, min_length=1, max_length=128)
+    new_password: str | None = Field(default=None, min_length=10, max_length=128)
 
     @field_validator("username")
     @classmethod

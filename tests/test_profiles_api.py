@@ -8,6 +8,28 @@ async def register(client: AsyncClient, username: str) -> str:
     return client.cookies.get("csrf_token")
 
 
+@pytest.mark.asyncio
+async def test_user_can_change_username_and_password(client: AsyncClient) -> None:
+    csrf = await register(client, "renameuser")
+    changed = await client.patch("/api/v1/users/me", json={"username": "renameduser", "current_password": "strong-password", "new_password": "new-strong-password"}, headers={"X-CSRF-Token": csrf})
+    assert changed.status_code == 200
+    assert changed.json()["username"] == "renameduser"
+    assert (await client.post("/api/v1/auth/login", json={"identifier": "renameduser", "password": "strong-password"})).status_code == 401
+    assert (await client.post("/api/v1/auth/login", json={"identifier": "renameduser", "password": "new-strong-password"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_username_change_rejects_taken_username(client: AsyncClient) -> None:
+    await register(client, "takenname")
+    second = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        csrf = await register(second, "othername")
+        response = await second.patch("/api/v1/users/me", json={"username": "takenname"}, headers={"X-CSRF-Token": csrf})
+        assert response.status_code == 409
+    finally:
+        await second.aclose()
+
+
 async def create_post(client: AsyncClient, csrf: str) -> str:
     response = await client.post("/api/v1/posts", json={"title": "Post", "content": "content", "category": "tech"}, headers={"X-CSRF-Token": csrf})
     assert response.status_code == 201
