@@ -66,6 +66,7 @@ export function ProfilePage({ username }) {
   };
   const updatePost = (id, next) => setPosts((current) => current.map((post) => (post.id === id ? next(post) : post)));
   const toggleLike = async (post) => {
+    if (!currentUser) return navigate("/login");
     if (post.liked_by_me) {
       await api.unlike(post.id);
       updatePost(post.id, (item) => ({ ...item, liked_by_me: false, like_count: Math.max(0, item.like_count - 1) }));
@@ -75,6 +76,7 @@ export function ProfilePage({ username }) {
     }
   };
   const toggleBookmark = async (post) => {
+    if (!currentUser) return navigate("/login");
     if (post.bookmarked_by_me) {
       await api.unbookmark(post.id);
       updatePost(post.id, (item) => ({ ...item, bookmarked_by_me: false }));
