@@ -1,5 +1,5 @@
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
+body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--canvas); color: var(--text); }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 .boot { display: grid; min-height: 100vh; place-items: center; font-weight: 700; }
@@ -12,4 +12,49 @@ button { cursor: pointer; }
 .account-logout { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 800; }
 .account-logout:hover { color: var(--accent); }
 .mobile-menu { display: none; }
-@media (max-width: 700px) { .feed-filters { grid-template-columns: 1fr; } .mobile-menu { position: fixed; z-index: 6; top: 57px; right: 12px; display: grid; min-width: 180px; gap: 4px; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: 0 16px 36px #22283b20; } .mobile-menu button { padding: 10px 12px; border: 0; border-radius: 10px; background: transparent; text-align: left; font-weight: 800; } .mobile-menu button:hover { background: #f5f3ff; color: var(--accent); } }
+@media (max-width: 700px) { .feed-filters { grid-template-columns: 1fr; } .mobile-menu { position: fixed; z-index: 6; top: 57px; right: 12px; display: grid; min-width: 180px; gap: 4px; padding: 8px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: 0 16px 36px #22283b20; } .mobile-menu button { padding: 10px 12px; border: 0; border-radius: 10px; background: transparent; text-align: left; font-weight: 800; } .mobile-menu button:hover { background: var(--surface-soft); color: var(--accent); } }
+
+:root[data-theme="dark"] .sidebar,
+:root[data-theme="dark"] .auth-card,
+:root[data-theme="dark"] .round-button,
+:root[data-theme="dark"] .composer,
+:root[data-theme="dark"] .filter-tabs button,
+:root[data-theme="dark"] .filter-toggle,
+:root[data-theme="dark"] .post-card,
+:root[data-theme="dark"] .card-state,
+:root[data-theme="dark"] .outline-button,
+:root[data-theme="dark"] .search-box,
+:root[data-theme="dark"] .rail-card,
+:root[data-theme="dark"] .comments-card,
+:root[data-theme="dark"] .create-form,
+:root[data-theme="dark"] .profile-hero,
+:root[data-theme="dark"] .profile-private,
+:root[data-theme="dark"] .profile-edit,
+:root[data-theme="dark"] .answer,
+:root[data-theme="dark"] .search-panel,
+:root[data-theme="dark"] .draft-card,
+:root[data-theme="dark"] .state-card,
+:root[data-theme="dark"] .reports-table,
+:root[data-theme="dark"] .moderation-modal,
+:root[data-theme="dark"] .report-modal { background: var(--surface); color: var(--text); }
+
+:root[data-theme="dark"] .feed-filters,
+:root[data-theme="dark"] .auth-card input,
+:root[data-theme="dark"] .feed-filters input,
+:root[data-theme="dark"] .feed-filters select,
+:root[data-theme="dark"] .create-form input,
+:root[data-theme="dark"] .create-form textarea,
+:root[data-theme="dark"] .create-form select,
+:root[data-theme="dark"] .profile-edit input,
+:root[data-theme="dark"] .profile-edit textarea,
+:root[data-theme="dark"] .comment-form textarea,
+:root[data-theme="dark"] .comment-inline-form textarea,
+:root[data-theme="dark"] .report-details textarea,
+:root[data-theme="dark"] .file-chip,
+:root[data-theme="dark"] .moderation-modal blockquote { background: var(--surface-soft); color: var(--text); }
+
+:root[data-theme="dark"] .post-body-link p,
+:root[data-theme="dark"] .post-page > .post-card .post-body-link p,
+:root[data-theme="dark"] .draft-card p,
+:root[data-theme="dark"] .profile-meta b,
+:root[data-theme="dark"] .profile-private b { color: var(--text); }

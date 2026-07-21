@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bookmark, CircleUserRound, House, LogIn, LogOut, Menu, PenLine, Plus, Search, ShieldCheck, X } from "lucide-react";
+import { Bookmark, CircleUserRound, House, LogIn, LogOut, Menu, Moon, PenLine, Plus, Search, ShieldCheck, Sun, X } from "lucide-react";
 import { Brand } from "./Brand";
 import { api } from "../lib/api";
 import { Link, useRouter } from "../lib/router";
@@ -18,7 +18,14 @@ function NavLink({ to, label, Icon, badge }) {
   </Link>;
 }
 
-function Sidebar() {
+function ThemeButton({ theme, onToggle }) {
+  const isDark = theme === "dark";
+  return <button className="theme-button" onClick={onToggle} aria-label={isDark ? "Включить светлую тему" : "Включить тёмную тему"}>
+    {isDark ? <Sun size={17} /> : <Moon size={17} />} <span>{isDark ? "Светлая тема" : "Тёмная тема"}</span>
+  </button>;
+}
+
+function Sidebar({ theme, onThemeToggle }) {
   const { user, isAdmin, logout } = useSession();
   const { navigate } = useRouter();
   const [reportCount, setReportCount] = useState(0);
@@ -33,6 +40,7 @@ function Sidebar() {
       {isAdmin && <NavLink to="/moderation" label="Модерация" Icon={ShieldCheck} badge={reportCount} />}
     </nav>
     <Link to={user ? "/posts/new" : "/login"} className="primary create-button"><Plus size={21} /> {user ? "Новый пост" : "Войти"}</Link>
+    <ThemeButton theme={theme} onToggle={onThemeToggle} />
     <div className="sidebar-account">
       {user ? <><Link to="/me" className="account-row"><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><span><b>{user.display_name || user.username}</b><em>@{user.username}</em></span></Link><button className="account-logout" onClick={signOut}><LogOut size={15} /> Выйти</button></> : <Link to="/login" className="account-row"><span className="account-login"><LogIn size={21} /></span><span><b>Войти</b><em>или создать аккаунт</em></span></Link>}
     </div>
@@ -43,11 +51,17 @@ export function AppShell({ children, title = "Лента", right }) {
   const { user, isAdmin, logout } = useSession();
   const { navigate } = useRouter();
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [theme, setTheme] = useState(() => localStorage.getItem("simple-theme") || "light");
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("simple-theme", theme);
+  }, [theme]);
+  const toggleTheme = () => setTheme((value) => value === "dark" ? "light" : "dark");
   const go = (to) => { setMobileMenu(false); navigate(to); };
   const signOut = async () => { setMobileMenu(false); await logout(); navigate("/"); };
   return <div className="app-shell">
-    <Sidebar />
-    <header className="mobile-header"><Brand compact /><b>{title}</b><button className="icon-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label={mobileMenu ? "Закрыть меню" : "Открыть меню"}>{mobileMenu ? <X /> : <Menu />}</button></header>
+    <Sidebar theme={theme} onThemeToggle={toggleTheme} />
+    <header className="mobile-header"><Brand compact /><b>{title}</b><span className="mobile-header-actions"><ThemeButton theme={theme} onToggle={toggleTheme} /><button className="icon-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label={mobileMenu ? "Закрыть меню" : "Открыть меню"}>{mobileMenu ? <X /> : <Menu />}</button></span></header>
     {mobileMenu && <div className="mobile-menu"><button onClick={() => go("/")}>Лента</button><button onClick={() => go("/search")}>Поиск</button><button onClick={() => go(user ? "/posts/new" : "/login")}>{user ? "Создать" : "Войти"}</button><button onClick={() => go(user ? "/me" : "/login")}>{user ? "Профиль" : "Войти"}</button>{user && <button onClick={() => go("/bookmarks")}>Закладки</button>}{isAdmin && <button onClick={() => go("/moderation")}>Модерация</button>}{user && <button onClick={signOut}>Выйти</button>}</div>}
     <main className="main-content">{children}</main>
     {right && <aside className="right-rail">{right}</aside>}
