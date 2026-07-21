@@ -33,7 +33,7 @@ The project handles the work that turns a basic CRUD app into a social product:
 - **Clear API boundaries.** FastAPI routers, domain services, and PostgreSQL
   models separate transport, use cases, and persistence.
 - **A browser-safe session.** HttpOnly access and refresh cookies, a CSRF header,
-  \`user\` and \`admin\` roles, a stable error envelope, and \`X-Request-ID\`.
+  `user` and `admin` roles, a stable error envelope, and `X-Request-ID`.
 - **Social workflows in the contract.** Feed, cursor pagination, comments,
   likes, bookmarks, shares, reports, and moderation.
 - **Provider-neutral media.** Upload validation works with S3-compatible storage;
@@ -45,26 +45,25 @@ The project handles the work that turns a basic CRUD app into a social product:
 
 You need Docker Desktop and Docker Compose v2.
 
-\`\`\`bash
+```bash
 git clone https://github.com/Kene33/simple-blog.git
 cd simple-blog
-cp .env.example .env
 docker compose up --build
-\`\`\`
+```
 
-Compose starts FastAPI, PostgreSQL, MinIO, and the migration job. The values in
-\`.env.example\` work as development defaults. Replace \`JWT_SECRET_KEY\` and
+Compose starts FastAPI, PostgreSQL, MinIO, and the migration job with the
+ development defaults from `docker-compose.yml`. Replace `JWT_SECRET_KEY` and
 other secrets before a public deployment.
 
 Check the API:
 
-\`\`\`bash
+```bash
 curl http://localhost:8000/health/live
-\`\`\`
+```
 
-\`\`\`json
+```json
 {"status":"ok","service":"Simple Blog API","version":"0.1.0"}
-\`\`\`
+```
 
 Open the interactive contract in [Swagger UI](http://localhost:8000/docs).
 
@@ -79,40 +78,40 @@ Open the interactive contract in [Swagger UI](http://localhost:8000/docs).
 
 Open a second terminal:
 
-\`\`\`bash
+```bash
 cd src/frontend
 npm install
 npm run dev
-\`\`\`
+```
 
-The client runs at <http://localhost:5173>. Vite proxies \`/api\` to
-\`localhost:8000\`, so cookies and the CSRF flow stay on one origin.
+The client runs at <http://localhost:5173>. Vite proxies `/api` to
+`localhost:8000`, so cookies and the CSRF flow stay on one origin.
 
 ## API-first flow
 
 Start with the health check, then explore the full contract in Swagger. Every
-resource uses \`/api/v1\`; collection responses contain \`items\` and
-\`next_cursor\`.
+resource uses `/api/v1`; collection responses contain `items` and
+`next_cursor`.
 
-\`\`\`mermaid
+```mermaid
 flowchart LR
     A[Register] --> B[Login]
     B --> C[Create post]
     C --> D[Comment or like]
     D --> E[Report content]
     E --> F[Admin resolves report]
-\`\`\`
+```
 
 Registration creates a browser session and sets the cookies:
 
-\`\`\`bash
+```bash
 curl -i -c cookies.txt \\
   -H 'Content-Type: application/json' \\
   -d '{"username":"reader_01","email":"reader@example.com","password":"change-me-123"}' \\
   http://localhost:8000/api/v1/auth/register
-\`\`\`
+```
 
-The server returns a \`csrf_token\` cookie. Send its value in \`X-CSRF-Token\`
+The server returns a `csrf_token` cookie. Send its value in `X-CSRF-Token`
 for state-changing requests. Find schemas and response details in
 [REST API v1](./docs/api-v1.md) and [API schemas](./docs/api-schemas.md).
 
@@ -126,11 +125,11 @@ for state-changing requests. Find schemas and response details in
 | Discussion | Root comments, nested replies, edits, soft-delete tombstones |
 | Interactions | Likes, bookmarks, copy/native shares |
 | Moderation | Reports, admin queue, target snapshots, resolve/reject workflow |
-| Client | React 19, Vite, JSX, vanilla CSS, \`lucide-react\`, fetch API layer |
+| Client | React 19, Vite, JSX, vanilla CSS, `lucide-react`, fetch API layer |
 
 ## Architecture
 
-\`\`\`mermaid
+```mermaid
 flowchart LR
     Browser[React + Vite client] -->|/api/v1| App[FastAPI application]
     App --> Auth[Auth and users]
@@ -139,12 +138,12 @@ flowchart LR
     App --> Moderation[Reports and moderation]
     App --> DB[(PostgreSQL)]
     App --> Storage[S3 / MinIO]
-\`\`\`
+```
 
 FastAPI routers receive HTTP requests. Domain services enforce ownership, roles,
 and business rules. PostgreSQL stores relationships and state; S3-compatible
-storage accepts media. The client uses \`fetch\` and keeps access tokens out of
-\`localStorage\`.
+storage accepts media. The client uses `fetch` and keeps access tokens out of
+`localStorage`.
 
 Read the detailed docs:
 
@@ -153,25 +152,25 @@ Read the detailed docs:
 - [Database schema](./docs/database-schema.md)
 - [Error format](./docs/error-format.md)
 - [Pagination](./docs/pagination.md)
-- [Roadmap](./docs/roadmap.md)
+- [API v1](./docs/api-v1.md)
 
 ## Checks
 
 Run these commands before opening a pull request:
 
-\`\`\`bash
+```bash
 ruff check src tests
 pytest -q tests
 alembic upgrade head --sql
 npm --prefix src/frontend run build
-\`\`\`
+```
 
 GitHub Actions checks the backend with Python 3.12 and PostgreSQL 16. Vite
 builds the frontend separately.
 
 ## Project structure
 
-\`\`\`text
+```text
 src/
   api/       HTTP routers
   core/      config, security, logging, errors
@@ -181,16 +180,7 @@ src/
 docs/        API contracts and architecture notes
 alembic/     PostgreSQL migrations
 tests/       API and PostgreSQL integration tests
-\`\`\`
-
-## Roadmap
-
-- Maintain the versioned API and test coverage as the client evolves.
-- Publish verified Docker images and deployment instructions.
-- Stabilize frontend integration and add a hosted demo.
-
-Track task status in the [roadmap](./docs/roadmap.md). The docs follow the
-current API contract and do not describe retired legacy routes.
+```
 
 ## Contributing
 

@@ -49,13 +49,12 @@
 ```bash
 git clone https://github.com/Kene33/simple-blog.git
 cd simple-blog
-cp .env.example .env
 docker compose up --build
 ```
 
-Compose запускает FastAPI, PostgreSQL, MinIO и миграции. Для локального
-запуска значения из `.env.example` подходят как development defaults. Перед
-публичным deployment замените `JWT_SECRET_KEY` и остальные секреты.
+Compose запускает FastAPI, PostgreSQL, MinIO и миграции с development-настройками
+из `docker-compose.yml`. Перед публичным deployment замените `JWT_SECRET_KEY` и
+остальные секреты.
 
 Проверьте API:
 
@@ -153,7 +152,7 @@ storage принимает медиа. Клиент получает данны�
 - [Database schema](./docs/database-schema.md)
 - [Error format](./docs/error-format.md)
 - [Pagination](./docs/pagination.md)
-- [Roadmap](./docs/roadmap.md)
+- [API v1](./docs/api-v1.md)
 
 ## Проверки
 
@@ -182,15 +181,6 @@ docs/        API contracts and architecture notes
 alembic/     PostgreSQL migrations
 tests/       API and PostgreSQL integration tests
 ```
-
-## Roadmap
-
-- Поддерживать versioned API и тесты при изменениях клиента.
-- Выпускать проверенные Docker images и deployment instructions.
-- Стабилизировать frontend integration и добавить hosted demo.
-
-Статус каждой задачи находится в [roadmap](./docs/roadmap.md). Документация
-следует текущему API-контракту, а не старым legacy routes.
 
 ## Contributing
 
