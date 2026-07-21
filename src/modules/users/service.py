@@ -10,15 +10,16 @@ from src.modules.auth.service import normalize_email, normalize_username, user_s
 
 
 async def profile_for_user(session: AsyncSession, user: User, include_private: bool) -> UserProfile | PublicUserProfile:
-    posts_count = await session.scalar(select(func.count()).select_from(Post).where(Post.author_id == user.id, Post.status == "published", Post.deleted_at.is_(None)))
+    post_filter = [Post.author_id == user.id, Post.status == "published", Post.deleted_at.is_(None)]
+    posts_count = 0 if not include_private and user.posts_visibility != "public" else await session.scalar(select(func.count()).select_from(Post).where(*post_filter))
     values = user_summary(user).model_dump() | {"display_name": user.display_name, "bio": user.bio, "cover_url": f"/api/v1/media/{user.cover_media_id}" if user.cover_media_id else None, "posts_count": posts_count or 0, "created_at": user.created_at, "updated_at": user.updated_at}
     if include_private:
-        return UserProfile(**values, email=user.email, role=user.role)
+        return UserProfile(**values, email=user.email, role=user.role, profile_visibility=user.profile_visibility, posts_visibility=user.posts_visibility, comments_visibility=user.comments_visibility)
     return PublicUserProfile(**values)
 
 
 async def find_public_user(session: AsyncSession, username: str) -> User:
-    user = await session.scalar(select(User).where(User.username_normalized == normalize_username(username), User.disabled_at.is_(None)))
+    user = await session.scalar(select(User).where(User.username_normalized == normalize_username(username), User.profile_visibility == "public", User.disabled_at.is_(None)))
     if user is None:
         raise AppError("RESOURCE_NOT_FOUND", "User not found", 404)
     return user
@@ -72,5 +73,8 @@ async def update_user(session: AsyncSession, user: User, payload: UserUpdateRequ
         user.display_name = payload.display_name
     if "bio" in payload.model_fields_set:
         user.bio = payload.bio
+    for field in ("profile_visibility", "posts_visibility", "comments_visibility"):
+        if field in payload.model_fields_set:
+            setattr(user, field, getattr(payload, field))
     await session.flush()
     return user

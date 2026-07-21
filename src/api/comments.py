@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
 from src.db.session import get_session
-from src.modules.auth.dependencies import CurrentAuth, require_csrf
+from src.modules.auth.dependencies import CurrentAuth, get_optional_auth, require_csrf
 from src.modules.comments.schemas import CommentCreateRequest, CommentPage, CommentRead, CommentUpdateRequest
 from src.modules.comments.service import create_comment, delete_comment, get_comment, list_comments, serialize_comments, update_comment
 
@@ -21,8 +21,8 @@ async def create(post_id: UUID, payload: CommentCreateRequest, auth: CurrentAuth
 
 
 @router.get("/api/v1/posts/{post_id}/comments", response_model=CommentPage)
-async def list_for_post(post_id: UUID, parent_id: UUID | None = None, cursor: str | None = None, limit: int = 20, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> CommentPage:
-    return await list_comments(session, settings=settings, post_id=post_id, parent_id=parent_id, cursor=cursor, limit=min(max(limit, 1), 100))
+async def list_for_post(post_id: UUID, parent_id: UUID | None = None, cursor: str | None = None, limit: int = 20, auth: CurrentAuth | None = Depends(get_optional_auth), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> CommentPage:
+    return await list_comments(session, settings=settings, post_id=post_id, parent_id=parent_id, cursor=cursor, limit=min(max(limit, 1), 100), viewer_id=auth.user.id if auth else None)
 
 
 @router.get("/api/v1/comments/{comment_id}", response_model=CommentRead)

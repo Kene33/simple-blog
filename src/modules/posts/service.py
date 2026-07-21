@@ -171,7 +171,7 @@ async def delete_draft(session: AsyncSession, draft: Post) -> None:
 async def get_post(session: AsyncSession, post_id: UUID, owner_id: UUID | None = None) -> Post:
     query = select(Post).where(Post.id == post_id, Post.deleted_at.is_(None))
     if owner_id is None:
-        query = query.where(Post.status == "published")
+        query = query.join(User, User.id == Post.author_id).where(Post.status == "published", User.posts_visibility == "public")
     else:
         query = query.where(Post.author_id == owner_id)
     post = await session.scalar(query)
@@ -268,9 +268,10 @@ async def serialize_posts(session: AsyncSession, posts: list[Post], viewer_id: U
 
 
 async def list_posts(session: AsyncSession, *, settings: Settings, author: str | None, category: str | None, tag: str | None, query_text: str | None, search_in: str, sort: str, cursor: str | None, limit: int, viewer_id: UUID | None = None) -> PostPage:
-    query = select(Post).where(Post.status == "published", Post.deleted_at.is_(None))
+    visibility = or_(User.posts_visibility == "public", Post.author_id == viewer_id) if viewer_id is not None else User.posts_visibility == "public"
+    query = select(Post).join(User, User.id == Post.author_id).where(Post.status == "published", Post.deleted_at.is_(None), visibility)
     if author:
-        query = query.join(User, User.id == Post.author_id).where(User.username_normalized == author.casefold())
+        query = query.where(User.username_normalized == author.casefold())
     if category:
         query = query.where(Post.category == category)
     if tag:

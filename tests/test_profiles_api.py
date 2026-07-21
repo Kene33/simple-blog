@@ -42,3 +42,25 @@ async def test_profile_cannot_attach_wrong_media_purpose_as_cover(client: AsyncC
     assert post_media.status_code == 201
     response = await client.patch("/api/v1/users/me", json={"cover_media_id": post_media.json()["id"]}, headers={"X-CSRF-Token": csrf})
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_profile_post_and_comment_visibility(client: AsyncClient) -> None:
+    csrf = await register(client, "privateuser")
+    post_id = await create_post(client, csrf)
+    comment = await client.post(f"/api/v1/posts/{post_id}/comments", json={"body": "Hidden reply"}, headers={"X-CSRF-Token": csrf})
+    assert comment.status_code == 201
+    private_posts = await client.patch("/api/v1/users/me", json={"posts_visibility": "private", "comments_visibility": "private"}, headers={"X-CSRF-Token": csrf})
+    assert private_posts.status_code == 200
+    assert private_posts.json()["posts_visibility"] == "private"
+    assert (await client.get("/api/v1/posts", params={"author": "privateuser"})).json()["items"]
+
+    guest = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        assert (await guest.get("/api/v1/posts", params={"author": "privateuser"})).json()["items"] == []
+        assert (await guest.get("/api/v1/users/privateuser/comments")).json()["items"] == []
+        hidden_profile = await client.patch("/api/v1/users/me", json={"profile_visibility": "private"}, headers={"X-CSRF-Token": csrf})
+        assert hidden_profile.status_code == 200
+        assert (await guest.get("/api/v1/users/privateuser")).status_code == 404
+    finally:
+        await guest.aclose()

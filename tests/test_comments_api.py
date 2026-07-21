@@ -42,6 +42,24 @@ async def test_comment_roots_replies_and_pagination(client: AsyncClient) -> None
 
 
 @pytest.mark.asyncio
+async def test_comment_branches_support_deep_nesting_and_cursors(client: AsyncClient) -> None:
+    csrf = await register(client, "deepcommenter")
+    post_id = await create_post(client, csrf)
+    parent_id = None
+    for depth in range(8):
+        response = await client.post(f"/api/v1/posts/{post_id}/comments", json={"body": f"Depth {depth}", "parent_id": parent_id}, headers={"X-CSRF-Token": csrf})
+        assert response.status_code == 201
+        parent_id = response.json()["id"]
+    root = await client.post(f"/api/v1/posts/{post_id}/comments", json={"body": "Branch root"}, headers={"X-CSRF-Token": csrf})
+    for index in range(3):
+        assert (await client.post(f"/api/v1/posts/{post_id}/comments", json={"body": f"Reply {index}", "parent_id": root.json()["id"]}, headers={"X-CSRF-Token": csrf})).status_code == 201
+    first = await client.get(f"/api/v1/posts/{post_id}/comments", params={"parent_id": root.json()["id"], "limit": 2})
+    assert len(first.json()["items"]) == 2
+    second = await client.get(f"/api/v1/posts/{post_id}/comments", params={"parent_id": root.json()["id"], "limit": 2, "cursor": first.json()["next_cursor"]})
+    assert len(second.json()["items"]) == 1
+
+
+@pytest.mark.asyncio
 async def test_comment_rejects_parent_from_another_post(client: AsyncClient) -> None:
     csrf = await register(client, "treeowner")
     first_post = await create_post(client, csrf)

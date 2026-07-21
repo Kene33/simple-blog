@@ -44,7 +44,7 @@ def _decode_cursor(value: str, scope: str, settings: Settings) -> tuple[datetime
 
 
 async def create_comment(session: AsyncSession, post_id: UUID, author: User, payload: CommentCreateRequest) -> Comment:
-    await get_post(session, post_id)
+    await get_post(session, post_id, author.id)
     if payload.parent_id is not None:
         parent = await session.scalar(select(Comment).where(Comment.id == payload.parent_id, Comment.post_id == post_id, Comment.deleted_at.is_(None)))
         if parent is None:
@@ -89,8 +89,8 @@ async def serialize_comments(session: AsyncSession, comments: list[Comment]) -> 
     return [CommentRead(id=comment.id, post_id=comment.post_id, author=user_summary(authors[comment.author_id]), parent_id=comment.parent_id, body=TOMBSTONE_BODY if comment.deleted_at else comment.body, is_deleted=comment.deleted_at is not None, created_at=comment.created_at, updated_at=comment.updated_at) for comment in comments]
 
 
-async def list_comments(session: AsyncSession, *, settings: Settings, post_id: UUID, parent_id: UUID | None, cursor: str | None, limit: int) -> CommentPage:
-    await get_post(session, post_id)
+async def list_comments(session: AsyncSession, *, settings: Settings, post_id: UUID, parent_id: UUID | None, cursor: str | None, limit: int, viewer_id: UUID | None = None) -> CommentPage:
+    await get_post(session, post_id, viewer_id)
     scope = _scope(post_id, parent_id)
     query = select(Comment).where(Comment.post_id == post_id, Comment.parent_id == parent_id)
     sqlite_cursor_id: UUID | None = None
@@ -136,7 +136,7 @@ def _decode_user_cursor(value: str, settings: Settings, user_id: UUID) -> tuple[
 
 
 async def list_user_comments(session: AsyncSession, *, settings: Settings, user_id: UUID, cursor: str | None, limit: int) -> CommentPage:
-    query = select(Comment).join(Post, Post.id == Comment.post_id).where(Comment.author_id == user_id, Comment.deleted_at.is_(None), Post.status == "published", Post.deleted_at.is_(None))
+    query = select(Comment).join(Post, Post.id == Comment.post_id).join(User, User.id == Comment.author_id).where(Comment.author_id == user_id, Comment.deleted_at.is_(None), Post.status == "published", Post.deleted_at.is_(None), User.comments_visibility == "public")
     if cursor:
         created_at, comment_id = _decode_user_cursor(cursor, settings, user_id)
         query = query.where((Comment.created_at < created_at) | ((Comment.created_at == created_at) & (Comment.id < comment_id)))

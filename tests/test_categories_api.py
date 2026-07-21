@@ -46,3 +46,21 @@ async def test_rejected_category_returns_pending_post_to_drafts(client: AsyncCli
     assert drafts.json()["items"][0]["id"] == post.json()["id"]
     assert drafts.json()["items"][0]["status"] == "needs_category_change"
     assert drafts.json()["items"][0]["category_resolution"] == "Not a category"
+
+
+@pytest.mark.asyncio
+async def test_admin_category_requests_use_scoped_cursor(client: AsyncClient) -> None:
+    csrf = await register(client, "categoryadmin")
+    for name in ("Astronomy", "Biology", "Chemistry"):
+        assert (await client.post("/api/v1/category-requests", json={"name": name}, headers={"X-CSRF-Token": csrf})).status_code == 201
+    async with client._transport.app.state.session_factory() as session:
+        admin = await session.scalar(select(User).where(User.username_normalized == "categoryadmin"))
+        admin.role = "admin"
+        await session.commit()
+    first = await client.get("/api/v1/admin/category-requests", params={"limit": 2})
+    assert first.status_code == 200
+    assert len(first.json()["items"]) == 2
+    assert first.json()["next_cursor"]
+    second = await client.get("/api/v1/admin/category-requests", params={"limit": 2, "cursor": first.json()["next_cursor"]})
+    assert len(second.json()["items"]) == 1
+    assert (await client.get("/api/v1/admin/category-requests", params={"status": "approved", "cursor": first.json()["next_cursor"]})).status_code == 400

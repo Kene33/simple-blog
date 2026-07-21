@@ -1,12 +1,17 @@
+import base64
+import hashlib
+import hmac
+import json
 from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import Settings
 from src.core.errors import AppError
 from src.db.models import Category, CategoryRequest, Post, User
-from src.modules.categories.schemas import CategoryRequestAdminRead, CategoryRequestCreate, CategoryRequestUpdate
+from src.modules.categories.schemas import CategoryRequestAdminRead, CategoryRequestCreate, CategoryRequestPage, CategoryRequestUpdate
 from src.modules.posts.schemas import CategoryRead, CategoryRequestRead
 
 
@@ -77,13 +82,52 @@ async def list_own_requests(session: AsyncSession, user_id: UUID) -> list[Catego
     return [as_request(request, category) for request, category in rows if as_request(request, category)]
 
 
-async def list_admin_requests(session: AsyncSession, status: str, cursor: str | None, limit: int) -> list[CategoryRequestAdminRead]:
+def _scope(status: str) -> str:
+    return hashlib.sha256(status.encode()).hexdigest()
+
+
+def _encode_cursor(request: CategoryRequest, scope: str, settings: Settings) -> str:
+    payload = {"v": 1, "resource": "category_requests", "created_at": request.created_at.isoformat(), "id": str(request.id), "scope": scope}
+    encoded = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode().rstrip("=")
+    signature = hmac.new(settings.jwt_secret_key.encode(), encoded.encode(), hashlib.sha256).hexdigest()
+    return f"{encoded}.{signature}"
+
+
+def _decode_cursor(value: str, scope: str, settings: Settings) -> tuple[datetime, UUID]:
+    try:
+        encoded, signature = value.split(".", 1)
+        expected = hmac.new(settings.jwt_secret_key.encode(), encoded.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            raise ValueError
+        payload = json.loads(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)))
+        if payload["v"] != 1 or payload["resource"] != "category_requests" or payload["scope"] != scope:
+            raise ValueError
+        return datetime.fromisoformat(payload["created_at"]), UUID(payload["id"])
+    except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+        raise AppError("INVALID_CURSOR", "Cursor is invalid", 400) from None
+
+
+async def list_admin_requests(session: AsyncSession, *, settings: Settings, status: str, cursor: str | None, limit: int) -> CategoryRequestPage:
     if status not in {"pending", "approved", "rejected"}:
         raise AppError("VALIDATION_ERROR", "Unsupported category request status", 422)
+    scope = _scope(status)
+    query = select(CategoryRequest, Category).join(Category, Category.id == CategoryRequest.category_id).where(CategoryRequest.status == status)
+    sqlite_cursor_id: UUID | None = None
     if cursor:
-        raise AppError("INVALID_CURSOR", "Category request cursor is not supported yet", 400)
-    rows = (await session.execute(select(CategoryRequest, Category).join(Category, Category.id == CategoryRequest.category_id).where(CategoryRequest.status == status).order_by(CategoryRequest.created_at.desc()).limit(limit))).all()
-    return [CategoryRequestAdminRead(id=request.id, name=category.name, status=request.status, resolution=request.resolution, requester_id=request.requester_id, created_at=request.created_at, resolved_at=request.resolved_at) for request, category in rows]
+        created_at, request_id = _decode_cursor(cursor, scope, settings)
+        if session.bind and session.bind.dialect.name == "postgresql":
+            query = query.where((CategoryRequest.created_at < created_at) | ((CategoryRequest.created_at == created_at) & (CategoryRequest.id < request_id)))
+        else:
+            sqlite_cursor_id = request_id
+    rows = (await session.execute(query.order_by(CategoryRequest.created_at.desc(), CategoryRequest.id.desc()))).all() if sqlite_cursor_id else (await session.execute(query.order_by(CategoryRequest.created_at.desc(), CategoryRequest.id.desc()).limit(limit + 1))).all()
+    if sqlite_cursor_id:
+        try:
+            rows = rows[[request.id for request, _ in rows].index(sqlite_cursor_id) + 1 : limit + 2]
+        except ValueError:
+            raise AppError("INVALID_CURSOR", "Cursor is invalid", 400) from None
+    items = [CategoryRequestAdminRead(id=request.id, name=category.name, status=request.status, resolution=request.resolution, requester_id=request.requester_id, created_at=request.created_at, resolved_at=request.resolved_at) for request, category in rows[:limit]]
+    next_cursor = _encode_cursor(rows[limit - 1][0], scope, settings) if len(rows) > limit else None
+    return CategoryRequestPage(items=items, next_cursor=next_cursor)
 
 
 async def resolve_category_request(session: AsyncSession, request_id: UUID, payload: CategoryRequestUpdate) -> CategoryRequest:

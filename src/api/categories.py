@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.config import Settings, get_settings
 from src.core.errors import AppError
 from src.db.models import Category
 from src.db.session import get_session
@@ -32,9 +33,8 @@ async def list_mine(auth: CurrentAuth = Depends(get_current_auth), session: Asyn
 
 
 @router.get("/admin/category-requests", response_model=CategoryRequestPage)
-async def list_admin(status: str = "pending", cursor: str | None = None, limit: int = 20, _: CurrentAuth = Depends(require_admin), session: AsyncSession = Depends(get_session)) -> CategoryRequestPage:
-    items = await list_admin_requests(session, status, cursor, min(max(limit, 1), 100))
-    return CategoryRequestPage(items=items, next_cursor=None)
+async def list_admin(status: str = "pending", cursor: str | None = None, limit: int = 20, _: CurrentAuth = Depends(require_admin), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> CategoryRequestPage:
+    return await list_admin_requests(session, settings=settings, status=status, cursor=cursor, limit=min(max(limit, 1), 100))
 
 
 @router.patch("/admin/category-requests/{request_id}", response_model=CategoryRequestRead)

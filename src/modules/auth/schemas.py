@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -34,6 +35,9 @@ class UserProfile(UserSummary):
     cover_url: str | None = None
     email: EmailStr | None = None
     role: str | None = None
+    profile_visibility: Literal["public", "private"]
+    posts_visibility: Literal["public", "private"]
+    comments_visibility: Literal["public", "private"]
     posts_count: int
     created_at: datetime
     updated_at: datetime
@@ -55,6 +59,9 @@ class UserUpdateRequest(BaseModel):
     cover_media_id: UUID | None = None
     display_name: str | None = Field(default=None, max_length=80)
     bio: str | None = Field(default=None, max_length=500)
+    profile_visibility: Literal["public", "private"] | None = None
+    posts_visibility: Literal["public", "private"] | None = None
+    comments_visibility: Literal["public", "private"] | None = None
 
     @field_validator("username")
     @classmethod
