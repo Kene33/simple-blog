@@ -37,6 +37,8 @@ export function DraftsPage() {
   const { user } = useSession();
   const [drafts, setDrafts] = useState([]);
   const [state, setState] = useState("loading");
+  const [busyDraft, setBusyDraft] = useState("");
+  const [error, setError] = useState("");
   const { navigate } = useRouter();
 
   const load = () => api.drafts().then((page) => {
@@ -45,9 +47,9 @@ export function DraftsPage() {
   }).catch(() => setState("error"));
 
   useEffect(() => { if (user) load(); }, [user]);
-  const remove = async (id) => { await api.deleteDraft(id); load(); };
-  const publish = async (id) => { const post = await api.publishDraft(id); navigate(`/posts/${post.id}`); };
+  const remove = async (id) => { setBusyDraft(id); setError(""); try { await api.deleteDraft(id); await load(); } catch (cause) { setError(cause.message || "Не удалось удалить черновик"); } finally { setBusyDraft(""); } };
+  const publish = async (id) => { setBusyDraft(id); setError(""); try { const post = await api.publishDraft(id); navigate(`/posts/${post.id}`); } catch (cause) { setError(cause.message || "Не удалось опубликовать черновик"); setBusyDraft(""); } };
 
   if (!user) return <LoginPrompt title="Черновики" text="Войдите, чтобы открыть черновики" />;
-  return <AppShell title="Черновики"><section className="list-page"><h1>Черновики</h1>{state === "loading" ? <div className="card-state">Загружаем черновики…</div> : state === "empty" ? <div className="card-state"><b>Черновиков пока нет</b><span>Сохраните публикацию, чтобы закончить её позже.</span></div> : state === "error" ? <div className="card-state">Не удалось загрузить черновики</div> : <div className="draft-list">{drafts.map((draft) => <article className="draft-card" key={draft.id}><span className="draft-icon"><FileText size={20} /></span><div><b>{draft.title || "Без названия"}</b><p>{draft.content || "Черновик без текста"}</p><small>Изменён {new Date(draft.updated_at).toLocaleDateString("ru-RU")}</small></div><footer><button className="outline-button" onClick={() => remove(draft.id)} aria-label="Удалить черновик"><Trash2 size={16} /></button><button className="primary" onClick={() => publish(draft.id)}>Опубликовать</button></footer></article>)}</div>}</section></AppShell>;
+  return <AppShell title="Черновики"><section className="list-page"><h1>Черновики</h1>{error && <div className="form-error" role="alert">{error}</div>}{state === "loading" ? <div className="card-state">Загружаем черновики…</div> : state === "empty" ? <div className="card-state"><b>Черновиков пока нет</b><span>Сохраните публикацию, чтобы закончить её позже.</span></div> : state === "error" ? <div className="card-state">Не удалось загрузить черновики</div> : <div className="draft-list">{drafts.map((draft) => <article className="draft-card" key={draft.id}><span className="draft-icon"><FileText size={20} /></span><div><b>{draft.title || "Без названия"}</b><p>{draft.content || "Черновик без текста"}</p><small>Изменён {new Date(draft.updated_at).toLocaleDateString("ru-RU")}</small></div><footer><button className="outline-button" disabled={busyDraft === draft.id} onClick={() => remove(draft.id)} aria-label="Удалить черновик"><Trash2 size={16} /></button><button className="primary" disabled={busyDraft === draft.id} onClick={() => publish(draft.id)}>{busyDraft === draft.id ? "Сохраняем…" : "Опубликовать"}</button></footer></article>)}</div>}</section></AppShell>;
 }
