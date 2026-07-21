@@ -20,10 +20,11 @@ export function BookmarksPage() {
 
   useEffect(() => {
     if (!user) return;
+    setState("loading");
     api.bookmarks().then((page) => {
       setPosts(page.items);
       setState(page.items.length ? "ready" : "empty");
-    }).catch(() => setState("error"));
+    }).catch(() => { setPosts([]); setState("error"); });
   }, [user]);
   const toggleLike = async (post) => { const before = { ...post }; const next = { ...post, liked_by_me: !post.liked_by_me, like_count: Math.max(0, post.like_count + (post.liked_by_me ? -1 : 1)) }; setPosts((items) => items.map((item) => item.id === post.id ? next : item)); try { post.liked_by_me ? await api.unlike(post.id) : await api.like(post.id); } catch { setPosts((items) => items.map((item) => item.id === post.id ? before : item)); } };
   const removeBookmark = async (post) => { const before = posts; setPosts((items) => items.filter((item) => item.id !== post.id)); try { await api.unbookmark(post.id); } catch { setPosts(before); } };
@@ -41,10 +42,10 @@ export function DraftsPage() {
   const [error, setError] = useState("");
   const { navigate } = useRouter();
 
-  const load = () => api.drafts().then((page) => {
+  const load = () => { setState("loading"); return api.drafts().then((page) => {
     setDrafts(page.items);
     setState(page.items.length ? "ready" : "empty");
-  }).catch(() => setState("error"));
+  }).catch(() => { setDrafts([]); setState("error"); }); };
 
   useEffect(() => { if (user) load(); }, [user]);
   const remove = async (id) => { setBusyDraft(id); setError(""); try { await api.deleteDraft(id); await load(); } catch (cause) { setError(cause.message || "Не удалось удалить черновик"); } finally { setBusyDraft(""); } };
