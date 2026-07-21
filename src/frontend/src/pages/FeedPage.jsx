@@ -42,7 +42,7 @@ export function FeedPage() {
     event.preventDefault();
     setError("");
     try {
-      const created = await api.createLink(user ? { url: form.url, label: form.label || null, mode: "reuse" } : { url: form.url });
+      const created = await api.createLink({ url: form.url, label: form.label || null, mode: "reuse" });
       setResult(created);
       setForm({ url: "", label: "" });
       if (user) load(false);
@@ -60,7 +60,7 @@ export function FeedPage() {
     {result && <div className="filter-toggle"><Check size={18} /> Готово <b>{result.short_url}</b><button onClick={() => copy(result)}><Copy size={16} /></button></div>}
     {error && <div className="form-error" role="alert">{error}</div>}
     <div className="filter-tabs">{sorts.map(([value, label]) => <button type="button" className={sort === value ? "selected" : ""} onClick={() => setSort(value)} key={value}>{label}</button>)}</div><button className="filter-toggle" onClick={() => navigate("/search")}><SlidersHorizontal size={18} /> Поиск и фильтры <b>{user ? "по ссылкам" : "после входа"}</b></button>
-    {!user && <div className="card-state"><b>Войдите, чтобы сохранять ссылки</b><span>Гостевая ссылка создаётся сразу, но название, список и аналитика доступны аккаунту.</span></div>}
+    {!user && <div className="card-state"><b>Войдите, чтобы видеть свои ссылки</b><span>Гостевая ссылка создаётся сразу, но список и аналитика доступны аккаунту.</span></div>}
     {user && state === "loading" && <div className="card-state">Загружаем ссылки...</div>}{user && state === "error" && <div className="card-state"><b>Не удалось загрузить</b><button className="outline-button" onClick={() => load()}>Повторить</button></div>}{user && state === "empty" && <div className="card-state"><b>Ссылок пока нет</b><span>Создайте первую короткую ссылку выше.</span></div>}
     {links.map((link) => <LinkCard key={link.shortcode} item={link} onCopy={copy} />)}{nextOffset != null && <button className="outline-button load-more" disabled={state === "loading-more"} onClick={() => load(true)}>{state === "loading-more" ? "Загружаем..." : "Показать ещё"}</button>}
   </section></AppShell>;
