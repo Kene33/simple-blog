@@ -48,7 +48,12 @@ async def get_current_auth(request: Request, session: AsyncSession = Depends(get
 async def get_optional_auth(request: Request, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> CurrentAuth | None:
     if not request.cookies.get(settings.access_cookie_name):
         return None
-    return await get_current_auth(request, session, settings)
+    try:
+        return await get_current_auth(request, session, settings)
+    except AppError as error:
+        if error.status_code == 401:
+            return None
+        raise
 
 
 async def require_csrf(request: Request, auth: CurrentAuth = Depends(get_current_auth), settings: Settings = Depends(get_settings)) -> CurrentAuth:

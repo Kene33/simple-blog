@@ -78,3 +78,10 @@ async def test_password_reset_is_single_use_and_revokes_sessions(client: AsyncCl
     assert (await client.post("/api/v1/auth/password-reset/confirm", json={"token": token, "password": "another-password"})).status_code == 401
     assert (await client.post("/api/v1/auth/login", json={"identifier": payload["email"], "password": payload["password"]})).status_code == 401
     assert (await client.post("/api/v1/auth/login", json={"identifier": payload["email"], "password": "new-strong-password"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_public_feed_ignores_invalid_optional_auth_cookie(client: AsyncClient) -> None:
+    client.cookies.set("access_token", "broken", domain="testserver", path="/")
+    response = await client.get("/api/v1/posts")
+    assert response.status_code == 200
