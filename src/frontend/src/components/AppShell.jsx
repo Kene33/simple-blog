@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bookmark, CircleUserRound, Compass, House, LogIn, Menu, PenLine, Plus, Search, ShieldCheck } from "lucide-react";
+import { Bookmark, CircleUserRound, House, LogIn, Menu, PenLine, Plus, Search, ShieldCheck, X } from "lucide-react";
 import { Brand } from "./Brand";
 import { api } from "../lib/api";
 import { Link, useRouter } from "../lib/router";
@@ -39,10 +39,14 @@ function Sidebar() {
 }
 
 export function AppShell({ children, title = "Лента", right }) {
+  const { user, isAdmin } = useSession();
   const { navigate } = useRouter();
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const go = (to) => { setMobileMenu(false); navigate(to); };
   return <div className="app-shell">
     <Sidebar />
-    <header className="mobile-header"><Brand compact /><b>{title}</b><button className="icon-button" aria-label="Открыть меню"><Menu /></button></header>
+    <header className="mobile-header"><Brand compact /><b>{title}</b><button className="icon-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label={mobileMenu ? "Закрыть меню" : "Открыть меню"}>{mobileMenu ? <X /> : <Menu />}</button></header>
+    {mobileMenu && <div className="mobile-menu"><button onClick={() => go("/")}>Лента</button><button onClick={() => go("/search")}>Поиск</button><button onClick={() => go(user ? "/posts/new" : "/login")}>{user ? "Создать" : "Войти"}</button><button onClick={() => go(user ? "/me" : "/login")}>Профиль</button>{user && <button onClick={() => go("/bookmarks")}>Закладки</button>}{isAdmin && <button onClick={() => go("/moderation")}>Модерация</button>}</div>}
     <main className="main-content">{children}</main>
     {right && <aside className="right-rail">{right}</aside>}
     <nav className="mobile-nav">
