@@ -51,8 +51,8 @@ export function AppShell({ children, title = "Лента", right }) {
     {right && <aside className="right-rail">{right}</aside>}
     <nav className="mobile-nav">
       <button onClick={() => navigate("/")} aria-label="Лента"><House /></button>
-      <button className="mobile-create" onClick={() => navigate("/posts/new")} aria-label="Новый пост"><Plus /></button>
-      <button onClick={() => navigate("/me")} aria-label="Профиль"><CircleUserRound /></button>
+      <button className="mobile-create" onClick={() => navigate(user ? "/posts/new" : "/login")} aria-label={user ? "Новый пост" : "Войти"}><Plus /></button>
+      <button onClick={() => navigate(user ? "/me" : "/login")} aria-label={user ? "Профиль" : "Войти"}><CircleUserRound /></button>
     </nav>
   </div>;
 }
