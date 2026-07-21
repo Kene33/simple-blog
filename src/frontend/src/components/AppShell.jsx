@@ -22,6 +22,7 @@ function Sidebar() {
   const { user, isAdmin } = useSession();
   const [reportCount, setReportCount] = useState(0);
   useEffect(() => { if (isAdmin) api.reportCount().then((data) => setReportCount(data.open_count)).catch(() => setReportCount(0)); }, [isAdmin]);
+  const accountName = user?.display_name || user?.email || "";
   return <aside className="sidebar">
     <Brand />
     <nav className="sidebar-nav">
@@ -33,7 +34,7 @@ function Sidebar() {
     <Link to="/posts/new" className="primary create-button"><Plus size={21} /> Новый пост</Link>
     <div className="sidebar-account">
       <small>Режим прототипа</small>
-      {user ? <Link to="/me" className="account-row"><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><span><b>{user.display_name || user.username}</b><em>@{user.username}</em></span></Link> : <Link to="/login" className="account-row"><span className="account-login"><LogIn size={21} /></span><span><b>Войти</b><em>или создать аккаунт</em></span></Link>}
+      {user ? <Link to="/me" className="account-row"><span className="avatar">{accountName.slice(0, 2).toUpperCase()}</span><span><b>{user.display_name || user.email}</b><em>{user.email}</em></span></Link> : <Link to="/login" className="account-row"><span className="account-login"><LogIn size={21} /></span><span><b>Войти</b><em>или создать аккаунт</em></span></Link>}
     </div>
   </aside>;
 }

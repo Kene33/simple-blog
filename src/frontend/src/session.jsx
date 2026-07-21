@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { ApiError, api } from "./lib/api";
+import { ApiError, api, clearAccessToken } from "./lib/api";
 
 const SessionContext = createContext(null);
 
@@ -14,6 +14,7 @@ export function SessionProvider({ children }) {
       return profile;
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 401) throw error;
+      clearAccessToken();
       setUser(null);
       return null;
     } finally {
@@ -34,7 +35,10 @@ export function SessionProvider({ children }) {
       return refreshMe();
     },
     async register(data) {
-      await api.register(data);
+      const registered = await api.register({ email: data.email, password: data.password });
+      if (registered.verification_token) await api.verifyEmail(registered.verification_token);
+      await api.login({ email: data.email, password: data.password });
+      if (data.display_name) await api.updateMe({ display_name: data.display_name });
       return refreshMe();
     },
     async logout() {
