@@ -185,7 +185,6 @@ graphify-out/
 ROADMAP.md
 FRONTEND_SPEC.md
 FRONTEND_IMPLEMENTATION_PLAN.md
-BACKEND_FRONTEND_MISMATCHES.md
 design-reference/
 .DS_Store
 node_modules/

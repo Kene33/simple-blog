@@ -9,7 +9,7 @@ export function AuthPage({ mode }) {
   const isLogin = mode === "login";
   const { login, register } = useSession();
   const { navigate } = useRouter();
-  const [form, setForm] = useState({ display_name: "", email: "", password: "" });
+  const [form, setForm] = useState({ username: "", email: "", identifier: "", password: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -18,8 +18,8 @@ export function AuthPage({ mode }) {
     event.preventDefault();
     setBusy(true); setError("");
     try {
-      if (isLogin) await login({ email: form.email, password: form.password });
-      else await register({ display_name: form.display_name, email: form.email, password: form.password });
+      if (isLogin) await login({ identifier: form.identifier, password: form.password });
+      else await register({ username: form.username, email: form.email, password: form.password });
       navigate("/");
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : "Проверьте подключение и попробуйте ещё раз");
@@ -34,10 +34,10 @@ export function AuthPage({ mode }) {
       <h2>{isLogin ? "Вход" : "Регистрация"}</h2>
       <p>{isLogin ? "Введите данные аккаунта" : "Это займёт меньше минуты"}</p>
       <form onSubmit={submit} noValidate>
-        {!isLogin && <label>Имя<input value={form.display_name} onChange={set("display_name")} maxLength="120" autoComplete="name" /></label>}
+        {!isLogin && <label>Username<input value={form.username} onChange={set("username")} minLength="3" maxLength="30" required autoComplete="username" /></label>}
         {!isLogin && <label>Email<input type="email" value={form.email} onChange={set("email")} required autoComplete="email" /></label>}
-        {isLogin && <label>Email<input type="email" value={form.email} onChange={set("email")} required autoComplete="email" /></label>}
-        <label>Пароль<span className="password-input"><input type={showPassword ? "text" : "password"} value={form.password} onChange={set("password")} minLength="8" required autoComplete={isLogin ? "current-password" : "new-password"} /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label="Показать пароль">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
+        {isLogin && <label>Username или email<input value={form.identifier} onChange={set("identifier")} required autoComplete="username" /></label>}
+        <label>Пароль<span className="password-input"><input type={showPassword ? "text" : "password"} value={form.password} onChange={set("password")} minLength="10" required autoComplete={isLogin ? "current-password" : "new-password"} /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label="Показать пароль">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
         {error && <div className="form-error" role="alert">{error}</div>}
         <button className="primary auth-submit" disabled={busy}>{busy ? "Подождите…" : isLogin ? "Войти" : "Создать аккаунт"}</button>
       </form>
