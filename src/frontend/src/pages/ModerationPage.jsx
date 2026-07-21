@@ -25,6 +25,7 @@ export function ModerationPage() {
   const [query, setQuery] = useState("");
   const [openCount, setOpenCount] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [state, setState] = useState("loading");
@@ -62,29 +63,21 @@ export function ModerationPage() {
       setError(cause.message || "Не удалось обработать категорию");
     }
   };
-  const userAction = async (item, action) => {
+  const confirmUserAction = async () => {
+    const { item, action, type } = pendingAction;
     const text = reason.trim();
     if (!text) return setError("Укажите причину действия.");
     try {
-      const payload = action === "mute" ? { action, reason: text, muted_until: new Date(Date.now() + 86400000).toISOString() } : { action, reason: text };
-      const updated = await api.moderateUser(item.id, payload);
+      const payload = type === "role" ? { role: action, reason: text } : action === "mute" ? { action, reason: text, muted_until: new Date(Date.now() + 86400000).toISOString() } : { action, reason: text };
+      const updated = type === "role" ? await api.setUserRole(item.id, payload) : await api.moderateUser(item.id, payload);
       setUsers((current) => current.map((entry) => entry.id === item.id ? updated : entry));
       setReason("");
+      setPendingAction(null);
     } catch (cause) {
       setError(cause.message || "Не удалось изменить пользователя");
     }
   };
-  const roleAction = async (item, role) => {
-    const text = reason.trim();
-    if (!text) return setError("Укажите причину изменения роли.");
-    try {
-      const updated = await api.setUserRole(item.id, { role, reason: text });
-      setUsers((current) => current.map((entry) => entry.id === item.id ? updated : entry));
-      setReason("");
-    } catch (cause) {
-      setError(cause.message || "Не удалось изменить роль");
-    }
-  };
+  const openUserAction = (item, action, type = "moderation") => { setError(""); setReason(""); setPendingAction({ item, action, type }); };
   const restoreTarget = async () => {
     const text = reason.trim() || "Восстановлено администратором";
     try {
@@ -104,9 +97,10 @@ export function ModerationPage() {
     <header className="moderation-heading"><div><h1>Модерация</h1><p>{openCount ?? "—"} открытых жалоб</p></div>{tab === "reports" && <select value={status} onChange={(event) => setStatus(event.target.value)}><option value="open">Открытые</option><option value="resolved">Решённые</option><option value="rejected">Отклонённые</option></select>}</header>
     <div className="moderation-tabs">{tabs.filter((item) => isAdmin || item !== "actions").map((item) => <TabButton key={item} value={item} active={tab} onClick={setTab}>{item === "reports" ? "Жалобы" : item === "categories" ? "Категории" : item === "users" ? "Пользователи" : "Аудит"}</TabButton>)}</div>
     {error && <div className="form-error" role="alert">{error}</div>}
-    {(tab === "users" || tab === "categories") && <div className="moderation-tools"><input value={tab === "users" ? query : reason} onChange={(event) => tab === "users" ? setQuery(event.target.value) : setReason(event.target.value)} placeholder={tab === "users" ? "username или email" : "Причина решения"} />{tab === "users" && <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Причина действия" />}</div>}
-    {state === "loading" ? <div className="card-state">Загружаем…</div> : tab === "reports" ? <Reports reports={reports} open={open} /> : tab === "categories" ? <Categories items={categories} decide={decideCategory} /> : tab === "users" ? <Users items={users} isAdmin={isAdmin} userAction={userAction} roleAction={roleAction} /> : <Actions items={actions} />}
+    {tab === "users" && <div className="moderation-tools"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="username или email" /></div>}
+    {state === "loading" ? <div className="card-state">Загружаем…</div> : tab === "reports" ? <Reports reports={reports} open={open} /> : tab === "categories" ? <Categories items={categories} decide={decideCategory} /> : tab === "users" ? <Users items={users} isAdmin={isAdmin} openAction={openUserAction} /> : <Actions items={actions} />}
     {selected && <ReportModal report={selected} reason={reason} setReason={setReason} isAdmin={isAdmin} onClose={() => setSelected(null)} onReject={() => resolve("rejected")} onResolve={() => resolve("resolved")} onHide={() => resolve("resolved", { hide_target: true })} onBan={() => resolve("resolved", { ban_author: true })} onHideBan={() => resolve("resolved", { hide_target: true, ban_author: true })} onRestore={restoreTarget} />}
+    {pendingAction && <UserActionModal action={pendingAction} reason={reason} setReason={setReason} onClose={() => setPendingAction(null)} onConfirm={confirmUserAction} />}
   </section></AppShell>;
 }
 
@@ -118,8 +112,8 @@ function Categories({ items, decide }) {
   return <div className="reports-table">{items.map((item) => <div className="simple-row" key={item.id}><span><b>{item.name}</b><small>#{item.id.slice(0, 8)}</small></span><button className="outline-button" onClick={() => decide(item, "rejected")}>Отклонить</button><button className="primary compact" onClick={() => decide(item, "approved")}>Одобрить</button></div>)}{!items.length && <div className="empty-row">Нет новых категорий</div>}</div>;
 }
 
-function Users({ items, isAdmin, userAction, roleAction }) {
-  return <div className="reports-table">{items.map((item) => <div className="user-row" key={item.id}><span><b>@{item.username}</b><small>{item.email} · {item.role}{item.disabled_at ? " · banned" : ""}{item.muted_until ? " · muted" : ""}</small></span><button className="danger-button" onClick={() => userAction(item, "ban")}>Бан</button>{isAdmin && <button className="outline-button" onClick={() => userAction(item, "unban")}>Разбан</button>}{isAdmin && <button className="outline-button" onClick={() => userAction(item, "mute")}>Мут 24ч</button>}{isAdmin && <button className="outline-button" onClick={() => userAction(item, "unmute")}>Снять мут</button>}{isAdmin && <button className="outline-button" onClick={() => roleAction(item, item.role === "moderator" ? "user" : "moderator")}>{item.role === "moderator" ? "Снять модера" : "Сделать модером"}</button>}</div>)}{!items.length && <div className="empty-row">Пользователи не найдены</div>}</div>;
+function Users({ items, isAdmin, openAction }) {
+  return <div className="reports-table">{items.map((item) => <div className="user-row" key={item.id}><span><b>@{item.username}</b><small>{item.email} · {item.role}{item.disabled_at ? " · banned" : ""}{item.muted_until ? " · muted" : ""}</small></span><button className="danger-button" onClick={() => openAction(item, "ban")}>Бан</button>{isAdmin && <button className="outline-button" onClick={() => openAction(item, "unban")}>Разбан</button>}{isAdmin && <button className="outline-button" onClick={() => openAction(item, "mute")}>Мут 24ч</button>}{isAdmin && <button className="outline-button" onClick={() => openAction(item, "unmute")}>Снять мут</button>}{isAdmin && <button className="outline-button" onClick={() => openAction(item, item.role === "moderator" ? "user" : "moderator", "role")}>{item.role === "moderator" ? "Снять модера" : "Сделать модером"}</button>}</div>)}{!items.length && <div className="empty-row">Пользователи не найдены</div>}</div>;
 }
 
 function Actions({ items }) {
@@ -128,4 +122,9 @@ function Actions({ items }) {
 
 function ReportModal({ report, reason, setReason, isAdmin, onClose, onReject, onResolve, onHide, onBan, onHideBan, onRestore }) {
   return <div className="modal-backdrop" role="presentation"><section className="moderation-modal" role="dialog" aria-modal="true"><button className="modal-close" onClick={onClose} aria-label="Закрыть"><X /></button><small>ЖАЛОБА НА {(report.target?.kind || "объект").toUpperCase()}</small><h2>#{report.id.slice(0, 8)}</h2><p><b>{reasonLabels[report.reason] || report.reason}</b> · @{report.reporter.username}</p><blockquote>{report.target?.title || report.target?.body || "Объект жалобы недоступен"}</blockquote><label className="report-reason"><ShieldAlert size={16} /> Причина<input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Что сделал модератор" /></label><footer><button className="outline-button" onClick={onReject}>Отклонить</button>{isAdmin && report.target?.is_deleted && <button className="outline-button" onClick={onRestore}>Восстановить</button>}<button className="outline-button" onClick={onResolve}>Решить</button><button className="danger-button" onClick={onHide}>Скрыть</button><button className="danger-button" onClick={onBan}>Бан автора</button><button className="danger-button" onClick={onHideBan}>Скрыть + бан</button></footer></section></div>;
+}
+
+function UserActionModal({ action, reason, setReason, onClose, onConfirm }) {
+  const labels = { ban: "Заблокировать", unban: "Разблокировать", mute: "Ограничить на 24 часа", unmute: "Снять ограничение", user: "Снять модератора", moderator: "Сделать модератором" };
+  return <div className="modal-backdrop" role="presentation"><section className="moderation-modal" role="dialog" aria-modal="true" aria-label="Подтверждение действия"><button className="modal-close" onClick={onClose} aria-label="Закрыть"><X /></button><small>ДЕЙСТВИЕ С ПОЛЬЗОВАТЕЛЕМ</small><h2>{labels[action.action]}</h2><p>Пользователь: <b>@{action.item.username}</b></p><label className="report-reason"><ShieldAlert size={16} /> Причина<input autoFocus value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Опишите причину" /></label><footer><button className="outline-button" onClick={onClose}>Отмена</button><button className={action.action === "ban" ? "danger-button" : "primary compact"} onClick={onConfirm}>Подтвердить</button></footer></section></div>;
 }
