@@ -26,6 +26,7 @@ export function ProfilePage({ username }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ display_name: "", bio: "" });
   const [uploading, setUploading] = useState("");
+  const [profileError, setProfileError] = useState("");
 
   useEffect(() => {
     if (!target) return;
@@ -55,9 +56,14 @@ export function ProfilePage({ username }) {
 
   const save = async (event) => {
     event.preventDefault();
-    const updated = await api.updateMe(form);
-    setProfile(updated);
-    setEditing(false);
+    setProfileError("");
+    try {
+      const updated = await api.updateMe(form);
+      setProfile(updated);
+      setEditing(false);
+    } catch (cause) {
+      setProfileError(cause.message || "Не удалось сохранить профиль");
+    }
   };
   const loadMorePosts = async () => {
     if (!postCursor) return;
@@ -118,7 +124,7 @@ export function ProfilePage({ username }) {
       <div className="profile-cover" style={profile.cover_url ? { backgroundImage: `url(${profile.cover_url})` } : undefined}>{own && <button className="cover-upload" onClick={() => coverInput.current?.click()}>Изменить обложку</button>}</div>
       <div className="profile-info"><span className="profile-avatar">{profile.avatar_url ? <img src={profile.avatar_url} alt="" /> : profile.username.slice(0, 2).toUpperCase()}</span>{own && <button className="outline-button edit-profile" onClick={() => setEditing(!editing)}><Settings size={16} /> Редактировать профиль</button>}<h1>{profile.display_name || profile.username}</h1><span className="handle">@{profile.username}</span><p>{profile.bio || "Расскажите немного о себе в настройках профиля."}</p><div className="profile-meta"><span><CalendarDays size={15} /> С нами с {new Date(profile.created_at).toLocaleDateString("ru-RU", { month: "long", year: "numeric" })}</span><b>{profile.posts_count} публикаций</b></div></div>
     </section>
-    {editing && <form className="profile-edit" onSubmit={save}><label>Отображаемое имя<input value={form.display_name} onChange={(event) => setForm({ ...form, display_name: event.target.value })} maxLength="80" /></label><label>О себе<textarea value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} maxLength="500" /></label><button className="primary">Сохранить</button></form>}
+    {editing && <form className="profile-edit" onSubmit={save}>{profileError && <div className="form-error" role="alert">{profileError}</div>}<label>Отображаемое имя<input value={form.display_name} onChange={(event) => setForm({ ...form, display_name: event.target.value })} maxLength="80" /></label><label>О себе<textarea value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} maxLength="500" /></label><button className="primary">Сохранить</button></form>}
     {own && <section className="profile-private"><span>Email <b>{profile.email}</b>{uploading && <small>{uploading}</small>}</span><input ref={avatarInput} className="visually-hidden" type="file" accept="image/*" onChange={(event) => uploadProfileImage(event, "avatar")} /><input ref={coverInput} className="visually-hidden" type="file" accept="image/*" onChange={(event) => uploadProfileImage(event, "cover")} /><button className="outline-button" onClick={() => avatarInput.current?.click()}><Camera size={16} /> Изменить avatar</button></section>}
     <nav className="profile-tabs"><button className={tab === "posts" ? "selected" : ""} onClick={() => setTab("posts")}>Публикации</button><button className={tab === "answers" ? "selected" : ""} onClick={() => setTab("answers")}>Ответы</button></nav>
     {tab === "posts" ? <>{posts.length ? posts.map((post) => <PostCard key={post.id} post={post} onLike={toggleLike} onBookmark={toggleBookmark} onShare={share} />) : <div className="card-state">Публикаций пока нет</div>}{postCursor && <button className="outline-button load-more" disabled={loadingMore} onClick={loadMorePosts}>Показать ещё</button>}</> : <>{answers.length ? <section className="answers-list">{answers.map((comment) => <article className="answer" key={comment.id}><span className="avatar">{profile.username.slice(0, 2).toUpperCase()}</span><div><b>Ответ в публикации</b><p>{comment.is_deleted ? "Комментарий удалён автором" : comment.body}</p></div></article>)}</section> : <div className="card-state">Ответов пока нет</div>}{answerCursor && <button className="outline-button load-more" disabled={loadingMore} onClick={loadMoreAnswers}>Показать ещё</button>}</>}
