@@ -21,6 +21,9 @@ button { cursor: pointer; }
 .media-viewer-position { position: absolute; bottom: 6px; padding: 7px 10px; border-radius: 999px; background: #151925e6; color: #fff; font-size: 12px; font-weight: 800; }
 .user-row > button { width: 112px; justify-content: center; }
 .user-row { grid-template-columns: minmax(220px, 1fr) repeat(5, 112px) !important; }
+.user-list-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.user-list-tabs button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 12px; font-weight: 800; }
+.user-list-tabs button.selected { background: var(--text); color: var(--surface); }
 .comment-replies { display: grid; gap: 12px; margin-top: 14px; padding-left: 14px; border-left: 2px solid var(--line); }
 .account-logout { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 800; }
 .account-logout:hover { color: var(--accent); }

@@ -23,6 +23,7 @@ export function ModerationPage() {
   const [users, setUsers] = useState([]);
   const [actions, setActions] = useState([]);
   const [query, setQuery] = useState("");
+  const [userView, setUserView] = useState("all");
   const [openCount, setOpenCount] = useState(null);
   const [selected, setSelected] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
@@ -36,7 +37,7 @@ export function ModerationPage() {
     setState("loading");
     const load = tab === "reports" ? Promise.all([api.reports({ status }), api.reportCount()]).then(([page, count]) => { setReports(page.items); setOpenCount(count.open_count); })
       : tab === "categories" ? api.adminCategoryRequests({ status: "pending" }).then((page) => setCategories(page.items))
-        : tab === "users" ? api.adminUsers({ query }).then(setUsers)
+        : tab === "users" ? api.adminUsers({ query, limit: 100 }).then(setUsers)
           : isAdmin ? api.moderationActions().then((page) => setActions(page.items)) : Promise.resolve();
     load.then(() => setState("ready")).catch((cause) => { setError(cause.message || "Не удалось загрузить данные"); setState("error"); });
   }, [tab, status, query, isStaff, isAdmin]);
@@ -97,8 +98,8 @@ export function ModerationPage() {
     <header className="moderation-heading"><div><h1>Модерация</h1><p>{openCount ?? "—"} открытых жалоб</p></div>{tab === "reports" && <select value={status} onChange={(event) => setStatus(event.target.value)}><option value="open">Открытые</option><option value="resolved">Решённые</option><option value="rejected">Отклонённые</option></select>}</header>
     <div className="moderation-tabs">{tabs.filter((item) => isAdmin || item !== "actions").map((item) => <TabButton key={item} value={item} active={tab} onClick={setTab}>{item === "reports" ? "Жалобы" : item === "categories" ? "Категории" : item === "users" ? "Пользователи" : "Аудит"}</TabButton>)}</div>
     {error && <div className="form-error" role="alert">{error}</div>}
-    {tab === "users" && <div className="moderation-tools"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="username или email" /></div>}
-    {state === "loading" ? <div className="card-state">Загружаем…</div> : tab === "reports" ? <Reports reports={reports} open={open} /> : tab === "categories" ? <Categories items={categories} decide={decideCategory} /> : tab === "users" ? <Users items={users} isAdmin={isAdmin} openAction={openUserAction} /> : <Actions items={actions} />}
+    {tab === "users" && <><div className="moderation-tools"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="username или email" /></div><div className="user-list-tabs"><button className={userView === "all" ? "selected" : ""} onClick={() => setUserView("all")}>Все пользователи</button><button className={userView === "banned" ? "selected" : ""} onClick={() => setUserView("banned")}>Заблокированные</button></div></>}
+    {state === "loading" ? <div className="card-state">Загружаем…</div> : tab === "reports" ? <Reports reports={reports} open={open} /> : tab === "categories" ? <Categories items={categories} decide={decideCategory} /> : tab === "users" ? <Users items={users} view={userView} isAdmin={isAdmin} openAction={openUserAction} /> : <Actions items={actions} />}
     {selected && <ReportModal report={selected} reason={reason} setReason={setReason} isAdmin={isAdmin} onClose={() => setSelected(null)} onReject={() => resolve("rejected")} onResolve={() => resolve("resolved")} onHide={() => resolve("resolved", { hide_target: true })} onBan={() => resolve("resolved", { ban_author: true })} onHideBan={() => resolve("resolved", { hide_target: true, ban_author: true })} onRestore={restoreTarget} />}
     {pendingAction && <UserActionModal action={pendingAction} reason={reason} setReason={setReason} onClose={() => setPendingAction(null)} onConfirm={confirmUserAction} />}
   </section></AppShell>;
@@ -112,8 +113,9 @@ function Categories({ items, decide }) {
   return <div className="reports-table">{items.map((item) => <div className="simple-row" key={item.id}><span><b>{item.name}</b><small>#{item.id.slice(0, 8)}</small></span><button className="outline-button" onClick={() => decide(item, "rejected")}>Отклонить</button><button className="primary compact" onClick={() => decide(item, "approved")}>Одобрить</button></div>)}{!items.length && <div className="empty-row">Нет новых категорий</div>}</div>;
 }
 
-function Users({ items, isAdmin, openAction }) {
-  return <div className="reports-table">{items.map((item) => <div className="user-row" key={item.id}><span><b>@{item.username}</b><small>{item.email} · {item.role}{item.disabled_at ? " · banned" : ""}{item.muted_until ? " · muted" : ""}</small></span><button className="danger-button" onClick={() => openAction(item, "ban")}>Бан</button>{isAdmin && <button className="outline-button" onClick={() => openAction(item, "unban")}>Разбан</button>}{isAdmin && <button className="outline-button" onClick={() => openAction(item, "mute")}>Мут 24ч</button>}{isAdmin && <button className="outline-button" onClick={() => openAction(item, "unmute")}>Снять мут</button>}{isAdmin && <button className="outline-button" onClick={() => openAction(item, item.role === "moderator" ? "user" : "moderator", "role")}>{item.role === "moderator" ? "Снять модера" : "Сделать модером"}</button>}</div>)}{!items.length && <div className="empty-row">Пользователи не найдены</div>}</div>;
+function Users({ items, view, isAdmin, openAction }) {
+  const visible = view === "banned" ? items.filter((item) => item.disabled_at) : items;
+  return <div className="reports-table">{visible.map((item) => <div className="user-row" key={item.id}><span><b>@{item.username}</b><small>{item.email} · {item.role}{item.disabled_at ? " · banned" : ""}{item.muted_until ? " · muted" : ""}</small></span><button className="danger-button" onClick={() => openAction(item, "ban")}>Бан</button>{isAdmin && <button className="outline-button" onClick={() => openAction(item, "unban")}>Разбан</button>}{isAdmin && <button className="outline-button" onClick={() => openAction(item, "mute")}>Мут 24ч</button>}{isAdmin && <button className="outline-button" onClick={() => openAction(item, "unmute")}>Снять мут</button>}{isAdmin && <button className="outline-button" onClick={() => openAction(item, item.role === "moderator" ? "user" : "moderator", "role")}>{item.role === "moderator" ? "Снять модера" : "Сделать модером"}</button>}</div>)}{!visible.length && <div className="empty-row">{view === "banned" ? "Заблокированных пользователей нет" : "Пользователи не найдены"}</div>}</div>;
 }
 
 function Actions({ items }) {
