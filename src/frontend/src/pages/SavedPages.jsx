@@ -3,6 +3,7 @@ import { FileText, Trash2 } from "lucide-react";
 import { AppShell } from "../components/AppShell";
 import { PostCard } from "../components/PostCard";
 import { api } from "../lib/api";
+import { sharePost } from "../lib/sharePost";
 import { useRouter } from "../lib/router";
 import { useSession } from "../session";
 import "../styles/list-pages.css";
@@ -26,9 +27,10 @@ export function BookmarksPage() {
   }, [user]);
   const toggleLike = async (post) => { const before = { ...post }; const next = { ...post, liked_by_me: !post.liked_by_me, like_count: Math.max(0, post.like_count + (post.liked_by_me ? -1 : 1)) }; setPosts((items) => items.map((item) => item.id === post.id ? next : item)); try { post.liked_by_me ? await api.unlike(post.id) : await api.like(post.id); } catch { setPosts((items) => items.map((item) => item.id === post.id ? before : item)); } };
   const removeBookmark = async (post) => { const before = posts; setPosts((items) => items.filter((item) => item.id !== post.id)); try { await api.unbookmark(post.id); } catch { setPosts(before); } };
+  const share = async (post) => { try { const result = await sharePost(post); setPosts((items) => items.map((item) => item.id === post.id ? { ...item, share_count: result.share_count } : item)); } catch { } };
 
   if (!user) return <LoginPrompt title="Закладки" text="Войдите, чтобы открыть закладки" />;
-  return <AppShell title="Закладки"><section className="list-page"><h1>Закладки</h1>{state === "loading" ? <div className="card-state">Загружаем закладки…</div> : state === "empty" ? <div className="card-state"><b>Закладок пока нет</b><span>Сохраняйте интересные публикации, чтобы вернуться к ним позже.</span></div> : state === "error" ? <div className="card-state">Не удалось загрузить закладки</div> : posts.map((post) => <PostCard key={post.id} post={post} onLike={toggleLike} onBookmark={removeBookmark} />)}</section></AppShell>;
+  return <AppShell title="Закладки"><section className="list-page"><h1>Закладки</h1>{state === "loading" ? <div className="card-state">Загружаем закладки…</div> : state === "empty" ? <div className="card-state"><b>Закладок пока нет</b><span>Сохраняйте интересные публикации, чтобы вернуться к ним позже.</span></div> : state === "error" ? <div className="card-state">Не удалось загрузить закладки</div> : posts.map((post) => <PostCard key={post.id} post={post} onLike={toggleLike} onBookmark={removeBookmark} onShare={share} />)}</section></AppShell>;
 }
 
 export function DraftsPage() {

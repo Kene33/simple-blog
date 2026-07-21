@@ -5,6 +5,7 @@ import { PostCard } from "../components/PostCard";
 import { RightRail } from "../components/RightRail";
 import { useRouter } from "../lib/router";
 import { api } from "../lib/api";
+import { sharePost } from "../lib/sharePost";
 import { useSession } from "../session";
 
 const tabs = ["Для вас", "Новое", "Технологии", "Дизайн", "Культура"];
@@ -19,7 +20,7 @@ export function FeedPage() {
   const updateFilter = (key) => (event) => setFilters((value) => ({ ...value, [key]: event.target.value }));
   const resetFilters = () => setFilters({ query: "", tag: "", author: "", sort: "newest" });
   const toggle = async (post, kind) => { if (!user) return navigate("/login"); const before = { ...post }; const next = kind === "like" ? { ...post, liked_by_me: !post.liked_by_me, like_count: post.like_count + (post.liked_by_me ? -1 : 1) } : { ...post, bookmarked_by_me: !post.bookmarked_by_me }; setPosts((items) => items.map((item) => item.id === post.id ? next : item)); try { if (kind === "like") post.liked_by_me ? await api.unlike(post.id) : await api.like(post.id); else post.bookmarked_by_me ? await api.unbookmark(post.id) : await api.bookmark(post.id); } catch { setPosts((items) => items.map((item) => item.id === post.id ? before : item)); } };
-  const share = async (post) => { const url = `${window.location.origin}/posts/${post.id}`; const channel = navigator.share ? "native" : "copy"; try { if (channel === "native") await navigator.share({ title: post.title, text: post.content, url }); else await navigator.clipboard.writeText(url); const result = await api.share(post.id, channel); setPosts((items) => items.map((item) => item.id === post.id ? { ...item, share_count: result.share_count } : item)); } catch (cause) { if (cause.name !== "AbortError") console.error("Не удалось поделиться публикацией", cause); } };
+  const share = async (post) => { try { const result = await sharePost(post); setPosts((items) => items.map((item) => item.id === post.id ? { ...item, share_count: result.share_count } : item)); } catch (cause) { if (cause.name !== "AbortError") console.error("Не удалось поделиться публикацией", cause); } };
   return <AppShell title="Лента" right={<RightRail />}><section className="feed-page"><header className="page-title"><div><h1>Лента</h1><p>Идеи и обсуждения сообщества</p></div><button className="round-button" onClick={() => load()} aria-label="Обновить ленту"><RefreshCw size={20} /></button></header>
     {user && <button className="composer" onClick={() => navigate("/posts/new")}><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><span>О чём вы думаете?</span><i><ImagePlus size={20} /></i></button>}
     <div className="filter-tabs">{tabs.map((name) => <button className={tab === name ? "selected" : ""} onClick={() => setTab(name)} key={name}>{name}</button>)}</div><button className="filter-toggle" onClick={() => setFiltersOpen(!filtersOpen)}><SlidersHorizontal size={18} /> Поиск и фильтры {activeCount > 0 && <b>{activeCount} активных</b>}<ChevronDown size={17} /></button>

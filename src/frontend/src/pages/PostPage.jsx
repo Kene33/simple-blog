@@ -4,6 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { PostCard } from "../components/PostCard";
 import { ReportModal } from "../components/ReportModal";
 import { api } from "../lib/api";
+import { sharePost } from "../lib/sharePost";
 import { useRouter } from "../lib/router";
 import { useSession } from "../session";
 import "../styles/post.css";
@@ -21,7 +22,7 @@ export function PostPage({ postId }) {
   async function load() { const [postValue, page] = await Promise.all([api.post(postId), loadCommentPage()]); return { postValue, page }; }
   useEffect(() => { let cancelled = false; setState("loading"); load().then(({ postValue, page }) => { if (cancelled) return; setPost(postValue); setComments(page.items); setCommentCursor(page.next_cursor); setState("ready"); }).catch(() => { if (!cancelled) setState("error"); }); return () => { cancelled = true; }; }, [postId]);
   async function toggle(item, kind) { if (!user) return navigate("/login"); const next = kind === "like" ? { ...item, liked_by_me: !item.liked_by_me, like_count: item.like_count + (item.liked_by_me ? -1 : 1) } : { ...item, bookmarked_by_me: !item.bookmarked_by_me }; setPost(next); try { if (kind === "like") item.liked_by_me ? await api.unlike(item.id) : await api.like(item.id); else item.bookmarked_by_me ? await api.unbookmark(item.id) : await api.bookmark(item.id); } catch { setPost(item); } }
-  async function share(item) { const url = `${window.location.origin}/posts/${item.id}`; const channel = navigator.share ? "native" : "copy"; try { if (channel === "native") await navigator.share({ title: item.title, text: item.content, url }); else await navigator.clipboard.writeText(url); const result = await api.share(item.id, channel); setPost({ ...item, share_count: result.share_count }); } catch (cause) { if (cause.name !== "AbortError") setError("Не удалось поделиться публикацией"); } }
+  async function share(item) { try { const result = await sharePost(item); setPost({ ...item, share_count: result.share_count }); } catch (cause) { if (cause.name !== "AbortError") setError("Не удалось поделиться публикацией"); } }
   async function addComment(parentId, value) { if (!user) return navigate("/login"); if (!value.trim()) return; try { const comment = await api.createComment(postId, { body: value.trim(), parent_id: parentId }); setComments((items) => [comment, ...items]); setBody(""); } catch (cause) { setError(cause.message); } }
   async function updateComment(id, value) { if (!value.trim()) return; try { const updated = await api.updateComment(id, { body: value.trim() }); setComments((items) => items.map((item) => item.id === id ? updated : item)); } catch (cause) { setError(cause.message); } }
   async function removeComment(id) { try { await api.deleteComment(id); setComments((items) => items.map((item) => item.id === id ? { ...item, is_deleted: true, body: "" } : item)); } catch (cause) { setError(cause.message); } }
