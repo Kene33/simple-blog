@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { Brand } from "../components/Brand";
 import { Link, useRouter } from "../lib/router";
@@ -7,12 +7,14 @@ import { useSession } from "../session";
 
 export function AuthPage({ mode }) {
   const isLogin = mode === "login";
-  const { login, register } = useSession();
+  const { user, login, register } = useSession();
   const { navigate } = useRouter();
   const [form, setForm] = useState({ username: "", email: "", identifier: "", password: "" });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => { if (user) navigate("/"); }, [user, navigate]);
 
   async function submit(event) {
     event.preventDefault();
