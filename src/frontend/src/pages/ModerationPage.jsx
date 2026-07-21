@@ -8,6 +8,7 @@ import { useSession } from "../session";
 import "../styles/moderation.css";
 
 const reasonLabels = { spam: "Спам", harassment: "Оскорбления", illegal: "Незаконный контент", other: "Другое" };
+const actionLabels = { user_ban: "Пользователь заблокирован", user_unban: "Блокировка пользователя снята", user_mute: "Пользователь получил мут", user_unmute: "Мут пользователя снят", user_delete: "Пользователь удалён", report_resolved: "Жалоба решена", report_rejected: "Жалоба отклонена" };
 const tabs = ["reports", "categories", "users", "actions"];
 
 function TabButton({ value, active, children, onClick }) {
@@ -27,6 +28,7 @@ export function ModerationPage() {
   const [userView, setUserView] = useState("all");
   const [openCount, setOpenCount] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [selectedAction, setSelectedAction] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
   const [muteDuration, setMuteDuration] = useState("24h");
   const [reason, setReason] = useState("");
@@ -109,9 +111,10 @@ export function ModerationPage() {
     <div className="moderation-tabs">{tabs.filter((item) => isAdmin || item !== "actions").map((item) => <TabButton key={item} value={item} active={tab} onClick={setTab}>{item === "reports" ? "Жалобы" : item === "categories" ? "Категории" : item === "users" ? "Пользователи" : "Аудит"}</TabButton>)}</div>
     {error && <div className="form-error" role="alert">{error}</div>}
     {tab === "users" && <><div className="moderation-tools"><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="username или email" /></div><div className="user-list-tabs"><button className={userView === "all" ? "selected" : ""} onClick={() => setUserView("all")}>Все пользователи</button><button className={userView === "banned" ? "selected" : ""} onClick={() => setUserView("banned")}>Заблокированные</button><button className={userView === "muted" ? "selected" : ""} onClick={() => setUserView("muted")}>Замученные</button></div></>}
-    {state === "loading" ? <div className="card-state">Загружаем…</div> : tab === "reports" ? <Reports reports={reports} open={open} /> : tab === "categories" ? <Categories items={categories} decide={decideCategory} /> : tab === "users" ? <Users items={users} view={userView} currentUser={user} isAdmin={isAdmin} openAction={openUserAction} /> : <Actions items={actions} />}
+    {state === "loading" ? <div className="card-state">Загружаем…</div> : tab === "reports" ? <Reports reports={reports} open={open} /> : tab === "categories" ? <Categories items={categories} decide={decideCategory} /> : tab === "users" ? <Users items={users} view={userView} currentUser={user} isAdmin={isAdmin} openAction={openUserAction} /> : <Actions items={actions} onOpen={setSelectedAction} />}
     {selected && <ReportModal report={selected} reason={reason} setReason={setReason} isAdmin={isAdmin} onClose={() => setSelected(null)} onReject={() => resolve("rejected")} onResolve={() => resolve("resolved")} onHide={() => resolve("resolved", { hide_target: true })} onBan={() => resolve("resolved", { ban_author: true })} onHideBan={() => resolve("resolved", { hide_target: true, ban_author: true })} onRestore={restoreTarget} />}
     {pendingAction && <UserActionModal action={pendingAction} reason={reason} setReason={setReason} muteDuration={muteDuration} setMuteDuration={setMuteDuration} onClose={() => setPendingAction(null)} onConfirm={confirmUserAction} />}
+    {selectedAction && <ActionModal action={selectedAction} onClose={() => setSelectedAction(null)} />}
   </section></AppShell>;
 }
 
@@ -129,8 +132,12 @@ function Users({ items, view, currentUser, isAdmin, openAction }) {
   return <div className="reports-table">{visible.map((item) => <div className="user-row" key={item.id}><span><b>@{item.username}</b><small><b>Роль:</b> {item.role}</small><small><b>Почта:</b> {item.email}</small>{view === "banned" && <small><b>Причина:</b> {item.moderation_reason || "не указана"}</small>}{view === "muted" && <small><b>До:</b> {new Date(item.muted_until).toLocaleString("ru-RU")}</small>}</span>{item.id === currentUser?.id ? <small className="user-self-label">Это вы</small> : <details className="user-action-menu"><summary>Действия</summary><div className="user-action-list">{view === "banned" ? isAdmin && <button onClick={() => openAction(item, "unban")}>Разбан</button> : view === "muted" ? isAdmin && <><button onClick={() => openAction(item, "mute")}>Дать мут</button><button onClick={() => openAction(item, "unmute")}>Снять мут</button></> : <>{item.id !== currentUser?.id && <button className="danger-text" onClick={() => openAction(item, "ban")}>Бан</button>}{isAdmin && <button onClick={() => openAction(item, "unban")}>Разбан</button>}{isAdmin && <button onClick={() => openAction(item, "mute")}>Дать мут</button>}{isAdmin && <button onClick={() => openAction(item, "unmute")}>Снять мут</button>}{isAdmin && <button onClick={() => openAction(item, item.role === "moderator" ? "user" : "moderator", "role")}>{item.role === "moderator" ? "Снять модера" : "Сделать модером"}</button>}{isAdmin && item.id !== currentUser?.id && <button className="danger-text" onClick={() => openAction(item, "delete", "delete")}>Удалить пользователя</button>}</>}</div></details>}</div>)}{!visible.length && <div className="empty-row">{view === "banned" ? "Заблокированных пользователей нет" : view === "muted" ? "Замученных пользователей нет" : "Пользователи не найдены"}</div>}</div>;
 }
 
-function Actions({ items }) {
-  return <div className="reports-table">{items.map((item) => <div className="simple-row" key={item.id}><span><b>{item.action}</b><small>@{item.actor.username} · {item.target_type} #{item.target_id.slice(0, 8)}</small></span><span>{item.reason || "Без причины"}</span><span>{new Date(item.created_at).toLocaleString("ru-RU")}</span></div>)}{!items.length && <div className="empty-row">Аудит пуст</div>}</div>;
+function Actions({ items, onOpen }) {
+  return <div className="reports-table">{items.map((item) => <button className="simple-row audit-row" key={item.id} onClick={() => onOpen(item)}><span><b>{actionLabels[item.action] || item.action}</b><small>@{item.actor.username} · {item.target_type} #{item.target_id.slice(0, 8)}</small></span><span>{item.reason || "Без причины"}</span><span>{new Date(item.created_at).toLocaleString("ru-RU")}</span></button>)}{!items.length && <div className="empty-row">Аудит пуст</div>}</div>;
+}
+
+function ActionModal({ action, onClose }) {
+  return <div className="modal-backdrop" role="presentation"><section className="moderation-modal" role="dialog" aria-modal="true" aria-label="Детали действия модерации"><button className="modal-close" onClick={onClose} aria-label="Закрыть"><X /></button><small>ДЕТАЛИ АУДИТА</small><h2>{actionLabels[action.action] || action.action}</h2><dl className="action-details"><dt>Кто выполнил</dt><dd>@{action.actor?.username || "неизвестно"}</dd><dt>По отношению к кому</dt><dd>{action.target_username ? `@${action.target_username}` : `${action.target_type} #${action.target_id.slice(0, 8)}`}</dd><dt>Когда</dt><dd>{new Date(action.created_at).toLocaleString("ru-RU")}</dd><dt>Причина</dt><dd>{action.reason || "Не указана"}</dd></dl><footer><button className="outline-button" onClick={onClose}>Закрыть</button></footer></section></div>;
 }
 
 function ReportModal({ report, reason, setReason, isAdmin, onClose, onReject, onResolve, onHide, onBan, onHideBan, onRestore }) {
