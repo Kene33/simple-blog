@@ -4,32 +4,210 @@ import { AppShell } from "../components/AppShell";
 import { PostCard } from "../components/PostCard";
 import { ReportModal } from "../components/ReportModal";
 import { api } from "../lib/api";
+import { groupComments, mergeComments } from "../lib/commentTree";
 import { sharePost } from "../lib/sharePost";
 import { useRouter } from "../lib/router";
 import { useSession } from "../session";
 import "../styles/post.css";
 
-function Comment({ comment, replies = [], currentUser, onReply, onUpdate, onDelete, onReport, onLogin }) {
-  const [reply, setReply] = useState(false); const [editing, setEditing] = useState(false); const [text, setText] = useState(comment.body); const own = comment.author.id === currentUser?.id;
-  const submitReply = (event) => { event.preventDefault(); onReply(comment.id, event.currentTarget.body.value); event.currentTarget.reset(); setReply(false); };
-  const submitEdit = (event) => { event.preventDefault(); onUpdate(comment.id, text); setEditing(false); };
-  return <article className={`comment ${comment.is_deleted ? "deleted" : ""}`}><span className="avatar">{comment.author.username.slice(0, 2).toUpperCase()}</span><div><b>{comment.author.username}</b>{comment.is_deleted ? <small>Комментарий удалён автором</small> : editing ? <form className="comment-inline-form" onSubmit={submitEdit}><textarea value={text} onChange={(event) => setText(event.target.value)} maxLength="2000" autoFocus /><button>Сохранить</button><button type="button" onClick={() => setEditing(false)}>Отмена</button></form> : <small>{comment.body}</small>} {!comment.is_deleted && <div className="comment-actions"><button onClick={() => currentUser ? setReply(!reply) : onLogin()}>Ответить</button>{own && <><button onClick={() => setEditing(true)}>Изменить</button><button onClick={() => onDelete(comment.id)}>Удалить</button></>}<button onClick={() => onReport(comment.id)}>Пожаловаться</button></div>}{reply && <form className="comment-inline-form" onSubmit={submitReply}><textarea name="body" placeholder="Написать ответ" maxLength="2000" autoFocus /><button>Ответить</button><button type="button" onClick={() => setReply(false)}>Отмена</button></form>}{replies.length > 0 && <div className="comment-replies">{replies.map((item) => <Comment key={item.id} comment={item} currentUser={currentUser} onReply={onReply} onUpdate={onUpdate} onDelete={onDelete} onReport={onReport} onLogin={onLogin} />)}</div>}</div></article>;
+function Comment({ comment, replies, replyState, currentUser, onReply, onUpdate, onDelete, onReport, onLogin, onLoadReplies, onToggleReplies }) {
+  const [reply, setReply] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(comment.body);
+  const own = comment.author.id === currentUser?.id;
+  const loaded = replyState.loaded[comment.id];
+  const expanded = replyState.expanded[comment.id];
+  const loading = replyState.loading[comment.id];
+  const nextCursor = replyState.cursors[comment.id];
+
+  function submitReply(event) {
+    event.preventDefault();
+    onReply(comment.id, event.currentTarget.body.value);
+    event.currentTarget.reset();
+    setReply(false);
+  }
+
+  function submitEdit(event) {
+    event.preventDefault();
+    onUpdate(comment.id, text);
+    setEditing(false);
+  }
+
+  return <article className={`comment ${comment.is_deleted ? "deleted" : ""}`}>
+    <span className="avatar">{comment.author.username.slice(0, 2).toUpperCase()}</span>
+    <div>
+      <b>{comment.author.username}</b>
+      {comment.is_deleted ? <small>Комментарий удалён автором</small> : editing ? <form className="comment-inline-form" onSubmit={submitEdit}><textarea value={text} onChange={(event) => setText(event.target.value)} maxLength="2000" autoFocus /><button>Сохранить</button><button type="button" onClick={() => setEditing(false)}>Отмена</button></form> : <small>{comment.body}</small>}
+      {!comment.is_deleted && <div className="comment-actions"><button onClick={() => currentUser ? setReply(!reply) : onLogin()}>Ответить</button>{own && <><button onClick={() => setEditing(true)}>Изменить</button><button onClick={() => onDelete(comment.id)}>Удалить</button></>}<button onClick={() => onReport(comment.id)}>Пожаловаться</button></div>}
+      {reply && <form className="comment-inline-form" onSubmit={submitReply}><textarea name="body" placeholder="Написать ответ" maxLength="2000" autoFocus /><button>Ответить</button><button type="button" onClick={() => setReply(false)}>Отмена</button></form>}
+      <div className="comment-thread-actions">
+        {!loaded ? <button disabled={loading} onClick={() => onLoadReplies(comment.id)}>{loading ? "Загружаем ответы…" : "Показать ответы"}</button> : replies.length > 0 ? <button aria-expanded={expanded} onClick={() => onToggleReplies(comment.id)}>{expanded ? "Скрыть ответы" : "Показать ответы"}</button> : <span>Ответов пока нет</span>}
+      </div>
+      {loaded && expanded && replies.length > 0 && <div className="comment-replies">
+        {replies.map((item) => <Comment key={item.id} comment={item} replies={replyState.groups.get(item.id) || []} replyState={replyState} currentUser={currentUser} onReply={onReply} onUpdate={onUpdate} onDelete={onDelete} onReport={onReport} onLogin={onLogin} onLoadReplies={onLoadReplies} onToggleReplies={onToggleReplies} />)}
+        {nextCursor && <button className="comment-more" disabled={loading} onClick={() => onLoadReplies(comment.id, true)}>{loading ? "Загружаем…" : "Показать ещё ответы"}</button>}
+      </div>}
+    </div>
+  </article>;
 }
 
 export function PostPage({ postId }) {
-  const { user } = useSession(); const { navigate } = useRouter(); const [post, setPost] = useState(null); const [comments, setComments] = useState([]); const [commentCursor, setCommentCursor] = useState(null); const [loadingComments, setLoadingComments] = useState(false); const [body, setBody] = useState(""); const [state, setState] = useState("loading"); const [error, setError] = useState(""); const [reportTarget, setReportTarget] = useState(null);
-  async function loadCommentPage(cursor) { const page = await api.comments(postId, { cursor }); const replies = await Promise.all(page.items.map((comment) => api.comments(postId, { parent_id: comment.id }).then((value) => value.items))); return { items: [...page.items, ...replies.flat()], next_cursor: page.next_cursor }; }
-  async function load() { const [postValue, page] = await Promise.all([api.post(postId), loadCommentPage()]); return { postValue, page }; }
-  useEffect(() => { let cancelled = false; setState("loading"); load().then(({ postValue, page }) => { if (cancelled) return; setPost(postValue); setComments(page.items); setCommentCursor(page.next_cursor); setState("ready"); }).catch(() => { if (!cancelled) setState("error"); }); return () => { cancelled = true; }; }, [postId]);
-  async function toggle(item, kind) { if (!user) return navigate("/login"); const next = kind === "like" ? { ...item, liked_by_me: !item.liked_by_me, like_count: item.like_count + (item.liked_by_me ? -1 : 1) } : { ...item, bookmarked_by_me: !item.bookmarked_by_me }; setPost(next); try { if (kind === "like") item.liked_by_me ? await api.unlike(item.id) : await api.like(item.id); else item.bookmarked_by_me ? await api.unbookmark(item.id) : await api.bookmark(item.id); } catch { setPost(item); } }
-  async function share(item) { try { const result = await sharePost(item); setPost({ ...item, share_count: result.share_count }); } catch (cause) { if (cause.name !== "AbortError") setError("Не удалось поделиться публикацией"); } }
-  async function addComment(parentId, value) { if (!user) return navigate("/login"); if (!value.trim()) return; try { const comment = await api.createComment(postId, { body: value.trim(), parent_id: parentId }); setComments((items) => [comment, ...items]); setPost((item) => ({ ...item, comment_count: item.comment_count + 1 })); setBody(""); } catch (cause) { setError(cause.message); } }
-  async function updateComment(id, value) { if (!value.trim()) return; try { const updated = await api.updateComment(id, { body: value.trim() }); setComments((items) => items.map((item) => item.id === id ? updated : item)); } catch (cause) { setError(cause.message); } }
-  async function removeComment(id) { try { await api.deleteComment(id); setComments((items) => items.map((item) => item.id === id ? { ...item, is_deleted: true, body: "" } : item)); setPost((item) => ({ ...item, comment_count: Math.max(0, item.comment_count - 1) })); } catch (cause) { setError(cause.message); } }
-  async function loadMoreComments() { if (!commentCursor) return; setLoadingComments(true); try { const page = await loadCommentPage(commentCursor); setComments((items) => [...items, ...page.items]); setCommentCursor(page.next_cursor); } catch (cause) { setError(cause.message); } finally { setLoadingComments(false); } }
-  async function removePost() { if (!window.confirm("Удалить публикацию?")) return; try { await api.deletePost(post.id); navigate("/"); } catch (cause) { setError(cause.message); } }
+  const { user } = useSession();
+  const { navigate } = useRouter();
+  const [post, setPost] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [commentCursor, setCommentCursor] = useState(null);
+  const [loadedReplies, setLoadedReplies] = useState({});
+  const [expandedReplies, setExpandedReplies] = useState({});
+  const [replyCursors, setReplyCursors] = useState({});
+  const [loadingReplies, setLoadingReplies] = useState({});
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [body, setBody] = useState("");
+  const [state, setState] = useState("loading");
+  const [error, setError] = useState("");
+  const [reportTarget, setReportTarget] = useState(null);
+
+  async function load() {
+    const [postValue, page] = await Promise.all([api.post(postId), api.comments(postId)]);
+    return { postValue, page };
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    setState("loading");
+    setLoadedReplies({});
+    setExpandedReplies({});
+    setReplyCursors({});
+    setLoadingReplies({});
+    load().then(({ postValue, page }) => {
+      if (cancelled) return;
+      setPost(postValue);
+      setComments(page.items);
+      setCommentCursor(page.next_cursor);
+      setState("ready");
+    }).catch(() => {
+      if (!cancelled) setState("error");
+    });
+    return () => { cancelled = true; };
+  }, [postId]);
+
+  async function toggle(item, kind) {
+    if (!user) return navigate("/login");
+    const next = kind === "like" ? { ...item, liked_by_me: !item.liked_by_me, like_count: item.like_count + (item.liked_by_me ? -1 : 1) } : { ...item, bookmarked_by_me: !item.bookmarked_by_me };
+    setPost(next);
+    try {
+      if (kind === "like") item.liked_by_me ? await api.unlike(item.id) : await api.like(item.id);
+      else item.bookmarked_by_me ? await api.unbookmark(item.id) : await api.bookmark(item.id);
+    } catch {
+      setPost(item);
+    }
+  }
+
+  async function share(item) {
+    try {
+      const result = await sharePost(item);
+      setPost({ ...item, share_count: result.share_count });
+    } catch (cause) {
+      if (cause.name !== "AbortError") setError("Не удалось поделиться публикацией");
+    }
+  }
+
+  async function addComment(parentId, value) {
+    if (!user) return navigate("/login");
+    if (!value.trim()) return;
+    try {
+      const comment = await api.createComment(postId, { body: value.trim(), parent_id: parentId });
+      setComments((items) => mergeComments([comment, ...items], []));
+      if (parentId) {
+        setLoadedReplies((items) => ({ ...items, [parentId]: true }));
+        setExpandedReplies((items) => ({ ...items, [parentId]: true }));
+      }
+      setPost((item) => ({ ...item, comment_count: item.comment_count + 1 }));
+      setBody("");
+    } catch (cause) {
+      setError(cause.message);
+    }
+  }
+
+  async function updateComment(id, value) {
+    if (!value.trim()) return;
+    try {
+      const updated = await api.updateComment(id, { body: value.trim() });
+      setComments((items) => items.map((item) => item.id === id ? updated : item));
+    } catch (cause) {
+      setError(cause.message);
+    }
+  }
+
+  async function removeComment(id) {
+    try {
+      await api.deleteComment(id);
+      setComments((items) => items.map((item) => item.id === id ? { ...item, is_deleted: true, body: "" } : item));
+      setPost((item) => ({ ...item, comment_count: Math.max(0, item.comment_count - 1) }));
+    } catch (cause) {
+      setError(cause.message);
+    }
+  }
+
+  async function loadReplies(parentId, more = false) {
+    if (loadingReplies[parentId]) return;
+    setLoadingReplies((items) => ({ ...items, [parentId]: true }));
+    try {
+      const page = await api.comments(postId, { parent_id: parentId, cursor: more ? replyCursors[parentId] : undefined });
+      setComments((items) => mergeComments(items, page.items));
+      setLoadedReplies((items) => ({ ...items, [parentId]: true }));
+      setExpandedReplies((items) => ({ ...items, [parentId]: true }));
+      setReplyCursors((items) => ({ ...items, [parentId]: page.next_cursor }));
+    } catch (cause) {
+      setError(cause.message);
+    } finally {
+      setLoadingReplies((items) => ({ ...items, [parentId]: false }));
+    }
+  }
+
+  async function loadMoreComments() {
+    if (!commentCursor) return;
+    setLoadingComments(true);
+    try {
+      const page = await api.comments(postId, { cursor: commentCursor });
+      setComments((items) => mergeComments(items, page.items));
+      setCommentCursor(page.next_cursor);
+    } catch (cause) {
+      setError(cause.message);
+    } finally {
+      setLoadingComments(false);
+    }
+  }
+
+  async function removePost() {
+    if (!window.confirm("Удалить публикацию?")) return;
+    try {
+      await api.deletePost(post.id);
+      navigate("/");
+    } catch (cause) {
+      setError(cause.message);
+    }
+  }
+
   if (state === "loading") return <AppShell title="Публикация"><div className="card-state">Загружаем публикацию…</div></AppShell>;
   if (state === "error") return <AppShell title="Публикация"><div className="card-state"><b>Публикация не найдена</b><button className="outline-button" onClick={() => navigate("/")}>К ленте</button></div></AppShell>;
-  const repliesByParent = comments.reduce((groups, comment) => ({ ...groups, [comment.parent_id]: [...(groups[comment.parent_id] || []), comment] }), {});
-  return <AppShell title="Публикация"><section className="post-page"><button className="back-link button-link" onClick={() => navigate("/")}><ArrowLeft size={17} /> Назад к ленте</button><PostCard detail post={post} onReport={() => user ? setReportTarget({ postId: post.id }) : navigate("/login")} onLike={(item) => toggle(item, "like")} onBookmark={(item) => toggle(item, "bookmark")} onShare={share} />{post.author.id === user?.id && <div className="post-owner-actions"><button className="outline-button" onClick={() => navigate(`/posts/${post.id}/edit`)}><Pencil size={15} /> Редактировать</button><button className="danger-button" onClick={removePost}><Trash2 size={15} /> Удалить</button></div>}<section className="comments-card"><header><h2>Комментарии <span>{post.comment_count}</span></h2><button className="report-link" onClick={() => user ? setReportTarget({ postId: post.id }) : navigate("/login")}><Flag size={15} /> Жалоба</button></header>{user && <form className="comment-form" onSubmit={(event) => { event.preventDefault(); addComment(null, body); }}><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Добавить комментарий" maxLength="2000" /><button className="primary" aria-label="Отправить комментарий"><Send size={17} /> Отправить</button></form>}{error && <div className="form-error">{error}</div>}<div className="comment-list">{(repliesByParent.null || []).map((comment) => <Comment comment={comment} replies={repliesByParent[comment.id]} currentUser={user} onReply={addComment} onUpdate={updateComment} onDelete={removeComment} onReport={(commentId) => user ? setReportTarget({ commentId }) : navigate("/login")} onLogin={() => navigate("/login")} key={comment.id} />)}</div>{commentCursor && <button className="outline-button load-more" disabled={loadingComments} onClick={loadMoreComments}>{loadingComments ? "Загружаем…" : "Показать ещё комментарии"}</button>}</section></section>{reportTarget && <ReportModal {...reportTarget} onClose={() => setReportTarget(null)} />}</AppShell>;
+
+  const replyState = { groups: groupComments(comments), loaded: loadedReplies, expanded: expandedReplies, cursors: replyCursors, loading: loadingReplies };
+  const rootComments = replyState.groups.get(null) || [];
+
+  return <AppShell title="Публикация">
+    <section className="post-page">
+      <button className="back-link button-link" onClick={() => navigate("/")}><ArrowLeft size={17} /> Назад к ленте</button>
+      <PostCard detail post={post} onReport={() => user ? setReportTarget({ postId: post.id }) : navigate("/login")} onLike={(item) => toggle(item, "like")} onBookmark={(item) => toggle(item, "bookmark")} onShare={share} />
+      {post.author.id === user?.id && <div className="post-owner-actions"><button className="outline-button" onClick={() => navigate(`/posts/${post.id}/edit`)}><Pencil size={15} /> Редактировать</button><button className="danger-button" onClick={removePost}><Trash2 size={15} /> Удалить</button></div>}
+      <section className="comments-card">
+        <header><h2>Комментарии <span>{post.comment_count}</span></h2><button className="report-link" onClick={() => user ? setReportTarget({ postId: post.id }) : navigate("/login")}><Flag size={15} /> Жалоба</button></header>
+        {user && <form className="comment-form" onSubmit={(event) => { event.preventDefault(); addComment(null, body); }}><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Добавить комментарий" maxLength="2000" /><button className="primary" aria-label="Отправить комментарий"><Send size={17} /> Отправить</button></form>}
+        {error && <div className="form-error">{error}</div>}
+        <div className="comment-list">{rootComments.map((comment) => <Comment key={comment.id} comment={comment} replies={replyState.groups.get(comment.id) || []} replyState={replyState} currentUser={user} onReply={addComment} onUpdate={updateComment} onDelete={removeComment} onReport={(commentId) => user ? setReportTarget({ commentId }) : navigate("/login")} onLogin={() => navigate("/login")} onLoadReplies={loadReplies} onToggleReplies={(id) => setExpandedReplies((items) => ({ ...items, [id]: !items[id] }))} />)}</div>
+        {commentCursor && <button className="outline-button load-more" disabled={loadingComments} onClick={loadMoreComments}>{loadingComments ? "Загружаем…" : "Показать ещё комментарии"}</button>}
+      </section>
+    </section>
+    {reportTarget && <ReportModal {...reportTarget} onClose={() => setReportTarget(null)} />}
+  </AppShell>;
 }
