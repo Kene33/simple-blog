@@ -18,7 +18,6 @@ export function ProfilePage({ username }) {
   const [uploading, setUploading] = useState("");
 
   useEffect(() => {
-    if (!currentUser) { setState("guest"); return; }
     if (username) { setState("error"); return; }
     Promise.all([api.me(), api.myLinks({ limit: 10 })])
       .then(([data, page]) => {
@@ -28,7 +27,7 @@ export function ProfilePage({ username }) {
         setState("ready");
       })
       .catch(() => setState("error"));
-  }, [currentUser, username]);
+  }, [username]);
 
   const save = async (event) => {
     event.preventDefault();
@@ -54,7 +53,6 @@ export function ProfilePage({ username }) {
   };
   const copy = (item) => navigator.clipboard.writeText(item.short_url);
 
-  if (state === "guest") return <AppShell title="Профиль"><div className="card-state"><b>Войдите, чтобы открыть профиль</b><span>Профиль, аватар и список ссылок доступны после входа.</span></div></AppShell>;
   if (state === "loading") return <AppShell title="Профиль"><div className="card-state">Загружаем профиль...</div></AppShell>;
   if (state === "error") return <AppShell title="Профиль"><div className="card-state"><b>Профиль недоступен</b><span>Публичных профилей в текущем backend нет.</span></div></AppShell>;
 
