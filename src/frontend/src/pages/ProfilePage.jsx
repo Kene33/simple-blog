@@ -3,11 +3,13 @@ import { CalendarDays, Camera, Settings } from "lucide-react";
 import { AppShell } from "../components/AppShell";
 import { PostCard } from "../components/PostCard";
 import { api } from "../lib/api";
+import { useRouter } from "../lib/router";
 import { useSession } from "../session";
 import "../styles/profile.css";
 
 export function ProfilePage({ username }) {
   const { user: currentUser } = useSession();
+  const { navigate } = useRouter();
   const own = !username || username === currentUser?.username;
   const target = username || currentUser?.username;
   const avatarInput = useRef(null);
@@ -97,6 +99,7 @@ export function ProfilePage({ username }) {
     }
   };
 
+  if (!target) return <AppShell title="Профиль"><div className="card-state"><b>Войдите, чтобы открыть профиль</b><button className="outline-button" onClick={() => navigate("/login")}>Войти</button></div></AppShell>;
   if (state === "loading") return <AppShell title="Профиль"><div className="card-state">Загружаем профиль…</div></AppShell>;
   if (state === "error") return <AppShell title="Профиль"><div className="card-state">Профиль не найден</div></AppShell>;
 
