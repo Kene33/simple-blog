@@ -177,6 +177,8 @@ class PostBookmark(Base):
 
 class ShareEvent(Base):
     __tablename__ = "share_events"
+    __table_args__ = (Index("uq_share_events_post_user", "post_id", "user_id", unique=True),)
+
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     post_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"), nullable=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

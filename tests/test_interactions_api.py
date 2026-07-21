@@ -47,11 +47,11 @@ async def test_shares_support_anonymous_and_authenticated_events(client: AsyncCl
 
 
 @pytest.mark.asyncio
-async def test_each_copy_share_creates_an_event(client: AsyncClient) -> None:
+async def test_authenticated_copy_share_counts_once_per_account(client: AsyncClient) -> None:
     csrf = await register(client, "copysharer")
     post = await client.post("/api/v1/posts", json={"title": "Post", "content": "content", "category": "tech"}, headers={"X-CSRF-Token": csrf})
     post_id = post.json()["id"]
-    for expected_count in (1, 2):
+    for expected_count in (1, 1):
         response = await client.post(f"/api/v1/posts/{post_id}/shares", json={"channel": "copy"}, headers={"X-CSRF-Token": csrf})
         assert response.status_code == 201
         assert response.json()["share_count"] == expected_count
