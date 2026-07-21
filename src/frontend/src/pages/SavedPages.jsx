@@ -19,7 +19,7 @@ export function BookmarksPage() {
   const [state, setState] = useState("loading");
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) { setPosts([]); setState("loading"); return; }
     setState("loading");
     api.bookmarks().then((page) => {
       setPosts(page.items);
@@ -47,7 +47,7 @@ export function DraftsPage() {
     setState(page.items.length ? "ready" : "empty");
   }).catch(() => { setDrafts([]); setState("error"); }); };
 
-  useEffect(() => { if (user) load(); }, [user]);
+  useEffect(() => { if (user) load(); else { setDrafts([]); setState("loading"); setBusyDraft(""); setError(""); } }, [user]);
   const remove = async (id) => { setBusyDraft(id); setError(""); try { await api.deleteDraft(id); await load(); } catch (cause) { setError(cause.message || "Не удалось удалить черновик"); } finally { setBusyDraft(""); } };
   const publish = async (id) => { setBusyDraft(id); setError(""); try { const post = await api.publishDraft(id); navigate(`/posts/${post.id}`); } catch (cause) { setError(cause.message || "Не удалось опубликовать черновик"); setBusyDraft(""); } };
 

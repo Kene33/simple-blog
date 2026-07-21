@@ -21,7 +21,7 @@ export function ModerationPage() {
   const [state, setState] = useState("loading");
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin) { setReports([]); setCursor(null); setNextCursor(null); setOpenCount(null); setSelected(null); setError(""); return; }
     let cancelled = false;
     setState("loading");
     Promise.all([api.reports({ status, cursor }), api.reportCount()])
