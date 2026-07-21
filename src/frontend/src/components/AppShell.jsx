@@ -51,6 +51,7 @@ export function AppShell({ children, title = "Лента", right }) {
   const { user, isAdmin, logout } = useSession();
   const { navigate } = useRouter();
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [guestNotice, setGuestNotice] = useState("");
   const [theme, setTheme] = useState(() => localStorage.getItem("simple-theme") || "light");
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -58,17 +59,19 @@ export function AppShell({ children, title = "Лента", right }) {
   }, [theme]);
   const toggleTheme = () => setTheme((value) => value === "dark" ? "light" : "dark");
   const go = (to) => { setMobileMenu(false); navigate(to); };
+  const guestOnly = (action) => { setMobileMenu(false); setGuestNotice(`Чтобы ${action}, войдите в аккаунт.`); };
   const signOut = async () => { setMobileMenu(false); await logout(); navigate("/"); };
   return <div className="app-shell">
     <Sidebar theme={theme} onThemeToggle={toggleTheme} />
     <header className="mobile-header"><Brand compact /><b>{title}</b><span className="mobile-header-actions"><ThemeButton theme={theme} onToggle={toggleTheme} /><button className="icon-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label={mobileMenu ? "Закрыть меню" : "Открыть меню"}>{mobileMenu ? <X /> : <Menu />}</button></span></header>
-    {mobileMenu && <div className="mobile-menu"><button onClick={() => go("/")}>Лента</button><button onClick={() => go("/search")}>Поиск</button><button onClick={() => go(user ? "/posts/new" : "/login")}>{user ? "Создать" : "Войти"}</button><button onClick={() => go(user ? "/me" : "/login")}>{user ? "Профиль" : "Войти"}</button>{user && <button onClick={() => go("/bookmarks")}>Закладки</button>}{isAdmin && <button onClick={() => go("/moderation")}>Модерация</button>}{user && <button onClick={signOut}>Выйти</button>}</div>}
+    {mobileMenu && <div className="mobile-menu"><button onClick={() => go("/")}>Лента</button><button onClick={() => go("/search")}>Поиск</button><button onClick={() => user ? go("/posts/new") : guestOnly("создать публикацию")}>Новый пост</button><button onClick={() => user ? go("/me") : guestOnly("открыть профиль")}>Профиль</button>{user && <button onClick={() => go("/bookmarks")}>Закладки</button>}{isAdmin && <button onClick={() => go("/moderation")}>Модерация</button>}{user && <button onClick={signOut}>Выйти</button>}</div>}
     <main className="main-content">{children}</main>
     {right && <aside className="right-rail">{right}</aside>}
+    {guestNotice && <div className="guest-notice" role="alert">{guestNotice}<button onClick={() => setGuestNotice("")} aria-label="Закрыть уведомление"><X size={16} /></button></div>}
     <nav className="mobile-nav">
       <button onClick={() => navigate("/")} aria-label="Лента"><House /></button>
-      <button className="mobile-create" onClick={() => navigate(user ? "/posts/new" : "/login")} aria-label={user ? "Новый пост" : "Войти"}><Plus /></button>
-      <button onClick={() => navigate(user ? "/me" : "/login")} aria-label={user ? "Профиль" : "Войти"}><CircleUserRound /></button>
+      <button className="mobile-create" onClick={() => user ? navigate("/posts/new") : guestOnly("создать публикацию")} aria-label="Новый пост"><Plus /></button>
+      <button onClick={() => user ? navigate("/me") : guestOnly("открыть профиль")} aria-label="Профиль"><CircleUserRound /></button>
     </nav>
   </div>;
 }
