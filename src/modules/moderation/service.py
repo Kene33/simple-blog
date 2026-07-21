@@ -5,15 +5,15 @@ import json
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
 from src.core.errors import AppError
-from src.db.models import Comment, Post, Report, User
+from src.db.models import Comment, Post, RefreshSession, Report, User
 from src.modules.auth.service import user_summary
 from src.modules.comments.service import get_comment
-from src.modules.moderation.schemas import ReportCount, ReportCreateRequest, ReportPage, ReportRead, ReportTarget, ReportUpdateRequest
+from src.modules.moderation.schemas import AdminUserRead, ReportCount, ReportCreateRequest, ReportPage, ReportRead, ReportTarget, ReportUpdateRequest, UserModerationRequest
 from src.modules.posts.service import get_post
 
 
@@ -123,3 +123,36 @@ async def resolve_report(session: AsyncSession, report_id: UUID, payload: Report
     report.resolved_at = datetime.now(timezone.utc)
     await session.flush()
     return report
+
+
+async def list_users(session: AsyncSession, query_text: str | None, limit: int) -> list[AdminUserRead]:
+    query = select(User)
+    if query_text:
+        pattern = f"%{query_text.strip().casefold()}%"
+        query = query.where(User.username_normalized.ilike(pattern) | User.email_normalized.ilike(pattern))
+    users = (await session.scalars(query.order_by(User.username_normalized).limit(limit))).all()
+    return [AdminUserRead(id=user.id, username=user.username, avatar_url=f"/api/v1/media/{user.avatar_media_id}" if user.avatar_media_id else None, email=user.email, role=user.role, disabled_at=user.disabled_at, muted_until=user.muted_until, moderation_reason=user.moderation_reason) for user in users]
+
+
+async def moderate_user(session: AsyncSession, actor: User, user_id: UUID, payload: UserModerationRequest) -> User:
+    user = await session.scalar(select(User).where(User.id == user_id).with_for_update())
+    if user is None:
+        raise AppError("RESOURCE_NOT_FOUND", "User not found", 404)
+    if user.id == actor.id or user.role == "admin":
+        raise AppError("FORBIDDEN", "Administrators cannot moderate this user", 403)
+    now = datetime.now(timezone.utc)
+    if payload.action == "ban":
+        user.disabled_at = now
+        user.muted_until = None
+        await session.execute(update(RefreshSession).where(RefreshSession.user_id == user.id, RefreshSession.revoked_at.is_(None)).values(revoked_at=now))
+    elif payload.action == "unban":
+        user.disabled_at = None
+    elif payload.action == "mute":
+        if payload.muted_until <= now:
+            raise AppError("VALIDATION_ERROR", "Mute expiry must be in the future", 422)
+        user.muted_until = payload.muted_until
+    else:
+        user.muted_until = None
+    user.moderation_reason = payload.reason
+    await session.flush()
+    return user

@@ -21,6 +21,8 @@
 | `POST` | `/auth/login` | Public | Create access and refresh cookies | `200` |
 | `POST` | `/auth/refresh` | Refresh cookie | Rotate refresh session and issue access cookie | `200` |
 | `POST` | `/auth/logout` | Access cookie | Revoke session and clear cookies | `204` |
+| `POST` | `/auth/password-reset/request` | Public | Issue a one-time reset token | `200` |
+| `POST` | `/auth/password-reset/confirm` | Public | Set a new password and revoke sessions | `204` |
 | `GET` | `/users/me` | Access cookie | Return the current user | `200` |
 | `PATCH` | `/users/me` | Access cookie | Update the current profile | `200` |
 | `GET` | `/users/{username}` | Public | Return a public profile | `200` |
@@ -153,6 +155,8 @@ share count.
 | `GET` | `/admin/reports/count` | Admin | Count open reports for a navigation badge | `200` |
 | `GET` | `/admin/reports/{report_id}` | Admin | Read a report with a target snapshot | `200` |
 | `PATCH` | `/admin/reports/{report_id}` | Admin | Resolve or reject a report | `200` |
+| `GET` | `/admin/users` | Admin | Find users by username or email | `200` |
+| `PATCH` | `/admin/users/{user_id}/moderation` | Admin + CSRF | Ban, unban, mute, or unmute a user | `200` |
 
 Reports are separate resources. Content ownership remains with the posts or
 comments module; moderation invokes explicit service methods rather than

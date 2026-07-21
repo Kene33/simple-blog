@@ -23,6 +23,19 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetRequestRead(BaseModel):
+    reset_token: str | None = None
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=500)
+    password: str = Field(min_length=10, max_length=128)
+
+
 class UserSummary(BaseModel):
     id: UUID
     username: str

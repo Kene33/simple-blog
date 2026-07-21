@@ -10,7 +10,7 @@ from src.core.config import Settings, get_settings
 from src.core.errors import AppError
 from src.db.models import Media
 from src.db.session import get_session
-from src.modules.auth.dependencies import CurrentAuth, get_optional_auth, require_csrf
+from src.modules.auth.dependencies import CurrentAuth, get_optional_auth, require_unmuted_csrf
 from src.modules.media.schemas import MediaPurpose, MediaRead
 from src.modules.media.service import as_read, delete_media, owned_media, upload_media
 from src.modules.media.storage import S3Storage
@@ -23,7 +23,7 @@ def get_storage(settings: Settings = Depends(get_settings)) -> S3Storage:
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=MediaRead)
-async def upload(file: UploadFile = File(...), purpose: MediaPurpose = Form(...), auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session), storage: S3Storage = Depends(get_storage)) -> MediaRead:
+async def upload(file: UploadFile = File(...), purpose: MediaPurpose = Form(...), auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session), storage: S3Storage = Depends(get_storage)) -> MediaRead:
     max_size = 5 * 1024 * 1024 if purpose == "avatar" else 100 * 1024 * 1024
     with SpooledTemporaryFile(max_size=1024 * 1024) as stream:
         header = await file.read(8_192)
@@ -58,7 +58,7 @@ async def download(media_id: UUID, auth: CurrentAuth | None = Depends(get_option
 
 
 @router.delete("/{media_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
-async def remove(media_id: UUID, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session), storage: S3Storage = Depends(get_storage)) -> Response:
+async def remove(media_id: UUID, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session), storage: S3Storage = Depends(get_storage)) -> Response:
     await delete_media(session, storage, await owned_media(session, media_id, auth.user.id))
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

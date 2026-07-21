@@ -43,6 +43,7 @@ export function AuthPage({ mode }) {
         {error && <div className="form-error" role="alert">{error}</div>}
         <button className="primary auth-submit" disabled={busy}>{busy ? "Подождите…" : isLogin ? "Войти" : "Создать аккаунт"}</button>
       </form>
+      {isLogin && <p className="auth-switch"><Link to="/password-reset">Забыли пароль?</Link></p>}
       <p className="auth-switch">{isLogin ? "Впервые здесь? " : "Уже есть аккаунт? "}<Link to={isLogin ? "/register" : "/login"}>{isLogin ? "Зарегистрироваться" : "Войти"}</Link></p>
     </section>
   </div>;

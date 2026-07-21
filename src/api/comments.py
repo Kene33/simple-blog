@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
 from src.db.session import get_session
-from src.modules.auth.dependencies import CurrentAuth, get_optional_auth, require_csrf
+from src.modules.auth.dependencies import CurrentAuth, get_optional_auth, require_unmuted_csrf
 from src.modules.comments.schemas import CommentCreateRequest, CommentPage, CommentRead, CommentUpdateRequest
 from src.modules.comments.service import create_comment, delete_comment, get_comment, list_comments, serialize_comments, update_comment
 
@@ -13,7 +13,7 @@ router = APIRouter(tags=["comments"])
 
 
 @router.post("/api/v1/posts/{post_id}/comments", response_model=CommentRead, status_code=status.HTTP_201_CREATED)
-async def create(post_id: UUID, payload: CommentCreateRequest, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> CommentRead:
+async def create(post_id: UUID, payload: CommentCreateRequest, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> CommentRead:
     comment = await create_comment(session, post_id, auth.user, payload)
     await session.commit()
     await session.refresh(comment)
@@ -31,7 +31,7 @@ async def read(comment_id: UUID, auth: CurrentAuth | None = Depends(get_optional
 
 
 @router.patch("/api/v1/comments/{comment_id}", response_model=CommentRead)
-async def update(comment_id: UUID, payload: CommentUpdateRequest, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> CommentRead:
+async def update(comment_id: UUID, payload: CommentUpdateRequest, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> CommentRead:
     comment = await update_comment(session, await get_comment(session, comment_id, auth.user.id), payload)
     await session.commit()
     await session.refresh(comment)
@@ -39,7 +39,7 @@ async def update(comment_id: UUID, payload: CommentUpdateRequest, auth: CurrentA
 
 
 @router.delete("/api/v1/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
-async def remove(comment_id: UUID, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+async def remove(comment_id: UUID, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> Response:
     await delete_comment(session, await get_comment(session, comment_id, auth.user.id))
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

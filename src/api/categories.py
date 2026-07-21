@@ -7,7 +7,7 @@ from src.core.config import Settings, get_settings
 from src.core.errors import AppError
 from src.db.models import Category
 from src.db.session import get_session
-from src.modules.auth.dependencies import CurrentAuth, get_current_auth, require_admin, require_csrf
+from src.modules.auth.dependencies import CurrentAuth, get_current_auth, require_admin, require_csrf, require_unmuted_csrf
 from src.modules.categories.schemas import CategoryRequestCreate, CategoryRequestPage, CategoryRequestUpdate
 from src.modules.categories.service import as_request, create_category_request, list_admin_requests, list_categories, list_own_requests, resolve_category_request
 from src.modules.posts.schemas import CategoryRead, CategoryRequestRead
@@ -21,7 +21,7 @@ async def list_all(session: AsyncSession = Depends(get_session)) -> list[Categor
 
 
 @router.post("/category-requests", response_model=CategoryRequestRead, status_code=status.HTTP_201_CREATED)
-async def create(payload: CategoryRequestCreate, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> CategoryRequestRead:
+async def create(payload: CategoryRequestCreate, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> CategoryRequestRead:
     request = await create_category_request(session, auth.user, payload)
     await session.commit()
     return as_request(request, await session.get(Category, request.category_id))

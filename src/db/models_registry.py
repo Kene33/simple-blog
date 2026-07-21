@@ -1,4 +1,20 @@
-from src.db.models import Category, CategoryRequest, Comment, Media, Post, PostBookmark, PostLike, PostMedia, PostTag, RefreshSession, Report, ShareEvent, Tag, User
+from src.db.models import (
+    Category,
+    CategoryRequest,
+    Comment,
+    Media,
+    PasswordResetToken,
+    Post,
+    PostBookmark,
+    PostLike,
+    PostMedia,
+    PostTag,
+    RefreshSession,
+    Report,
+    ShareEvent,
+    Tag,
+    User,
+)
 
 __all__ = [
     "Category",
@@ -9,6 +25,7 @@ __all__ = [
     "PostLike",
     "PostBookmark",
     "PostMedia",
+    "PasswordResetToken",
     "PostTag",
     "RefreshSession",
     "Report",

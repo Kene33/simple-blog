@@ -1,7 +1,7 @@
 import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import Settings
 from src.core.errors import AppError
 from src.core.security import TokenData, create_access_token, create_refresh_token, hash_password, token_hash, verify_password
-from src.db.models import RefreshSession, User
-from src.modules.auth.schemas import LoginRequest, RegisterRequest, SessionRead, UserSummary
+from src.db.models import PasswordResetToken, RefreshSession, User
+from src.modules.auth.schemas import LoginRequest, PasswordResetConfirmRequest, RegisterRequest, SessionRead, UserSummary
 
 
 @dataclass(frozen=True)
@@ -105,3 +105,28 @@ async def revoke_session(session: AsyncSession, session_id: uuid.UUID, user_id: 
     refresh_session = await session.scalar(select(RefreshSession).where(RefreshSession.id == session_id, RefreshSession.user_id == user_id))
     if refresh_session and refresh_session.revoked_at is None:
         refresh_session.revoked_at = datetime.now(timezone.utc)
+
+
+async def create_password_reset(session: AsyncSession, settings: Settings, email: str) -> str | None:
+    user = await session.scalar(select(User).where(User.email_normalized == normalize_email(email)))
+    if user is None or user.disabled_at is not None:
+        return None
+    now = datetime.now(timezone.utc)
+    await session.execute(update(PasswordResetToken).where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None)).values(used_at=now))
+    token = secrets.token_urlsafe(32)
+    session.add(PasswordResetToken(user_id=user.id, token_hash=token_hash(token), expires_at=now + timedelta(minutes=settings.password_reset_minutes)))
+    await session.flush()
+    return token
+
+
+async def reset_password(session: AsyncSession, payload: PasswordResetConfirmRequest) -> None:
+    now = datetime.now(timezone.utc)
+    reset = await session.scalar(select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash(payload.token)).with_for_update())
+    if reset is None or reset.used_at is not None or _is_expired(reset.expires_at):
+        raise AppError("AUTH_INVALID", "Password reset token is invalid or expired", 401)
+    user = await session.get(User, reset.user_id)
+    if user is None or user.disabled_at is not None:
+        raise AppError("AUTH_INVALID", "Password reset token is invalid or expired", 401)
+    user.password_hash = hash_password(payload.password)
+    reset.used_at = now
+    await session.execute(update(RefreshSession).where(RefreshSession.user_id == user.id, RefreshSession.revoked_at.is_(None)).values(revoked_at=now))

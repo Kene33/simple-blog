@@ -59,6 +59,13 @@ async def require_csrf(request: Request, auth: CurrentAuth = Depends(get_current
     return auth
 
 
+async def require_unmuted_csrf(auth: CurrentAuth = Depends(require_csrf)) -> CurrentAuth:
+    muted_until = auth.user.muted_until
+    if muted_until is not None and (muted_until.replace(tzinfo=timezone.utc) if muted_until.tzinfo is None else muted_until) > datetime.now(timezone.utc):
+        raise AppError("USER_MUTED", "User is muted", 403)
+    return auth
+
+
 async def optional_csrf(request: Request, auth: CurrentAuth | None = Depends(get_optional_auth), settings: Settings = Depends(get_settings)) -> CurrentAuth | None:
     if auth is None:
         return None

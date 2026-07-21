@@ -7,8 +7,18 @@ from src.core.errors import AppError
 from src.core.security import new_csrf_token
 from src.db.session import get_session
 from src.modules.auth.dependencies import CurrentAuth, require_csrf
-from src.modules.auth.schemas import LoginRequest, RegisterRequest, SessionRead
-from src.modules.auth.service import AuthSession, RefreshReplayDetected, authenticate_user, create_session, register_user, revoke_session, rotate_session
+from src.modules.auth.schemas import LoginRequest, PasswordResetConfirmRequest, PasswordResetRequest, PasswordResetRequestRead, RegisterRequest, SessionRead
+from src.modules.auth.service import (
+    AuthSession,
+    RefreshReplayDetected,
+    authenticate_user,
+    create_password_reset,
+    create_session,
+    register_user,
+    reset_password,
+    revoke_session,
+    rotate_session,
+)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -69,3 +79,17 @@ async def logout(auth: CurrentAuth = Depends(require_csrf), session: AsyncSessio
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
     clear_session_cookies(response, settings)
     return response
+
+
+@router.post("/password-reset/request", response_model=PasswordResetRequestRead)
+async def request_password_reset(payload: PasswordResetRequest, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PasswordResetRequestRead:
+    token = await create_password_reset(session, settings, str(payload.email))
+    await session.commit()
+    return PasswordResetRequestRead(reset_token=token if settings.environment in {"development", "test"} else None)
+
+
+@router.post("/password-reset/confirm", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def confirm_password_reset(payload: PasswordResetConfirmRequest, session: AsyncSession = Depends(get_session)) -> Response:
+    await reset_password(session, payload)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

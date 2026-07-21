@@ -59,6 +59,26 @@ class ReportCount(BaseModel):
     open_count: int
 
 
+class UserModerationRequest(BaseModel):
+    action: Literal["ban", "unban", "mute", "unmute"]
+    muted_until: datetime | None = None
+    reason: str | None = Field(default=None, max_length=2_000)
+
+    @model_validator(mode="after")
+    def validate_mute(self) -> "UserModerationRequest":
+        if self.action == "mute" and self.muted_until is None:
+            raise ValueError("muted_until is required when muting")
+        return self
+
+
+class AdminUserRead(UserSummary):
+    email: str
+    role: str
+    disabled_at: datetime | None
+    muted_until: datetime | None
+    moderation_reason: str | None
+
+
 class ReportPage(BaseModel):
     items: list[ReportRead]
     next_cursor: str | None = None

@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 15
     refresh_token_days: int = 30
+    password_reset_minutes: int = 30
     access_cookie_name: str = "access_token"
     refresh_cookie_name: str = "refresh_token"
     csrf_cookie_name: str = "csrf_token"
