@@ -19,8 +19,9 @@ button { cursor: pointer; }
 .media-viewer-nav { top: 50%; transform: translateY(-50%); }
 .media-viewer-prev { left: 6px; }.media-viewer-next { right: 6px; }
 .media-viewer-position { position: absolute; bottom: 6px; padding: 7px 10px; border-radius: 999px; background: #151925e6; color: #fff; font-size: 12px; font-weight: 800; }
-.user-row > button { width: 112px; justify-content: center; }
-.user-row { grid-template-columns: minmax(220px, 1fr) repeat(5, 112px) !important; }
+.user-row > button, .user-actions > button { width: 112px; justify-content: center; }
+.user-row { grid-template-columns: minmax(0, 1fr) minmax(220px, 360px) !important; }
+.user-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .user-list-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
 .user-list-tabs button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 12px; font-weight: 800; }
 .user-list-tabs button.selected { background: var(--text); color: var(--surface); }
