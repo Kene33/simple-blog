@@ -67,23 +67,13 @@ export function ProfilePage({ username }) {
   const updatePost = (id, next) => setPosts((current) => current.map((post) => (post.id === id ? next(post) : post)));
   const toggleLike = async (post) => {
     if (!currentUser) return navigate("/login");
-    if (post.liked_by_me) {
-      await api.unlike(post.id);
-      updatePost(post.id, (item) => ({ ...item, liked_by_me: false, like_count: Math.max(0, item.like_count - 1) }));
-    } else {
-      const result = await api.like(post.id);
-      updatePost(post.id, (item) => ({ ...item, liked_by_me: true, like_count: result.like_count }));
-    }
+    updatePost(post.id, (item) => ({ ...item, liked_by_me: !item.liked_by_me, like_count: Math.max(0, item.like_count + (item.liked_by_me ? -1 : 1)) }));
+    try { post.liked_by_me ? await api.unlike(post.id) : await api.like(post.id); } catch { updatePost(post.id, () => post); }
   };
   const toggleBookmark = async (post) => {
     if (!currentUser) return navigate("/login");
-    if (post.bookmarked_by_me) {
-      await api.unbookmark(post.id);
-      updatePost(post.id, (item) => ({ ...item, bookmarked_by_me: false }));
-    } else {
-      await api.bookmark(post.id);
-      updatePost(post.id, (item) => ({ ...item, bookmarked_by_me: true }));
-    }
+    updatePost(post.id, (item) => ({ ...item, bookmarked_by_me: !item.bookmarked_by_me }));
+    try { post.bookmarked_by_me ? await api.unbookmark(post.id) : await api.bookmark(post.id); } catch { updatePost(post.id, () => post); }
   };
   const uploadProfileImage = async (event, purpose) => {
     const file = event.target.files?.[0];
