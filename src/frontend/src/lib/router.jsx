@@ -14,7 +14,7 @@ export function RouterProvider({ children }) {
   const value = useMemo(() => ({
     location,
     navigate(to) {
-      if (to === window.location.pathname) return;
+      if (to === `${window.location.pathname}${window.location.search}${window.location.hash}`) return;
       window.history.pushState({}, "", to);
       setLocation(window.location);
       window.scrollTo({ top: 0, behavior: "instant" });
