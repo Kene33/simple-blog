@@ -69,7 +69,18 @@ export function PostPage({ postId }) {
 
   async function load() {
     const [postValue, page] = await Promise.all([api.post(postId), api.comments(postId)]);
-    return { postValue, page };
+    const replies = await loadRootReplies(page.items);
+    return { postValue, page: { ...page, items: mergeComments(page.items, replies.items) }, replies };
+  }
+
+  async function loadRootReplies(roots) {
+    const pages = await Promise.all(roots.map((comment) => api.comments(postId, { parent_id: comment.id })));
+    return {
+      items: pages.flatMap((page) => page.items),
+      loaded: Object.fromEntries(roots.map((comment) => [comment.id, true])),
+      expanded: Object.fromEntries(roots.filter((_, index) => pages[index].items.length > 0).map((comment) => [comment.id, true])),
+      cursors: Object.fromEntries(roots.map((comment, index) => [comment.id, pages[index].next_cursor]))
+    };
   }
 
   useEffect(() => {
@@ -79,11 +90,14 @@ export function PostPage({ postId }) {
     setExpandedReplies({});
     setReplyCursors({});
     setLoadingReplies({});
-    load().then(({ postValue, page }) => {
+    load().then(({ postValue, page, replies }) => {
       if (cancelled) return;
       setPost(postValue);
       setComments(page.items);
       setCommentCursor(page.next_cursor);
+      setLoadedReplies(replies.loaded);
+      setExpandedReplies(replies.expanded);
+      setReplyCursors(replies.cursors);
       setState("ready");
     }).catch(() => {
       if (!cancelled) setState("error");
@@ -170,8 +184,12 @@ export function PostPage({ postId }) {
     setLoadingComments(true);
     try {
       const page = await api.comments(postId, { cursor: commentCursor });
-      setComments((items) => mergeComments(items, page.items));
+      const replies = await loadRootReplies(page.items);
+      setComments((items) => mergeComments(items, mergeComments(page.items, replies.items)));
       setCommentCursor(page.next_cursor);
+      setLoadedReplies((items) => ({ ...items, ...replies.loaded }));
+      setExpandedReplies((items) => ({ ...items, ...replies.expanded }));
+      setReplyCursors((items) => ({ ...items, ...replies.cursors }));
     } catch (cause) {
       setError(cause.message);
     } finally {
