@@ -97,6 +97,8 @@ export const api = {
   resolveReport: (id, data) => request(`/admin/reports/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   bookmarks: (params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null)); return request(`/bookmarks${query.size ? `?${query}` : ""}`); },
   drafts: () => request("/drafts"),
+  draft: (id) => request(`/drafts/${id}`),
+  updateDraft: (id, data) => request(`/drafts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteDraft: (id) => request(`/drafts/${id}`, { method: "DELETE" }),
   publishDraft: (id) => request(`/drafts/${id}/publish`, { method: "POST" })
 };

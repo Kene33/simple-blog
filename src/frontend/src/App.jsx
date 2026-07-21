@@ -18,6 +18,8 @@ function AppContent() {
   if (location.pathname === "/login") return <AuthPage mode="login" />;
   if (location.pathname === "/register") return <AuthPage mode="register" />;
   if (location.pathname === "/posts/new") return <CreatePostPage />;
+  const draftEditMatch = location.pathname.match(/^\/drafts\/([^/]+)\/edit$/);
+  if (draftEditMatch) return <CreatePostPage draftId={draftEditMatch[1]} />;
   const editMatch = location.pathname.match(/^\/posts\/([^/]+)\/edit$/);
   if (editMatch) return <CreatePostPage postId={editMatch[1]} />;
   if (location.pathname === "/me") return <ProfilePage />;
