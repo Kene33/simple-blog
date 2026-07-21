@@ -90,7 +90,7 @@ export function CreatePostPage({ postId, draftId }) {
     }
   }
 
-  if (!user) return <AppShell title="Создать"><div className="card-state"><b>Войдите, чтобы создать публикацию</b><button className="outline-button" onClick={() => navigate("/login")}>Войти</button></div></AppShell>;
+  if (!user) return <AppShell title="Создать"><section className="guest-create"><div className="card-state"><b>Войдите, чтобы создать публикацию</b><button className="outline-button" onClick={() => navigate("/login")}>Войти</button></div></section></AppShell>;
 
   const usesCategoryCatalog = Array.isArray(categories);
   return <AppShell title={postId || draftId ? "Редактировать" : "Создать"}>
