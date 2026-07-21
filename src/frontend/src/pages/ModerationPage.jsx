@@ -17,6 +17,7 @@ export function ModerationPage() {
   const [nextCursor, setNextCursor] = useState(null);
   const [openCount, setOpenCount] = useState(null);
   const [selected, setSelected] = useState(null);
+  const [error, setError] = useState("");
   const [state, setState] = useState("loading");
 
   useEffect(() => {
@@ -40,13 +41,18 @@ export function ModerationPage() {
     setCursor(null);
     setStatus(event.target.value);
   };
-  const open = async (id) => { try { setSelected(await api.reportDetail(id)); } catch { } };
+  const open = async (id) => { setError(""); try { setSelected(await api.reportDetail(id)); } catch (cause) { setError(cause.message || "Не удалось открыть жалобу"); } };
   const resolve = async (value) => {
-    await api.resolveReport(selected.id, { status: value, resolution: "Обработано модератором" });
-    setReports((current) => current.filter((report) => report.id !== selected.id));
-    setSelected(null);
-    const count = await api.reportCount();
-    setOpenCount(count.open_count);
+    setError("");
+    try {
+      await api.resolveReport(selected.id, { status: value, resolution: "Обработано модератором" });
+      setReports((current) => current.filter((report) => report.id !== selected.id));
+      setSelected(null);
+      const count = await api.reportCount();
+      setOpenCount(count.open_count);
+    } catch (cause) {
+      setError(cause.message || "Не удалось обработать жалобу");
+    }
   };
 
   if (loading) return <AppShell title="Модерация"><div className="card-state">Проверяем доступ…</div></AppShell>;
@@ -55,6 +61,7 @@ export function ModerationPage() {
 
   return <AppShell title="Модерация"><section className="moderation-page">
     <header className="moderation-heading"><div><h1>Очередь жалоб</h1><p>{openCount ?? "—"} открытых обращений требуют проверки</p></div><select value={status} onChange={changeStatus}><option value="open">Открытые</option><option value="resolved">Решённые</option><option value="rejected">Отклонённые</option></select></header>
+    {error && <div className="form-error" role="alert">{error}</div>}
     {state === "loading" && !reports.length ? <div className="card-state">Загружаем обращения…</div> : state === "error" ? <div className="card-state">Не удалось загрузить очередь</div> : <><div className="reports-table"><div className="report-row report-titles"><span>Жалоба</span><span>Репортёр</span><span>Объект</span><span>Причина</span><span>Создана</span></div>{reports.map((report) => <div className="report-row" key={report.id}><span><i className={`report-status ${report.status}`}>{report.status}</i><b>#{report.id.slice(0, 8)}</b></span><span>@{report.reporter.username}</span><span>{report.target?.kind === "post" ? <Link to={`/posts/${report.post_id}`}>Пост</Link> : report.target ? "Комментарий" : "Недоступен"}<small>{report.target?.is_deleted ? "Удалён" : report.target ? "Открыть объект" : "Объект не найден"}</small></span><span><b>{reasonLabels[report.reason] || report.reason}</b><small>{report.details || report.resolution || "Без деталей"}</small></span><span>{new Date(report.created_at).toLocaleDateString("ru-RU")}</span><button className="outline-button" onClick={() => open(report.id)}><Eye size={15} /> Рассмотреть</button></div>)}{!reports.length && <div className="empty-row">Очередь пуста</div>}</div>{nextCursor && <button className="outline-button next-page" onClick={() => setCursor(nextCursor)}>Следующая страница</button>}</>}
     {selected && <div className="modal-backdrop" role="presentation"><section className="moderation-modal" role="dialog" aria-modal="true"><button className="modal-close" onClick={() => setSelected(null)} aria-label="Закрыть"><X /></button><small>ЖАЛОБА НА {(selected.target?.kind || "объект").toUpperCase()}</small><h2>#{selected.id.slice(0, 8)}</h2><p><b>{reasonLabels[selected.reason] || selected.reason}</b> · @{selected.reporter.username}</p><blockquote>{selected.target?.title || selected.target?.body || "Объект жалобы недоступен"}</blockquote><footer><button className="outline-button" onClick={() => resolve("rejected")}>Отклонить</button><button className="danger-button" onClick={() => resolve("resolved")}>Решить жалобу</button></footer></section></div>}
   </section></AppShell>;
