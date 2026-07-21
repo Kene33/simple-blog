@@ -19,6 +19,11 @@ export function RouterProvider({ children }) {
       window.history.pushState({}, "", to);
       setLocation(currentLocation());
       window.scrollTo({ top: 0, behavior: "instant" });
+    },
+    replace(to) {
+      if (to === `${window.location.pathname}${window.location.search}${window.location.hash}`) return;
+      window.history.replaceState({}, "", to);
+      setLocation(currentLocation());
     }
   }), [location]);
 
