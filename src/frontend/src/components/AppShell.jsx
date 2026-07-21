@@ -8,7 +8,7 @@ import { useSession } from "../session";
 const links = [
   ["/", "Лента", House],
   ["/search", "Поиск", Search],
-  ["/links/new", "Ссылка", PenLine]
+  ["/posts/new", "Ссылка", PenLine]
 ];
 
 function NavLink({ to, label, Icon, badge }) {
@@ -31,7 +31,7 @@ function Sidebar() {
       {user && <NavLink to="/bookmarks" label="Папки" Icon={Bookmark} />}
       {isAdmin && <NavLink to="/moderation" label="Модерация" Icon={ShieldCheck} badge={reportCount} />}
     </nav>
-    <Link to="/links/new" className="primary create-button"><Plus size={21} /> Новая ссылка</Link>
+    <Link to="/posts/new" className="primary create-button"><Plus size={21} /> Новая ссылка</Link>
     <div className="sidebar-account">
       <small>Режим прототипа</small>
       {user ? <Link to="/me" className="account-row"><span className="avatar">{accountName.slice(0, 2).toUpperCase()}</span><span><b>{user.display_name || user.email}</b><em>{user.email}</em></span></Link> : <Link to="/login" className="account-row"><span className="account-login"><LogIn size={21} /></span><span><b>Войти</b><em>или создать аккаунт</em></span></Link>}
@@ -48,7 +48,7 @@ export function AppShell({ children, title = "Лента", right }) {
     {right && <aside className="right-rail">{right}</aside>}
     <nav className="mobile-nav">
       <button onClick={() => navigate("/")} aria-label="Лента"><House /></button>
-      <button className="mobile-create" onClick={() => navigate("/links/new")} aria-label="Новая ссылка"><Plus /></button>
+      <button className="mobile-create" onClick={() => navigate("/posts/new")} aria-label="Новый пост"><Plus /></button>
       <button onClick={() => navigate("/me")} aria-label="Профиль"><CircleUserRound /></button>
     </nav>
   </div>;

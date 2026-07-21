@@ -3,7 +3,8 @@ import { RouterProvider, useRouter } from "./lib/router";
 import { AppShell } from "./components/AppShell";
 import { AuthPage } from "./pages/AuthPage";
 import { FeedPage } from "./pages/FeedPage";
-import { CreateLinkPage } from "./pages/CreateLinkPage";
+import { CreatePostPage } from "./pages/CreatePostPage";
+import { PostPage } from "./pages/PostPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ModerationPage } from "./pages/ModerationPage";
 import { SearchPage } from "./pages/SearchPage";
@@ -12,12 +13,13 @@ import "./styles/app.css";
 
 function AppContent() {
   const { loading } = useSession();
-  const { location, navigate } = useRouter();
+  const { location } = useRouter();
   if (loading) return <main className="boot">Загружаем Simple…</main>;
   if (location.pathname === "/login") return <AuthPage mode="login" />;
   if (location.pathname === "/register") return <AuthPage mode="register" />;
-  if (location.pathname === "/links/new") return <CreateLinkPage />;
-  if (location.pathname === "/posts/new") return <AppShell title="Создать"><div className="card-state"><b>Маршрут изменён</b><span>Для текущего backend используйте создание короткой ссылки.</span><button className="outline-button" onClick={() => navigate("/links/new")}>К созданию ссылки</button></div></AppShell>;
+  if (location.pathname === "/posts/new") return <CreatePostPage />;
+  const editMatch = location.pathname.match(/^\/posts\/([^/]+)\/edit$/);
+  if (editMatch) return <CreatePostPage postId={editMatch[1]} />;
   if (location.pathname === "/me") return <ProfilePage />;
   if (location.pathname === "/moderation") return <ModerationPage />;
   if (location.pathname === "/search") return <SearchPage />;
@@ -25,7 +27,8 @@ function AppContent() {
   if (location.pathname === "/drafts") return <DraftsPage />;
   const userMatch = location.pathname.match(/^\/users\/([^/]+)$/);
   if (userMatch) return <ProfilePage username={userMatch[1]} />;
-  if (location.pathname.startsWith("/posts/")) return <AppShell title="Недоступно"><div className="card-state"><b>Публикации недоступны</b><span>Текущий backend работает с короткими ссылками, а не с постами.</span></div></AppShell>;
+  const postMatch = location.pathname.match(/^\/posts\/([^/]+)$/);
+  if (postMatch) return <PostPage postId={postMatch[1]} />;
   return <FeedPage />;
 }
 

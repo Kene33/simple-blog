@@ -85,18 +85,39 @@ export const api = {
   register: (data) => request("/auth/register", { method: "POST", body: JSON.stringify(data) }),
   verifyEmail: (token) => request("/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }),
   logout: async () => { try { await request("/auth/logout", { method: "POST" }); } finally { clearAccessToken(); } },
+  posts: (params = {}) => {
+    const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== "" && value != null));
+    return request(`/posts${query.size ? `?${query}` : ""}`);
+  },
+  post: (id) => request(`/posts/${id}`),
   createLink: (data) => request("/links", { method: "POST", body: JSON.stringify(data) }),
   myLinks: (params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== "" && value != null)); return request(`/me/links${query.size ? `?${query}` : ""}`); },
   folders: () => request("/me/folders"),
   createFolder: (data) => request("/me/folders", { method: "POST", body: JSON.stringify(data) }),
+  like: (id) => request(`/posts/${id}/like`, { method: "PUT" }),
+  unlike: (id) => request(`/posts/${id}/like`, { method: "DELETE" }),
+  bookmark: (id) => request(`/posts/${id}/bookmark`, { method: "PUT" }),
+  unbookmark: (id) => request(`/posts/${id}/bookmark`, { method: "DELETE" }),
+  share: (id, channel) => request(`/posts/${id}/shares`, { method: "POST", body: JSON.stringify({ channel }) }),
+  createPost: (data) => request("/posts", { method: "POST", body: JSON.stringify(data) }),
+  updatePost: (id, data) => request(`/posts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deletePost: (id) => request(`/posts/${id}`, { method: "DELETE" }),
+  createDraft: (data) => request("/drafts", { method: "POST", body: JSON.stringify(data) }),
   uploadMedia: (file, purpose = "post") => {
     if (purpose === "avatar") {
       const body = new FormData(); body.append("file", file);
       return request("/me/avatar", { method: "POST", body });
     }
-    throw new ApiError("Этот тип загрузки не поддержан текущим backend", 400);
+    const body = new FormData(); body.append("file", file); body.append("purpose", purpose);
+    return request("/media", { method: "POST", body });
   },
+  user: (username) => request(`/users/${username}`),
   updateMe: (data) => request("/me/profile", { method: "PATCH", body: JSON.stringify(data) }),
+  userComments: (username, params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null)); return request(`/users/${username}/comments${query.size ? `?${query}` : ""}`); },
+  comments: (postId, params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null)); return request(`/posts/${postId}/comments${query.size ? `?${query}` : ""}`); },
+  createComment: (postId, data) => request(`/posts/${postId}/comments`, { method: "POST", body: JSON.stringify(data) }),
+  updateComment: (id, data) => request(`/comments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteComment: (id) => request(`/comments/${id}`, { method: "DELETE" }),
   report: (data) => request("/reports", { method: "POST", body: JSON.stringify(data) }),
   reportCount: async () => ({ open_count: (await api.reports({ status_filter: "open", limit: 1 })).total || 0 }),
   reports: (params = {}) => {
@@ -107,5 +128,9 @@ export const api = {
     return request(`/admin/reports${query.size ? `?${query}` : ""}`);
   },
   reportDetail: (id) => request(`/admin/reports/${id}`),
-  resolveReport: (id, data) => request(`/admin/reports/${id}`, { method: "PATCH", body: JSON.stringify({ password_confirmation: data.password_confirmation, status: data.status, comment: data.resolution || data.comment }) })
+  resolveReport: (id, data) => request(`/admin/reports/${id}`, { method: "PATCH", body: JSON.stringify({ password_confirmation: data.password_confirmation, status: data.status, comment: data.resolution || data.comment }) }),
+  bookmarks: (params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null)); return request(`/bookmarks${query.size ? `?${query}` : ""}`); },
+  drafts: () => request("/drafts"),
+  deleteDraft: (id) => request(`/drafts/${id}`, { method: "DELETE" }),
+  publishDraft: (id) => request(`/drafts/${id}/publish`, { method: "POST" })
 };
