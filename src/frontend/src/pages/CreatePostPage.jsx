@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Paperclip, X } from "lucide-react";
 import { AppShell } from "../components/AppShell";
 import { api } from "../lib/api";
+import { validatePostFiles } from "../lib/postFiles";
 import { useRouter } from "../lib/router";
 import { useSession } from "../session";
 import "../styles/create-post.css";
@@ -12,7 +13,7 @@ export function CreatePostPage({ postId }) {
   const [form, setForm] = useState(blank); const [files, setFiles] = useState([]); const [existingMedia, setExistingMedia] = useState([]); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
   useEffect(() => { if (!postId || !user) return; setBusy(true); api.post(postId).then((post) => { if (post.author.id !== user.id) throw new Error("Нет доступа к редактированию публикации"); setForm({ title: post.title, content: post.content, category: post.category, tags: post.tags.join(", ") }); setExistingMedia(post.media); }).catch((cause) => setError(cause.message || "Публикация не найдена")).finally(() => setBusy(false)); }, [postId, user?.id]);
   const update = (key) => (event) => setForm((value) => ({ ...value, [key]: event.target.value }));
-  const addFiles = (selected) => { const next = [...files, ...Array.from(selected)].slice(0, 4); if (next.filter((file) => file.type.startsWith("video/")).length > 1) return setError("К публикации можно добавить только одно видео."); if (next.some((file) => file.size > (file.type.startsWith("video/") ? 100 : 10) * 1024 * 1024)) return setError("Один из файлов превышает допустимый размер."); setError(""); setFiles(next); };
+  const addFiles = (selected) => { const result = validatePostFiles(existingMedia, files, selected); setError(result.error); setFiles(result.files); };
   const payload = async () => { const media = await Promise.all(files.map((file) => api.uploadMedia(file))); return { title: form.title.trim(), content: form.content.trim(), category: form.category, tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean), media_ids: [...existingMedia.map((item) => item.id), ...media.map((item) => item.id)] }; };
   const submit = async (draft) => { setBusy(true); setError(""); try { const data = await payload(); const result = postId ? await api.updatePost(postId, data) : draft ? await api.createDraft(data) : await api.createPost(data); navigate(postId ? `/posts/${result.id}` : draft ? "/drafts" : `/posts/${result.id}`); } catch (cause) { setError(cause.message || "Не удалось сохранить публикацию"); } finally { setBusy(false); } };
   if (!user) return <AppShell title="Создать"><div className="card-state"><b>Войдите, чтобы создать публикацию</b><button className="outline-button" onClick={() => navigate("/login")}>Войти</button></div></AppShell>;

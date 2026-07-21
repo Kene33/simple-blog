@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "check:post-files": "node src/lib/postFiles.check.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
