@@ -13,7 +13,7 @@ import "./styles/app.css";
 
 function AppContent() {
   const { loading } = useSession();
-  const { location } = useRouter();
+  const { location, navigate } = useRouter();
   if (loading) return <main className="boot">Загружаем Simple…</main>;
   if (location.pathname === "/login") return <AuthPage mode="login" />;
   if (location.pathname === "/register") return <AuthPage mode="register" />;
@@ -31,7 +31,8 @@ function AppContent() {
   if (userMatch) return <ProfilePage username={userMatch[1]} />;
   const postMatch = location.pathname.match(/^\/posts\/([^/]+)$/);
   if (postMatch) return <PostPage postId={postMatch[1]} />;
-  return <FeedPage />;
+  if (location.pathname === "/") return <FeedPage />;
+  return <AppShell title="Не найдено"><div className="card-state"><b>Страница не найдена</b><span>Ссылка устарела или такого раздела нет.</span><button className="outline-button" onClick={() => navigate("/")}>К ленте</button></div></AppShell>;
 }
 
 export function App() {
