@@ -32,6 +32,11 @@ export function ProfilePage({ username }) {
     if (!target) return;
     let cancelled = false;
     setState("loading");
+    setPosts([]);
+    setAnswers([]);
+    setPostCursor(null);
+    setAnswerCursor(null);
+    setProfileError("");
     (own ? api.me() : api.user(target))
       .then(async (data) => {
         const [postResult, commentResult] = await Promise.allSettled([api.posts({ author: target }), api.userComments(target)]);
@@ -47,7 +52,13 @@ export function ProfilePage({ username }) {
         setState("ready");
       })
       .catch(() => {
-        if (!cancelled) setState("error");
+        if (cancelled) return;
+        setProfile(null);
+        setPosts([]);
+        setAnswers([]);
+        setPostCursor(null);
+        setAnswerCursor(null);
+        setState("error");
       });
     return () => {
       cancelled = true;
