@@ -1,20 +1,34 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Paperclip, X } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Copy, Link as LinkIcon } from "lucide-react";
 import { AppShell } from "../components/AppShell";
 import { api } from "../lib/api";
 import { useRouter } from "../lib/router";
 import { useSession } from "../session";
 import "../styles/create-post.css";
+import "../styles/links.css";
 
-const blank = { title: "", content: "", category: "Технологии", tags: "" };
-export function CreatePostPage({ postId }) {
-  const { user } = useSession(); const { navigate } = useRouter(); const fileInput = useRef(null);
-  const [form, setForm] = useState(blank); const [files, setFiles] = useState([]); const [existingMedia, setExistingMedia] = useState([]); const [error, setError] = useState(""); const [busy, setBusy] = useState(Boolean(postId));
-  if (!user) { navigate("/login"); return null; }
-  useEffect(() => { if (!postId) return; api.post(postId).then((post) => { if (post.author.id !== user.id) throw new Error("Нет доступа к редактированию публикации"); setForm({ title: post.title, content: post.content, category: post.category, tags: post.tags.join(", ") }); setExistingMedia(post.media); }).catch((cause) => setError(cause.message || "Публикация не найдена")).finally(() => setBusy(false)); }, [postId, user.id]);
+export function CreatePostPage() {
+  const { navigate } = useRouter();
+  const { user } = useSession();
+  const [form, setForm] = useState({ url: "", label: "", mode: "reuse" });
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const update = (key) => (event) => setForm((value) => ({ ...value, [key]: event.target.value }));
-  const addFiles = (selected) => { const next = [...files, ...Array.from(selected)].slice(0, 4); if (next.filter((file) => file.type.startsWith("video/")).length > 1) return setError("К публикации можно добавить только одно видео."); if (next.some((file) => file.size > (file.type.startsWith("video/") ? 100 : 10) * 1024 * 1024)) return setError("Один из файлов превышает допустимый размер."); setError(""); setFiles(next); };
-  const payload = async () => { const media = await Promise.all(files.map((file) => api.uploadMedia(file))); return { title: form.title.trim(), content: form.content.trim(), category: form.category, tags: form.tags.split(",").map((tag) => tag.trim()).filter(Boolean), media_ids: [...existingMedia.map((item) => item.id), ...media.map((item) => item.id)] }; };
-  const submit = async (draft) => { setBusy(true); setError(""); try { const data = await payload(); const result = postId ? await api.updatePost(postId, data) : draft ? await api.createDraft(data) : await api.createPost(data); navigate(postId ? `/posts/${result.id}` : draft ? "/drafts" : `/posts/${result.id}`); } catch (cause) { setError(cause.message || "Не удалось сохранить публикацию"); } finally { setBusy(false); } };
-  return <AppShell title={postId ? "Редактировать" : "Создать"}><section className="create-page"><button className="back-link button-link" onClick={() => navigate(postId ? `/posts/${postId}` : "/")}><ArrowLeft size={17} /> Отмена</button><h1>{postId ? "Редактирование публикации" : "Новая публикация"}</h1><p>{postId ? "Обновите текст и вложения" : "Поделитесь идеей с сообществом"}</p><form className="create-form" onSubmit={(event) => { event.preventDefault(); submit(false); }}><label>Заголовок <small>обязательно</small><input value={form.title} onChange={update("title")} maxLength="200" required placeholder="О чём ваша публикация?" /></label><label>Текст <small>обязательно</small><textarea value={form.content} onChange={update("content")} maxLength="10000" required placeholder="Расскажите больше…" /></label><div className="create-grid"><label>Категория<select value={form.category} onChange={update("category")}><option>Технологии</option><option>Дизайн</option><option>Культура</option><option>Идеи</option></select></label><label>Теги <small>через запятую</small><input value={form.tags} onChange={update("tags")} maxLength="300" placeholder="design, product" /></label></div><div className="attachments"><header><div><b>Вложения</b><small>До 4 файлов, максимум одно видео</small></div><button type="button" className="outline-button" onClick={() => fileInput.current.click()}><Paperclip size={18} /> Добавить файл</button></header><input ref={fileInput} className="visually-hidden" type="file" accept="image/*,video/*" multiple onChange={(event) => addFiles(event.target.files)} />{[...existingMedia, ...files].length > 0 && <div className="file-list">{existingMedia.map((media) => <div className="file-chip" key={media.id}><span>{media.kind === "video" ? "Видео" : "Фото"}</span><b>Текущее вложение</b><button type="button" onClick={() => setExistingMedia((items) => items.filter((item) => item.id !== media.id))} aria-label="Удалить файл"><X size={17} /></button></div>)}{files.map((file, index) => <div className="file-chip" key={`${file.name}-${index}`}><span>{file.type.startsWith("video/") ? "Видео" : "Фото"}</span><b>{file.name}</b><button type="button" onClick={() => setFiles((items) => items.filter((_, fileIndex) => fileIndex !== index))} aria-label="Удалить файл"><X size={17} /></button></div>)}</div>}</div>{error && <div className="form-error" role="alert">{error}</div>}<footer>{!postId && <button type="button" className="outline-button" disabled={busy} onClick={() => submit(true)}>Сохранить черновик</button>}<button className="primary" disabled={busy}>{busy ? "Сохраняем…" : postId ? "Сохранить изменения" : "Опубликовать"}</button></footer></form></section></AppShell>;
+  const submit = async (event) => {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      setResult(await api.createLink(user ? { url: form.url, label: form.label || null, mode: form.mode } : { url: form.url }));
+      setForm({ url: "", label: "", mode: "reuse" });
+    } catch (cause) {
+      setError(cause.message || "Не удалось создать ссылку");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const copy = async () => navigator.clipboard.writeText(result.short_url);
+
+  return <AppShell title="Создать"><section className="create-page"><button className="back-link button-link" onClick={() => navigate("/")}><ArrowLeft size={17} /> Отмена</button><h1>Новая ссылка</h1><p>Сократите URL и сохраните его в Simple</p><form className="create-form" onSubmit={submit}><label>Длинная ссылка <small>обязательно</small><input type="url" value={form.url} onChange={update("url")} maxLength="2048" required placeholder="https://example.com/long/path" /></label><label>Название <small>{user ? "необязательно" : "после входа"}</small><input value={form.label} onChange={update("label")} maxLength="120" disabled={!user} placeholder="Документация, лендинг, кампания" /></label><label>Поведение<select value={form.mode} onChange={update("mode")} disabled={!user}><option value="reuse">Переиспользовать существующую</option><option value="new">Создать новую</option></select></label>{error && <div className="form-error" role="alert">{error}</div>}{result && <div className="card-state"><LinkIcon size={20} /><b>{result.short_url}</b><span>{result.created ? "Ссылка создана" : "Найдена существующая ссылка"}</span><button type="button" className="outline-button" onClick={copy}><Copy size={16} /> Копировать</button></div>}<footer><button type="button" className="outline-button" onClick={() => navigate("/")}>К ленте</button><button className="primary" disabled={busy}>{busy ? "Создаём..." : "Создать ссылку"}</button></footer></form></section></AppShell>;
 }
