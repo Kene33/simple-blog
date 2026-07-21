@@ -32,6 +32,8 @@ export function SessionProvider({ children }) {
     user,
     loading,
     isAdmin: user?.role === "admin",
+    isModerator: user?.role === "moderator",
+    isStaff: user?.role === "admin" || user?.role === "moderator",
     async login(data) {
       await api.login(data);
       return refreshMe();

@@ -27,10 +27,10 @@ function ThemeButton({ theme, onToggle }) {
 }
 
 function Sidebar({ theme, onThemeToggle }) {
-  const { user, isAdmin, logout } = useSession();
+  const { user, isStaff, logout } = useSession();
   const { navigate } = useRouter();
   const [reportCount, setReportCount] = useState(0);
-  useEffect(() => { if (isAdmin) api.reportCount().then((data) => setReportCount(data.open_count)).catch(() => setReportCount(0)); }, [isAdmin]);
+  useEffect(() => { if (isStaff) api.reportCount().then((data) => setReportCount(data.open_count)).catch(() => setReportCount(0)); }, [isStaff]);
   const signOut = async () => { await logout(); navigate("/"); };
   return <aside className="sidebar">
     <Brand />
@@ -38,7 +38,7 @@ function Sidebar({ theme, onThemeToggle }) {
       {links.map(([to, label, Icon]) => <NavLink key={to} to={to} label={label} Icon={Icon} />)}
       {user && <NavLink to="/me" label="Профиль" Icon={CircleUserRound} />}
       {user && <NavLink to="/bookmarks" label="Закладки" Icon={Bookmark} />}
-      {isAdmin && <NavLink to="/moderation" label="Модерация" Icon={ShieldCheck} badge={reportCount} />}
+      {isStaff && <NavLink to="/moderation" label="Модерация" Icon={ShieldCheck} badge={reportCount} />}
     </nav>
     <Link to={user ? "/posts/new" : "/login"} className="primary create-button"><Plus size={21} /> {user ? "Новый пост" : "Войти"}</Link>
     <ThemeButton theme={theme} onToggle={onThemeToggle} />
@@ -49,7 +49,7 @@ function Sidebar({ theme, onThemeToggle }) {
 }
 
 export function AppShell({ children, title = "Лента", right }) {
-  const { user, isAdmin, logout } = useSession();
+  const { user, isStaff, logout } = useSession();
   const { navigate } = useRouter();
   const [mobileMenu, setMobileMenu] = useState(false);
   const [guestNotice, setGuestNotice] = useState("");
@@ -65,7 +65,7 @@ export function AppShell({ children, title = "Лента", right }) {
   return <div className="app-shell">
     <Sidebar theme={theme} onThemeToggle={toggleTheme} />
     <header className="mobile-header"><Brand compact /><b>{title}</b><span className="mobile-header-actions"><ThemeButton theme={theme} onToggle={toggleTheme} /><button className="icon-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label={mobileMenu ? "Закрыть меню" : "Открыть меню"}>{mobileMenu ? <X /> : <Menu />}</button></span></header>
-    {mobileMenu && <div className="mobile-menu"><button onClick={() => go("/")}>Лента</button><button onClick={() => go("/search")}>Поиск</button><button onClick={() => user ? go("/posts/new") : guestOnly("создать публикацию")}>Новый пост</button><button onClick={() => user ? go("/me") : guestOnly("открыть профиль")}>Профиль</button>{user && <button onClick={() => go("/bookmarks")}>Закладки</button>}{isAdmin && <button onClick={() => go("/moderation")}>Модерация</button>}{user && <button onClick={signOut}>Выйти</button>}</div>}
+    {mobileMenu && <div className="mobile-menu"><button onClick={() => go("/")}>Лента</button><button onClick={() => go("/search")}>Поиск</button><button onClick={() => user ? go("/posts/new") : guestOnly("создать публикацию")}>Новый пост</button><button onClick={() => user ? go("/me") : guestOnly("открыть профиль")}>Профиль</button>{user && <button onClick={() => go("/bookmarks")}>Закладки</button>}{isStaff && <button onClick={() => go("/moderation")}>Модерация</button>}{user && <button onClick={signOut}>Выйти</button>}</div>}
     <main className="main-content">{children}</main>
     {right && <aside className="right-rail">{right}</aside>}
     {guestNotice && <div className="guest-notice" role="alert">{guestNotice}<button onClick={() => setGuestNotice("")} aria-label="Закрыть уведомление"><X size={16} /></button></div>}
