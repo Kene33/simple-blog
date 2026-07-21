@@ -29,6 +29,7 @@ button { cursor: pointer; }
 .user-action-list button { padding: 8px 10px; border: 0; border-radius: 7px; background: transparent; color: var(--text); text-align: left; font-size: 12px; font-weight: 700; }
 .user-action-list button:hover { background: var(--surface-soft); color: var(--accent); }
 .user-action-list .danger-text { color: #d93126; }
+.user-self-label { justify-self: end; color: var(--muted); font-size: 11px; font-weight: 700; }
 .author-status, .profile-status { display: inline-block; margin-left: 7px; padding: 3px 6px; border-radius: 8px; background: #fff0ee; color: #d93126; font-size: 10px; font-style: normal; font-weight: 800; }
 .avatar-deleted, .profile-avatar-deleted { background: var(--surface-soft); }
 .user-list-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
