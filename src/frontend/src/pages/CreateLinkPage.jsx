@@ -7,7 +7,7 @@ import { useSession } from "../session";
 import "../styles/create-post.css";
 import "../styles/links.css";
 
-export function CreatePostPage() {
+export function CreateLinkPage() {
   const { navigate } = useRouter();
   const { user } = useSession();
   const [form, setForm] = useState({ url: "", label: "", mode: "reuse" });
