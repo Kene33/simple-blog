@@ -86,6 +86,24 @@ async def test_other_users_can_comment_and_read_comment(client: AsyncClient) -> 
 
 
 @pytest.mark.asyncio
+async def test_guests_can_read_comments_but_cannot_change_them(client: AsyncClient) -> None:
+    owner_csrf = await register(client, "guestreader")
+    post_id = await create_post(client, owner_csrf)
+    created = await client.post(f"/api/v1/posts/{post_id}/comments", json={"body": "Public comment"}, headers={"X-CSRF-Token": owner_csrf})
+    comment_id = created.json()["id"]
+    guest = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        visible = await guest.get(f"/api/v1/posts/{post_id}/comments")
+        assert visible.status_code == 200
+        assert visible.json()["items"][0]["body"] == "Public comment"
+        assert (await guest.post(f"/api/v1/posts/{post_id}/comments", json={"body": "Not allowed"})).status_code == 401
+        assert (await guest.patch(f"/api/v1/comments/{comment_id}", json={"body": "Not allowed"})).status_code == 401
+        assert (await guest.delete(f"/api/v1/comments/{comment_id}")).status_code == 401
+    finally:
+        await guest.aclose()
+
+
+@pytest.mark.asyncio
 async def test_comment_edit_delete_and_tombstone(client: AsyncClient) -> None:
     csrf = await register(client, "owner")
     post_id = await create_post(client, csrf)
