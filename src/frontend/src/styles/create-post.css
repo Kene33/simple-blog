@@ -15,3 +15,4 @@
 .draft-menu-actions{display:flex;flex-shrink:0;gap:7px}
 .draft-menu-actions .outline-button{width:32px;height:32px;padding:0}
 @media(max-width:700px){.drafts-menu{padding:15px}.drafts-menu-header{align-items:center}.drafts-menu-header p{display:none}.drafts-menu-header .button-link{font-size:11px}.draft-menu-item{align-items:flex-start}.draft-menu-copy span{max-width:190px}}
+.create-form footer{background:var(--surface)}
