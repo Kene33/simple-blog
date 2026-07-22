@@ -24,6 +24,7 @@ class CommentRead(BaseModel):
     post_id: UUID
     author: UserSummary
     parent_id: UUID | None
+    reply_count: int = 0
     body: str
     is_deleted: bool
     created_at: datetime

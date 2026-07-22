@@ -43,7 +43,7 @@ function Comment({ comment, replies, replyState, currentUser, onReply, onUpdate,
       {!comment.is_deleted && <div className="comment-actions"><button onClick={() => currentUser ? setReply(!reply) : onLogin()}>Ответить</button>{own && <><button onClick={() => setEditing(true)}>Изменить</button><button onClick={() => onDelete(comment.id)}>Удалить</button></>}<button onClick={() => onReport(comment.id)}>Пожаловаться</button></div>}
       {reply && <form className="comment-inline-form" onSubmit={submitReply}><textarea name="body" placeholder="Написать ответ" maxLength="2000" autoFocus /><button>Ответить</button><button type="button" onClick={() => setReply(false)}>Отмена</button></form>}
       <div className="comment-thread-actions">
-        {!loaded ? <button disabled={loading} onClick={() => onLoadReplies(comment.id)}>{loading ? "Загружаем ответы…" : "Показать ответы"}</button> : replies.length > 0 ? <button aria-expanded={expanded} onClick={() => onToggleReplies(comment.id)}>{expanded ? "Скрыть ответы" : "Показать ответы"}</button> : <span>Ответов пока нет</span>}
+        {comment.reply_count > 0 && (!loaded ? <button disabled={loading} onClick={() => onLoadReplies(comment.id)}>{loading ? "Загружаем ответы…" : "Показать ответы"}</button> : replies.length > 0 ? <button aria-expanded={expanded} onClick={() => onToggleReplies(comment.id)}>{expanded ? "Скрыть ответы" : "Показать ответы"}</button> : null)}
       </div>
       {loaded && expanded && replies.length > 0 && <div className="comment-replies">
         {replies.map((item) => <Comment key={item.id} comment={item} replies={replyState.groups.get(item.id) || []} replyState={replyState} currentUser={currentUser} onReply={onReply} onUpdate={onUpdate} onDelete={onDelete} onReport={onReport} onLogin={onLogin} onLoadReplies={onLoadReplies} onToggleReplies={onToggleReplies} />)}
@@ -76,7 +76,7 @@ export function PostPage({ postId }) {
   }
 
   async function loadRootReplies(roots) {
-    const pages = await Promise.all(roots.map((comment) => api.comments(postId, { parent_id: comment.id })));
+    const pages = await Promise.all(roots.map((comment) => api.comments(postId, { parent_id: comment.id, limit: 3 })));
     return {
       items: pages.flatMap((page) => page.items),
       loaded: Object.fromEntries(roots.map((comment) => [comment.id, true])),
@@ -133,7 +133,7 @@ export function PostPage({ postId }) {
     if (!value.trim()) return;
     try {
       const comment = await api.createComment(postId, { body: value.trim(), parent_id: parentId });
-      setComments((items) => mergeComments([comment, ...items], []));
+      setComments((items) => mergeComments([comment, ...items.map((item) => item.id === parentId ? { ...item, reply_count: item.reply_count + 1 } : item)], []));
       if (parentId) {
         setLoadedReplies((items) => ({ ...items, [parentId]: true }));
         setExpandedReplies((items) => ({ ...items, [parentId]: true }));
@@ -158,7 +158,8 @@ export function PostPage({ postId }) {
   async function removeComment(id) {
     try {
       await api.deleteComment(id);
-      setComments((items) => items.map((item) => item.id === id ? { ...item, is_deleted: true, body: "" } : item));
+      const removed = comments.find((item) => item.id === id);
+      setComments((items) => items.map((item) => item.id === id ? { ...item, is_deleted: true, body: "" } : item.id === removed?.parent_id ? { ...item, reply_count: Math.max(0, item.reply_count - 1) } : item));
       setPost((item) => ({ ...item, comment_count: Math.max(0, item.comment_count - 1) }));
     } catch (cause) {
       setError(cause.message);
@@ -169,7 +170,7 @@ export function PostPage({ postId }) {
     if (loadingReplies[parentId]) return;
     setLoadingReplies((items) => ({ ...items, [parentId]: true }));
     try {
-      const page = await api.comments(postId, { parent_id: parentId, cursor: more ? replyCursors[parentId] : undefined });
+      const page = await api.comments(postId, { parent_id: parentId, limit: 3, cursor: more ? replyCursors[parentId] : undefined });
       setComments((items) => mergeComments(items, page.items));
       setLoadedReplies((items) => ({ ...items, [parentId]: true }));
       setExpandedReplies((items) => ({ ...items, [parentId]: true }));

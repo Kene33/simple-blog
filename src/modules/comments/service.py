@@ -5,7 +5,7 @@ import json
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
@@ -86,7 +86,9 @@ async def serialize_comments(session: AsyncSession, comments: list[Comment]) -> 
     if not comments:
         return []
     authors = {user.id: user for user in (await session.scalars(select(User).where(User.id.in_({comment.author_id for comment in comments})))).all()}
-    return [CommentRead(id=comment.id, post_id=comment.post_id, author=user_summary(authors[comment.author_id]), parent_id=comment.parent_id, body=TOMBSTONE_BODY if comment.deleted_at else comment.body, is_deleted=comment.deleted_at is not None, created_at=comment.created_at, updated_at=comment.updated_at) for comment in comments]
+    ids = [comment.id for comment in comments]
+    counts = dict((parent_id, count) for parent_id, count in (await session.execute(select(Comment.parent_id, func.count(Comment.id)).where(Comment.parent_id.in_(ids), Comment.deleted_at.is_(None)).group_by(Comment.parent_id))).all())
+    return [CommentRead(id=comment.id, post_id=comment.post_id, author=user_summary(authors[comment.author_id]), parent_id=comment.parent_id, reply_count=counts.get(comment.id, 0), body=TOMBSTONE_BODY if comment.deleted_at else comment.body, is_deleted=comment.deleted_at is not None, created_at=comment.created_at, updated_at=comment.updated_at) for comment in comments]
 
 
 async def list_comments(session: AsyncSession, *, settings: Settings, post_id: UUID, parent_id: UUID | None, cursor: str | None, limit: int, viewer_id: UUID | None = None) -> CommentPage:
