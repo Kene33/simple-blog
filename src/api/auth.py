@@ -90,6 +90,7 @@ async def logout(auth: CurrentAuth = Depends(require_csrf), session: AsyncSessio
 
 @router.post("/password-reset/request", response_model=PasswordResetRequestRead)
 async def request_password_reset(payload: PasswordResetRequest, request: Request, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PasswordResetRequestRead:
+    await request.app.state.rate_limiter.check(request, "password-reset-request-ip", 20, 900)
     await request.app.state.rate_limiter.check(request, "password-reset-request", 5, 900, str(payload.email).casefold())
     token = await create_password_reset(session, settings, str(payload.email))
     if token:

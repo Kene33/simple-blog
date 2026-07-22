@@ -34,6 +34,20 @@ async def test_registration_rate_limit_is_enforced(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_password_reset_rate_limit_has_ip_and_email_buckets(client: AsyncClient) -> None:
+    for _ in range(5):
+        response = await client.post("/api/v1/auth/password-reset/request", json={"email": "user@example.com"})
+        assert response.status_code == 200
+    blocked_email = await client.post("/api/v1/auth/password-reset/request", json={"email": "user@example.com"})
+    assert blocked_email.status_code == 429
+    for index in range(14):
+        response = await client.post("/api/v1/auth/password-reset/request", json={"email": f"user-{index}@example.com"})
+        assert response.status_code == 200
+    blocked_ip = await client.post("/api/v1/auth/password-reset/request", json={"email": "last@example.com"})
+    assert blocked_ip.status_code == 429
+
+
+@pytest.mark.asyncio
 async def test_attached_media_from_private_post_is_not_public(client: AsyncClient) -> None:
     csrf = await register(client, "private_media")
     image = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
