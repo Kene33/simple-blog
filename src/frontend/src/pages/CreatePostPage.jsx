@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Paperclip, X } from "lucide-react";
+import { ArrowLeft, FileText, Paperclip, Pencil, Trash2, X } from "lucide-react";
 import { AppShell } from "../components/AppShell";
 import { api } from "../lib/api";
 import { validatePostFiles } from "../lib/postFiles";
@@ -21,6 +21,9 @@ export function CreatePostPage({ postId, draftId }) {
   const [proposedCategory, setProposedCategory] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [drafts, setDrafts] = useState([]);
+  const [draftsState, setDraftsState] = useState("loading");
+  const [draftAction, setDraftAction] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +34,25 @@ export function CreatePostPage({ postId, draftId }) {
     });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setDrafts([]);
+      setDraftsState("empty");
+      return undefined;
+    }
+    let cancelled = false;
+    setDraftsState("loading");
+    api.drafts().then((page) => {
+      if (cancelled) return;
+      const items = Array.isArray(page) ? page : page.items || [];
+      setDrafts(items);
+      setDraftsState(items.length ? "ready" : "empty");
+    }).catch(() => {
+      if (!cancelled) setDraftsState("error");
+    });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!postId || !user) return;
@@ -90,6 +112,22 @@ export function CreatePostPage({ postId, draftId }) {
     }
   }
 
+  async function removeDraft(id) {
+    setDraftAction(id);
+    try {
+      await api.deleteDraft(id);
+      setDrafts((items) => {
+        const next = items.filter((item) => item.id !== id);
+        setDraftsState(next.length ? "ready" : "empty");
+        return next;
+      });
+    } catch (cause) {
+      setError(cause.message || "Не удалось удалить черновик");
+    } finally {
+      setDraftAction("");
+    }
+  }
+
   if (!user) return <AppShell title="Создать"><section className="guest-create"><div className="card-state"><b>Войдите, чтобы создать публикацию</b><button className="outline-button" onClick={() => navigate("/login")}>Войти</button></div></section></AppShell>;
 
   const usesCategoryCatalog = Array.isArray(categories);
@@ -110,6 +148,13 @@ export function CreatePostPage({ postId, draftId }) {
         {error && <div className="form-error" role="alert">{error}</div>}
         <footer>{!postId && <button type="button" className="outline-button" disabled={busy} onClick={() => submit(true)}>Сохранить черновик</button>}<button className="primary" disabled={busy}>{busy ? "Сохраняем…" : postId || draftId ? "Сохранить изменения" : "Опубликовать"}</button></footer>
       </form>
+      <section className="drafts-menu" aria-labelledby="drafts-menu-title">
+        <header className="drafts-menu-header">
+          <div><h2 id="drafts-menu-title"><FileText size={19} /> Черновики</h2><p>Сохранённые публикации, которые можно закончить позже</p></div>
+          <button type="button" className="button-link" onClick={() => navigate("/drafts")}>Все черновики</button>
+        </header>
+        {draftsState === "loading" ? <div className="drafts-menu-state">Загружаем черновики…</div> : draftsState === "error" ? <div className="drafts-menu-state">Не удалось загрузить черновики</div> : draftsState === "empty" ? <div className="drafts-menu-state">Черновиков пока нет</div> : <div className="drafts-menu-list">{drafts.slice(0, 5).map((draft) => <article className="draft-menu-item" key={draft.id}><div className="draft-menu-copy"><b>{draft.title || "Без названия"}</b><span>{draft.status === "needs_category_change" ? "Категория отклонена — нужна правка" : draft.content || "Черновик без текста"}</span><small>Изменён {new Date(draft.updated_at).toLocaleDateString("ru-RU")}</small></div><div className="draft-menu-actions"><button type="button" className="outline-button" onClick={() => navigate(`/drafts/${draft.id}/edit`)} disabled={draftAction === draft.id} aria-label="Редактировать черновик"><Pencil size={15} /></button><button type="button" className="outline-button" onClick={() => removeDraft(draft.id)} disabled={draftAction === draft.id} aria-label="Удалить черновик"><Trash2 size={15} /></button></div></article>)}</div>}
+      </section>
     </section>
   </AppShell>;
 }
