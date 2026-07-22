@@ -107,6 +107,17 @@ export function PostPage({ postId }) {
     return () => { cancelled = true; };
   }, [postId]);
 
+  useEffect(() => {
+    if (!post) return;
+    const title = `${post.title} — Simple`;
+    const description = post.content?.slice(0, 155) || "Публикация и обсуждение в Simple.";
+    document.title = title;
+    document.querySelector('meta[name="description"]')?.setAttribute("content", description);
+    document.querySelector('meta[property="og:title"]')?.setAttribute("content", title);
+    document.querySelector('meta[property="og:description"]')?.setAttribute("content", description);
+    document.querySelector('meta[property="og:url"]')?.setAttribute("content", `${window.location.origin}/posts/${post.id}`);
+  }, [post]);
+
   async function toggle(item, kind) {
     if (!user) return navigate("/login");
     const next = kind === "like" ? { ...item, liked_by_me: !item.liked_by_me, like_count: item.like_count + (item.liked_by_me ? -1 : 1) } : { ...item, bookmarked_by_me: !item.bookmarked_by_me };
