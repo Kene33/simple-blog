@@ -51,11 +51,15 @@ async def test_shares_support_anonymous_and_authenticated_events(client: AsyncCl
     try:
         copied = await anonymous.post(f"/api/v1/posts/{post_id}/shares", json={"channel": "copy"})
         assert copied.status_code == 201
+        assert copied.json()["share_count"] == 0
+        repeated = await anonymous.post(f"/api/v1/posts/{post_id}/shares", json={"channel": "copy"})
+        assert repeated.status_code == 201
+        assert repeated.json()["share_count"] == 0
     finally:
         await anonymous.aclose()
     native = await client.post(f"/api/v1/posts/{post_id}/shares", json={"channel": "native"}, headers={"X-CSRF-Token": csrf})
     assert native.status_code == 201
-    assert native.json()["share_count"] == 2
+    assert native.json()["share_count"] == 1
     assert native.json()["canonical_url"].endswith(f"/posts/{post_id}")
     assert (await client.post(f"/api/v1/posts/{post_id}/shares", json={"channel": "copy"})).status_code == 403
 

@@ -45,9 +45,7 @@ async def unlike_post(session: AsyncSession, post_id: UUID, user: User) -> None:
 async def record_share(session: AsyncSession, post_id: UUID, user: User | None, payload: ShareCreateRequest, settings: Settings) -> ShareRead:
     post = await get_post(session, post_id)
     if user is None:
-        session.add(ShareEvent(post_id=post_id, user_id=None, channel=payload.channel))
-        await session.flush()
-        share_count = await change_post_counter(session, post_id, "share_count", 1)
+        share_count = await read_post_counter(session, post_id, "share_count")
     elif session.bind and session.bind.dialect.name == "postgresql":
         result = await session.execute(postgresql_insert(ShareEvent).values(post_id=post_id, user_id=user.id, channel=payload.channel).on_conflict_do_nothing(index_elements=[ShareEvent.post_id, ShareEvent.user_id]))
         share_count = await change_post_counter(session, post_id, "share_count", 1) if result.rowcount == 1 else await read_post_counter(session, post_id, "share_count")
