@@ -168,10 +168,10 @@ async def delete_draft(session: AsyncSession, draft: Post) -> None:
     await session.flush()
 
 
-async def get_post(session: AsyncSession, post_id: UUID, owner_id: UUID | None = None) -> Post:
+async def get_post(session: AsyncSession, post_id: UUID, owner_id: UUID | None = None, viewer_id: UUID | None = None) -> Post:
     query = select(Post).where(Post.id == post_id, Post.deleted_at.is_(None))
     if owner_id is None:
-        query = query.join(User, User.id == Post.author_id).where(Post.status == "published", User.posts_visibility == "public")
+        query = query.join(User, User.id == Post.author_id).where(Post.status == "published", or_(User.posts_visibility == "public", Post.author_id == viewer_id) if viewer_id is not None else User.posts_visibility == "public")
     else:
         query = query.where(Post.author_id == owner_id)
     post = await session.scalar(query)

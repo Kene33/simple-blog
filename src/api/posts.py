@@ -44,7 +44,7 @@ async def trending(session: AsyncSession = Depends(get_session)) -> TrendingRead
 
 @router.get("/{post_id}", response_model=PostRead)
 async def read(post_id: UUID, auth: CurrentAuth | None = Depends(get_optional_auth), session: AsyncSession = Depends(get_session)) -> PostRead:
-    return await serialize_post(session, await get_post(session, post_id), auth.user.id if auth else None)
+    return await serialize_post(session, await get_post(session, post_id, viewer_id=auth.user.id if auth else None), auth.user.id if auth else None)
 
 
 @router.patch("/{post_id}", response_model=PostRead)

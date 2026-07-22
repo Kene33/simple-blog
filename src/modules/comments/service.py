@@ -64,7 +64,7 @@ async def get_comment(session: AsyncSession, comment_id: UUID, owner_id: UUID | 
     comment = await session.scalar(query)
     if comment is None or owner_id is not None and comment.author_id != owner_id:
         raise AppError("RESOURCE_NOT_FOUND", "Comment not found", 404)
-    await get_post(session, comment.post_id, viewer_id if viewer_id is not None else owner_id)
+    await get_post(session, comment.post_id, owner_id=owner_id, viewer_id=viewer_id)
     return comment
 
 
@@ -92,7 +92,7 @@ async def serialize_comments(session: AsyncSession, comments: list[Comment]) -> 
 
 
 async def list_comments(session: AsyncSession, *, settings: Settings, post_id: UUID, parent_id: UUID | None, cursor: str | None, limit: int, viewer_id: UUID | None = None) -> CommentPage:
-    await get_post(session, post_id, viewer_id)
+    await get_post(session, post_id, viewer_id=viewer_id)
     scope = _scope(post_id, parent_id)
     query = select(Comment).where(Comment.post_id == post_id, Comment.parent_id == parent_id)
     sqlite_cursor_id: UUID | None = None

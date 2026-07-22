@@ -78,7 +78,7 @@ async def test_other_users_can_comment_and_read_comment(client: AsyncClient) -> 
         other_csrf = await register(other, "othercommenter")
         created = await other.post(f"/api/v1/posts/{post_id}/comments", json={"body": "From another user"}, headers={"X-CSRF-Token": other_csrf})
         assert created.status_code == 201
-        read = await client.get(f"/api/v1/comments/{created.json()['id']}")
+        read = await other.get(f"/api/v1/comments/{created.json()['id']}")
         assert read.status_code == 200
         assert read.json()["body"] == "From another user"
     finally:
