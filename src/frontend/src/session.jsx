@@ -6,6 +6,9 @@ const SessionContext = createContext(null);
 export function SessionProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    document.documentElement.dataset.auth = user ? "authenticated" : "guest";
+  }, [user]);
 
   async function refreshMe() {
     try {
