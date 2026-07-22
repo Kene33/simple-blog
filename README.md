@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/readme-assets/logo.svg" width="128" alt="Simple Blog logo" />
+  <img src="docs/readme-assets/logo.svg" width="180" alt="Simple Blog logo" />
   <h1>Simple Blog</h1>
   <p><a href="./README.md">🇬🇧 English</a> · <a href="./README.ru.md">🇷🇺 Русский</a></p>
   <p><strong>Self-hosted social publishing with a versioned API, real PostgreSQL data, and a React client.</strong></p>
@@ -21,6 +21,24 @@
     <a href="./CONTRIBUTING.md">Contributing</a>
   </p>
 </div>
+
+## Product preview
+
+<p align="center">
+  <img src="design-reference/01-feed.png" alt="Simple Blog feed on desktop" width="900" />
+</p>
+
+<p align="center">
+  <img src="design-reference/03-create-post.png" alt="Create post screen" width="440" />
+  <img src="design-reference/08-moderation.png" alt="Moderation queue" width="440" />
+</p>
+
+<p align="center">
+  <img src="design-reference/11-mobile-feed.png" alt="Simple Blog feed on mobile" width="280" />
+</p>
+
+The preview covers the main product surfaces: feed, publishing, moderation, and
+mobile browsing. The source images live in [`design-reference/`](./design-reference/).
 
 > Simple Blog gives you a practical base for a social publishing product. Start
 > the API and PostgreSQL with one command, inspect the contract in Swagger, and
