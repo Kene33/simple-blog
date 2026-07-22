@@ -88,6 +88,7 @@ export const api = {
     return request("/media", { method: "POST", body });
   },
   user: (username) => request(`/users/${username}`),
+  activeAuthors: (limit = 3) => request(`/users/active-authors?limit=${limit}`),
   updateMe: (data) => request("/users/me", { method: "PATCH", body: JSON.stringify(data) }),
   userComments: (username, params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null)); return request(`/users/${username}/comments${query.size ? `?${query}` : ""}`); },
   comments: (postId, params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null)); return request(`/posts/${postId}/comments${query.size ? `?${query}` : ""}`); },

@@ -68,6 +68,12 @@ class PublicUserProfile(UserSummary):
     updated_at: datetime
 
 
+class ActiveAuthorRead(BaseModel):
+    author: UserSummary
+    posts_count: int
+    likes_count: int
+
+
 class UserUpdateRequest(BaseModel):
     username: str | None = Field(default=None, min_length=3, max_length=30)
     email: EmailStr | None = None
