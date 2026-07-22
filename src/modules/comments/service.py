@@ -57,14 +57,14 @@ async def create_comment(session: AsyncSession, post_id: UUID, author: User, pay
     return comment
 
 
-async def get_comment(session: AsyncSession, comment_id: UUID, owner_id: UUID | None = None, include_deleted: bool = False) -> Comment:
+async def get_comment(session: AsyncSession, comment_id: UUID, owner_id: UUID | None = None, include_deleted: bool = False, viewer_id: UUID | None = None) -> Comment:
     query = select(Comment).where(Comment.id == comment_id)
     if not include_deleted:
         query = query.where(Comment.deleted_at.is_(None))
     comment = await session.scalar(query)
     if comment is None or owner_id is not None and comment.author_id != owner_id:
         raise AppError("RESOURCE_NOT_FOUND", "Comment not found", 404)
-    await get_post(session, comment.post_id, owner_id)
+    await get_post(session, comment.post_id, viewer_id if viewer_id is not None else owner_id)
     return comment
 
 

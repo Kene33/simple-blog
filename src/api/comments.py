@@ -29,7 +29,7 @@ async def list_for_post(post_id: UUID, parent_id: UUID | None = None, cursor: st
 
 @router.get("/api/v1/comments/{comment_id}", response_model=CommentRead)
 async def read(comment_id: UUID, auth: CurrentAuth | None = Depends(get_optional_auth), session: AsyncSession = Depends(get_session)) -> CommentRead:
-    return (await serialize_comments(session, [await get_comment(session, comment_id)]))[0]
+    return (await serialize_comments(session, [await get_comment(session, comment_id, viewer_id=auth.user.id if auth else None)]))[0]
 
 
 @router.patch("/api/v1/comments/{comment_id}", response_model=CommentRead)
