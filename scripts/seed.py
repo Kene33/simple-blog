@@ -1,11 +1,14 @@
 import asyncio
 import os
 
+from dotenv import load_dotenv
 from pwdlib import PasswordHash
 from sqlalchemy import select
 
 from src.db.models import User
 from src.db.session import session_factory
+
+load_dotenv()
 
 
 async def seed_admin() -> None:
