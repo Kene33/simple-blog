@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,7 +45,9 @@ router = APIRouter(prefix="/api/v1", tags=["moderation"])
 
 
 @router.post("/reports", response_model=ReportRead, status_code=status.HTTP_201_CREATED)
-async def create(payload: ReportCreateRequest, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> ReportRead:
+async def create(payload: ReportCreateRequest, request: Request, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> ReportRead:
+    await request.app.state.rate_limiter.check(request, "report-create", 20, 600, str(auth.user.id))
+    await request.app.state.rate_limiter.check(request, "report-create-ip", 60, 600)
     try:
         report = await create_report(session, auth.user, payload)
         await session.commit()
