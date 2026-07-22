@@ -73,6 +73,7 @@ export const api = {
     const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value !== "" && value != null));
     return request(`/posts${query.size ? `?${query}` : ""}`);
   },
+  trending: () => request("/posts/trending"),
   post: (id) => request(`/posts/${id}`),
   like: (id) => request(`/posts/${id}/like`, { method: "PUT" }),
   unlike: (id) => request(`/posts/${id}/like`, { method: "DELETE" }),

@@ -176,6 +176,17 @@ class PostPage(BaseModel):
     next_cursor: str | None = None
 
 
+class TrendingTerm(BaseModel):
+    name: str
+    count: int
+
+
+class TrendingRead(BaseModel):
+    posts: list[PostRead]
+    categories: list[TrendingTerm]
+    tags: list[TrendingTerm]
+
+
 class CategoryRead(BaseModel):
     id: UUID
     name: str
