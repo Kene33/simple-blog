@@ -1,5 +1,17 @@
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim();
+const API_BASE = (() => {
+  if (!configuredApiBase) return "/api/v1";
+  if (configuredApiBase.startsWith("/")) return configuredApiBase.replace(/\/$/, "");
+  try {
+    const url = new URL(configuredApiBase, window.location.origin);
+    return import.meta.env.PROD && url.origin !== window.location.origin ? "/api/v1" : `${url.origin}${url.pathname}`.replace(/\/$/, "");
+  } catch {
+    return "/api/v1";
+  }
+})();
+const SAME_ORIGIN_API = new URL(API_BASE, window.location.origin).origin === window.location.origin;
+const mutationInFlight = new Map();
 
 export class ApiError extends Error {
   constructor(message, status, payload = null) {
@@ -52,14 +64,42 @@ async function send(path, options = {}) {
   });
 }
 
-export async function request(path, options = {}, retry = true) {
+function requestId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function bodyFingerprint(body) {
+  if (!body) return "";
+  if (typeof body === "string") return body;
+  if (body instanceof FormData) return [...body.entries()].map(([key, value]) => `${key}:${value instanceof File ? `${value.name}:${value.size}:${value.lastModified}` : value}`).join("|");
+  return String(body);
+}
+
+async function requestOnce(path, options, retry) {
   const response = await send(path, options);
   if (response.status === 401 && retry && path !== "/auth/refresh") {
     const refresh = await send("/auth/refresh", { method: "POST" });
-    if (refresh.ok) return request(path, options, false);
+    if (refresh.ok) return requestOnce(path, options, false);
     window.dispatchEvent(new Event("simple:auth-lost"));
   }
   return parse(response);
+}
+
+export function request(path, options = {}, retry = true) {
+  const method = (options.method || "GET").toUpperCase();
+  if (!MUTATING_METHODS.has(method)) return requestOnce(path, options, retry);
+  const headers = new Headers(options.headers);
+  const key = options.idempotencyKey || requestId();
+  if (SAME_ORIGIN_API) headers.set("Idempotency-Key", key);
+  const prepared = { ...options, headers };
+  delete prepared.idempotencyKey;
+  const fingerprint = `${method}:${path}:${bodyFingerprint(options.body)}`;
+  const existing = mutationInFlight.get(fingerprint);
+  if (existing) return existing;
+  const pending = requestOnce(path, prepared, retry);
+  mutationInFlight.set(fingerprint, pending);
+  pending.then(() => mutationInFlight.delete(fingerprint), () => mutationInFlight.delete(fingerprint));
+  return pending;
 }
 
 export const api = {
