@@ -21,7 +21,7 @@
 | `POST` | `/auth/login` | Public | Create access and refresh cookies | `200` |
 | `POST` | `/auth/refresh` | Refresh cookie | Rotate refresh session and issue access cookie | `200` |
 | `POST` | `/auth/logout` | Access cookie | Revoke session and clear cookies | `204` |
-| `POST` | `/auth/password-reset/request` | Public | Issue a one-time reset token | `200` |
+| `POST` | `/auth/password-reset/request` | Public | Send a one-time reset link by email | `200` |
 | `POST` | `/auth/password-reset/confirm` | Public | Set a new password and revoke sessions | `204` |
 | `GET` | `/users/me` | Access cookie | Return the current user | `200` |
 | `PATCH` | `/users/me` | Access cookie | Update the current profile | `200` |
