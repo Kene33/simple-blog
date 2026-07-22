@@ -201,3 +201,6 @@ README-AUDIT-REPORT.md
 .vercel
 .env.local
 .env.*.local
+SECURITY-REPORT.md
+SECURITY-AUDIT-REPORT.md
+SECURITY-AUDIT-RU.md
