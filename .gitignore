@@ -179,6 +179,11 @@ database/database.db
 README_2.md
 # Local Codex configuration
 .codex/
+# Local Neon connection context and generated agent integrations
+.neon
+.agents/
+.claude/
+skills-lock.json
 # Local AI-assistant instructions and generated code graph
 AGENTS.md
 graphify-out/
