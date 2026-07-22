@@ -28,7 +28,7 @@ class PasswordResetRequest(BaseModel):
 
 
 class PasswordResetRequestRead(BaseModel):
-    reset_token: str | None = None
+    message: str
 
 
 class PasswordResetConfirmRequest(BaseModel):

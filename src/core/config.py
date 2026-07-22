@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,7 +11,7 @@ class Settings(BaseSettings):
 
     app_name: str = "Simple Blog API"
     app_version: str = "0.1.0"
-    environment: Literal["development", "test", "production"] = "development"
+    environment: Literal["development", "test", "production"] = "production"
     host: str = "127.0.0.1"
     port: int = 4000
     reload: bool = True
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
     csrf_cookie_name: str = "csrf_token"
     csrf_header_name: str = "X-CSRF-Token"
     cookie_samesite: str = "lax"
-    cookie_secure: bool = False
+    cookie_secure: bool = True
     cookie_domain: str | None = None
     public_base_url: str = "http://localhost:4000"
     s3_endpoint_url: str = "http://localhost:9000"
@@ -35,6 +36,17 @@ class Settings(BaseSettings):
     s3_access_key: str = "minio"
     s3_secret_key: str = "minio-password"
     s3_region: str = "us-east-1"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+    smtp_starttls: bool = True
+    redis_url: str | None = None
+    media_quota_bytes: int = 1_073_741_824
+    media_quota_files: int = 100
+    media_pending_limit: int = 10
+    slow_request_ms: int = 1000
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -60,6 +72,15 @@ class Settings(BaseSettings):
             raise ValueError("COOKIE_SECURE must be true in production")
         if self.jwt_algorithm != "HS256":
             raise ValueError("JWT_ALGORITHM must be HS256")
+        origins = self.cors_origin_list
+        if not origins or "*" in origins or any(urlparse(origin).scheme != "https" or not urlparse(origin).netloc or urlparse(origin).path not in {"", "/"} for origin in origins):
+            raise ValueError("CORS_ORIGINS must contain only exact HTTPS origins in production")
+        if not self.public_base_url.startswith("https://"):
+            raise ValueError("PUBLIC_BASE_URL must use HTTPS in production")
+        if not self.smtp_host or not self.smtp_from:
+            raise ValueError("SMTP_HOST and SMTP_FROM are required in production")
+        if not self.redis_url:
+            raise ValueError("REDIS_URL is required in production")
         return self
 
     @property

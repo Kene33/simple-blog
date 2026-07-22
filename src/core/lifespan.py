@@ -10,5 +10,7 @@ from src.db.session import engine
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.lifecycle = "running"
     yield
+    if getattr(app.state, "rate_limiter", None) is not None:
+        await app.state.rate_limiter.close()
     await engine.dispose()
     app.state.lifecycle = "stopped"

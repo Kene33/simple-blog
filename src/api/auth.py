@@ -1,8 +1,11 @@
+import logging
+
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
+from src.core.email import send_password_reset_email
 from src.core.errors import AppError
 from src.core.security import new_csrf_token
 from src.db.session import get_session
@@ -21,6 +24,7 @@ from src.modules.auth.service import (
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 def set_session_cookies(response: Response, settings: Settings, auth_session: AuthSession) -> None:
@@ -36,7 +40,8 @@ def clear_session_cookies(response: Response, settings: Settings) -> None:
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=SessionRead)
-async def register(payload: RegisterRequest, response: Response, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> SessionRead:
+async def register(payload: RegisterRequest, request: Request, response: Response, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> SessionRead:
+    await request.app.state.rate_limiter.check(request, "register", 5, 3600)
     try:
         user = await register_user(session, payload)
         auth_session = await create_session(session, settings, user, new_csrf_token())
@@ -49,7 +54,9 @@ async def register(payload: RegisterRequest, response: Response, session: AsyncS
 
 
 @router.post("/login", response_model=SessionRead)
-async def login(payload: LoginRequest, response: Response, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> SessionRead:
+async def login(payload: LoginRequest, request: Request, response: Response, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> SessionRead:
+    await request.app.state.rate_limiter.check(request, "login", 30, 900)
+    await request.app.state.rate_limiter.check(request, "login", 10, 900, payload.identifier.casefold())
     user = await authenticate_user(session, payload)
     auth_session = await create_session(session, settings, user, new_csrf_token())
     await session.commit()
@@ -82,14 +89,23 @@ async def logout(auth: CurrentAuth = Depends(require_csrf), session: AsyncSessio
 
 
 @router.post("/password-reset/request", response_model=PasswordResetRequestRead)
-async def request_password_reset(payload: PasswordResetRequest, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PasswordResetRequestRead:
+async def request_password_reset(payload: PasswordResetRequest, request: Request, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PasswordResetRequestRead:
+    await request.app.state.rate_limiter.check(request, "password-reset-request", 5, 900, str(payload.email).casefold())
     token = await create_password_reset(session, settings, str(payload.email))
+    if token:
+        try:
+            await send_password_reset_email(settings, str(payload.email), token)
+        except Exception:
+            await session.rollback()
+            logger.exception("Password reset email delivery failed")
+            return PasswordResetRequestRead(message="If the email is registered, a reset link has been sent.")
     await session.commit()
-    return PasswordResetRequestRead(reset_token=token if settings.environment in {"development", "test"} else None)
+    return PasswordResetRequestRead(message="If the email is registered, a reset link has been sent.")
 
 
 @router.post("/password-reset/confirm", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
-async def confirm_password_reset(payload: PasswordResetConfirmRequest, session: AsyncSession = Depends(get_session)) -> Response:
+async def confirm_password_reset(payload: PasswordResetConfirmRequest, request: Request, session: AsyncSession = Depends(get_session)) -> Response:
+    await request.app.state.rate_limiter.check(request, "password-reset-confirm", 10, 900)
     await reset_password(session, payload)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

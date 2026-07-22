@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,7 +16,9 @@ router = APIRouter(prefix="/api/v1/posts", tags=["posts"])
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=PostRead)
-async def create(payload: PostCreateRequest, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> PostRead:
+async def create(payload: PostCreateRequest, request: Request, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> PostRead:
+    await request.app.state.rate_limiter.check(request, "post-create", 20, 3600, str(auth.user.id))
+    await request.app.state.rate_limiter.check(request, "post-create", 30, 3600)
     post = await create_post(session, auth.user, payload)
     await session.commit()
     await session.refresh(post)
@@ -24,7 +26,9 @@ async def create(payload: PostCreateRequest, auth: CurrentAuth = Depends(require
 
 
 @router.get("", response_model=PostPage)
-async def list_feed(author: str | None = None, category: str | None = None, tag: str | None = None, query: str | None = None, search_in: str = "all", sort: str = "newest", cursor: str | None = None, limit: int = 20, auth: CurrentAuth | None = Depends(get_optional_auth), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PostPage:
+async def list_feed(request: Request, author: str | None = Query(default=None, max_length=30), category: str | None = Query(default=None, max_length=80), tag: str | None = Query(default=None, max_length=30), query: str | None = Query(default=None, max_length=200), search_in: str = "all", sort: str = "newest", cursor: str | None = None, limit: int = 20, auth: CurrentAuth | None = Depends(get_optional_auth), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PostPage:
+    if query:
+        await request.app.state.rate_limiter.check(request, "post-search", 60, 60, str(auth.user.id) if auth else None)
     return await list_posts(session, settings=settings, author=author, category=category, tag=tag, query_text=query, search_in=search_in, sort=sort, cursor=cursor, limit=min(max(limit, 1), 100), viewer_id=auth.user.id if auth else None)
 
 

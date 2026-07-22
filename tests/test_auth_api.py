@@ -67,13 +67,20 @@ async def test_missing_refresh_csrf_and_logout(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_password_reset_is_single_use_and_revokes_sessions(client: AsyncClient) -> None:
+async def test_password_reset_is_single_use_and_revokes_sessions(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    sent: dict[str, str] = {}
+
+    async def fake_send(settings: object, recipient: str, token: str) -> None:
+        sent[recipient] = token
+
+    monkeypatch.setattr("src.api.auth.send_password_reset_email", fake_send)
     payload = {"username": "resetuser", "email": "reset@example.com", "password": "strong-password"}
     assert (await client.post("/api/v1/auth/register", json=payload)).status_code == 201
     requested = await client.post("/api/v1/auth/password-reset/request", json={"email": payload["email"]})
     assert requested.status_code == 200
-    token = requested.json()["reset_token"]
-    assert token
+    assert requested.json()["message"]
+    assert "reset_token" not in requested.json()
+    token = sent[payload["email"]]
     assert (await client.post("/api/v1/auth/password-reset/confirm", json={"token": token, "password": "new-strong-password"})).status_code == 204
     assert (await client.post("/api/v1/auth/password-reset/confirm", json={"token": token, "password": "another-password"})).status_code == 401
     assert (await client.post("/api/v1/auth/login", json={"identifier": payload["email"], "password": payload["password"]})).status_code == 401

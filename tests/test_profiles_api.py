@@ -1,3 +1,5 @@
+import base64
+
 import pytest
 from httpx import AsyncClient
 
@@ -60,7 +62,7 @@ async def test_profile_fields_are_private_and_public_comments_are_paginated(clie
 @pytest.mark.asyncio
 async def test_profile_cannot_attach_wrong_media_purpose_as_cover(client: AsyncClient) -> None:
     csrf = await register(client, "coveruser")
-    post_media = await client.post("/api/v1/media", files={"file": ("photo.png", b"\x89PNG\r\n\x1a\n\x00\x00\x00\x00", "image/png")}, data={"purpose": "post"}, headers={"X-CSRF-Token": csrf})
+    post_media = await client.post("/api/v1/media", files={"file": ("photo.png", base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="), "image/png")}, data={"purpose": "post"}, headers={"X-CSRF-Token": csrf})
     assert post_media.status_code == 201
     response = await client.patch("/api/v1/users/me", json={"cover_media_id": post_media.json()["id"]}, headers={"X-CSRF-Token": csrf})
     assert response.status_code == 422

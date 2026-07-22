@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
@@ -13,7 +13,9 @@ router = APIRouter(tags=["comments"])
 
 
 @router.post("/api/v1/posts/{post_id}/comments", response_model=CommentRead, status_code=status.HTTP_201_CREATED)
-async def create(post_id: UUID, payload: CommentCreateRequest, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> CommentRead:
+async def create(post_id: UUID, payload: CommentCreateRequest, request: Request, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> CommentRead:
+    await request.app.state.rate_limiter.check(request, "comment-create", 30, 600, str(auth.user.id))
+    await request.app.state.rate_limiter.check(request, "comment-create", 60, 600)
     comment = await create_comment(session, post_id, auth.user, payload)
     await session.commit()
     await session.refresh(comment)

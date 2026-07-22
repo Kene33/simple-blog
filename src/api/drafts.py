@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
@@ -13,7 +13,8 @@ router = APIRouter(prefix="/api/v1/drafts", tags=["drafts"])
 
 
 @router.post("", response_model=DraftRead, status_code=status.HTTP_201_CREATED)
-async def create(payload: DraftCreateRequest, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> DraftRead:
+async def create(payload: DraftCreateRequest, request: Request, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> DraftRead:
+    await request.app.state.rate_limiter.check(request, "draft-create", 30, 3600, str(auth.user.id))
     draft = await create_draft(session, auth.user, payload)
     await session.commit()
     await session.refresh(draft)
@@ -39,7 +40,8 @@ async def update(draft_id: UUID, payload: DraftUpdateRequest, auth: CurrentAuth 
 
 
 @router.post("/{draft_id}/publish", response_model=PostRead)
-async def publish(draft_id: UUID, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> PostRead:
+async def publish(draft_id: UUID, request: Request, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> PostRead:
+    await request.app.state.rate_limiter.check(request, "post-publish", 20, 3600, str(auth.user.id))
     draft = await publish_draft(session, await get_draft(session, draft_id, auth.user.id))
     await session.commit()
     await session.refresh(draft)

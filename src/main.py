@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from src.api.health import meta_router
 from src.api.health import router as health_router
 from src.api.v1 import router as v1_router
 from src.core.config import Settings, get_settings
@@ -15,7 +17,8 @@ from src.core.errors import (
 )
 from src.core.lifespan import lifespan
 from src.core.logging import configure_logging
-from src.core.middleware import RequestIdMiddleware
+from src.core.middleware import ObservabilityMiddleware, RequestIdMiddleware, SecurityHeadersMiddleware
+from src.core.rate_limit import RateLimiter
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -26,7 +29,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version=resolved_settings.app_version,
         lifespan=lifespan,
     )
+    application.state.rate_limiter = RateLimiter(resolved_settings.redis_url)
+    application.state.settings = resolved_settings
     application.add_middleware(RequestIdMiddleware)
+    application.add_middleware(ObservabilityMiddleware)
+    application.add_middleware(SecurityHeadersMiddleware)
+    application.add_middleware(GZipMiddleware, minimum_size=1000)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=resolved_settings.cors_origin_list,
@@ -39,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
     application.add_exception_handler(Exception, unhandled_exception_handler)
     application.include_router(health_router)
+    application.include_router(meta_router)
     application.include_router(v1_router)
     return application
 

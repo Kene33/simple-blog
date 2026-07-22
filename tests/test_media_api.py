@@ -1,9 +1,11 @@
+import base64
+
 import pytest
 from httpx import AsyncClient
 
 from tests.conftest import FakeStorage
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
 
 
 async def register(client: AsyncClient) -> str:

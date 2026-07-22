@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
@@ -43,7 +43,10 @@ async def unbookmark(post_id: UUID, auth: CurrentAuth = Depends(require_csrf), s
 
 
 @router.post("/{post_id}/shares", response_model=ShareRead, status_code=status.HTTP_201_CREATED)
-async def share(post_id: UUID, payload: ShareCreateRequest, auth: CurrentAuth | None = Depends(optional_csrf), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> ShareRead:
+async def share(post_id: UUID, payload: ShareCreateRequest, request: Request, auth: CurrentAuth | None = Depends(optional_csrf), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> ShareRead:
+    await request.app.state.rate_limiter.check(request, "share", 30, 60, str(auth.user.id) if auth else None)
+    if auth:
+        await request.app.state.rate_limiter.check(request, "share", 60, 60)
     result = await record_share(session, post_id, auth.user if auth else None, payload, settings)
     await session.commit()
     return result
