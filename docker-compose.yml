@@ -28,6 +28,7 @@ services:
     build: .
     command: alembic upgrade head
     environment:
+      ENVIRONMENT: development
       DATABASE_URL: postgresql+asyncpg://blog:blog@postgres:5432/blog
     depends_on:
       postgres:
