@@ -12,7 +12,7 @@ function Media({ post, onOpen }) {
   const media = post.media || [];
   if (!media.length) return null;
   const open = () => onOpen(0);
-  return <div className={`post-media post-media-${Math.min(media.length, 2)}`} role="button" tabIndex={0} aria-label="Открыть вложения публикации" onClick={open} onKeyDown={(event) => (event.key === "Enter" || event.key === " ") && (event.preventDefault(), open())}>{media.slice(0, 2).map((item) => item.kind === "video" ? <video key={item.id} muted preload="metadata" src={item.url} /> : <img key={item.id} src={item.url} alt="Вложение публикации" />)}<span className="media-count"><Paperclip size={13} /> {media.length} вложения</span></div>;
+  return <div className={`post-media post-media-${Math.min(media.length, 2)}`} role="button" tabIndex={0} aria-label="Открыть вложения публикации" onClick={open} onKeyDown={(event) => (event.key === "Enter" || event.key === " ") && (event.preventDefault(), open())}>{media.slice(0, 2).map((item) => item.kind === "video" ? <video key={item.id} muted preload="metadata" src={item.url} aria-label={`Видео к публикации «${post.title}»`} /> : <img key={item.id} src={item.url} alt={`Вложение к публикации «${post.title}»`} loading="lazy" decoding="async" sizes="(max-width: 700px) calc(100vw - 52px), 680px" />)}<span className="media-count"><Paperclip size={13} /> {media.length} вложения</span></div>;
 }
 
 function MediaViewer({ media, currentIndex, onClose, onChange }) {
@@ -30,7 +30,7 @@ function MediaViewer({ media, currentIndex, onClose, onChange }) {
   return <div className="media-viewer-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
     <section className="media-viewer" role="dialog" aria-modal="true" aria-label="Просмотр вложения">
       <button className="media-viewer-close" onClick={onClose} aria-label="Закрыть просмотр"><X /></button>
-      {current.kind === "video" ? <video controls autoPlay src={current.url} /> : <img src={current.url} alt="Вложение публикации" />}
+      {current.kind === "video" ? <video controls autoPlay src={current.url} aria-label="Видео вложение публикации" /> : <img src={current.url} alt="Просматриваемое вложение публикации" decoding="async" />}
       {media.length > 1 && <><button className="media-viewer-nav media-viewer-prev" onClick={() => onChange(-1)} aria-label="Предыдущее вложение"><ChevronLeft /></button><span className="media-viewer-position">{currentIndex + 1} / {media.length}</span><button className="media-viewer-nav media-viewer-next" onClick={() => onChange(1)} aria-label="Следующее вложение"><ChevronRight /></button></>}
     </section>
   </div>;
@@ -38,6 +38,10 @@ function MediaViewer({ media, currentIndex, onClose, onChange }) {
 
 function categoryName(category) {
   return typeof category === "string" ? category : category?.name || "Без категории";
+}
+
+function topicQuery(value) {
+  return encodeURIComponent(String(value || "").trim());
 }
 
 export function PostCard({ post, onLike, onBookmark, onShare, onReport, detail = false }) {
@@ -50,10 +54,10 @@ export function PostCard({ post, onLike, onBookmark, onShare, onReport, detail =
   const shiftMedia = (step) => setMediaIndex((index) => (index + step + post.media.length) % post.media.length);
   const copy = async () => { await onShare?.(post); setCopied(true); window.setTimeout(() => setCopied(false), 2200); };
   return <article className="post-card">
-    <header className="post-head"><Link to={deletedAuthor ? "/" : `/users/${author.username}`} className="post-author"><Avatar user={author} /><span><b>{deletedAuthor ? "Удаленный аккаунт" : author.display_name || author.username}{bannedAuthor && <i className="author-status">Заблокирован</i>}</b>{!deletedAuthor && <em>@{author.username} · {formatDate(post.created_at)}</em>}</span></Link><div className="post-head-actions"><span className="category-pill">{categoryName(post.category)}</span></div></header>
+    <header className="post-head"><Link to={deletedAuthor ? "/" : `/users/${author.username}`} className="post-author"><Avatar user={author} /><span><b>{deletedAuthor ? "Удаленный аккаунт" : author.display_name || author.username}{bannedAuthor && <i className="author-status">Заблокирован</i>}</b>{!deletedAuthor && <em>@{author.username} · {formatDate(post.created_at)}</em>}</span></Link><div className="post-head-actions">{post.category && <Link className="category-pill topic-link" to={`/search?category=${topicQuery(categoryName(post.category))}`}>{categoryName(post.category)}</Link>}</div></header>
     {detailView ? <div className="post-body-link"><h2>{post.title}</h2><p>{post.content}</p><Media post={post} onOpen={setMediaIndex} /></div> : <><Link to={`/posts/${post.id}`} className="post-body-link"><h2>{post.title}</h2><p>{post.content}</p></Link><div className="post-media-shell"><Media post={post} onOpen={setMediaIndex} /></div></>}
-    <div className="tags">{post.tags.map((tag) => <span key={tag}>#{tag}</span>)}</div>
-    <footer className={`post-actions ${detailView ? "post-actions-detail" : ""}`}><button className={post.liked_by_me ? "liked" : ""} onClick={() => onLike(post)}><Heart size={19} fill={post.liked_by_me ? "currentColor" : "none"} /> <b>{detailView ? "Нравится" : post.like_count}</b>{detailView && <span>{post.like_count}</span>}</button><Link to={`/posts/${post.id}`}><MessageCircle size={19} /> <b>{detailView ? "Ответить" : post.comment_count}</b>{detailView && <span>{post.comment_count}</span>}</Link><button onClick={copy} aria-label="Поделиться публикацией"><Send size={19} /> <b>{detailView ? "Копировать" : post.share_count}</b>{detailView && <span>{post.share_count}</span>}</button>{detailView && onReport && <button onClick={() => onReport()}><Flag size={17} /> <b>Жалоба</b></button>}<button className={`bookmark ${post.bookmarked_by_me ? "bookmarked" : ""}`} onClick={() => onBookmark(post)}><Bookmark size={19} fill={post.bookmarked_by_me ? "currentColor" : "none"} /></button></footer>
+    <div className="tags">{post.tags.map((tag) => <Link className="topic-link" key={tag} to={`/search?tag=${topicQuery(String(tag).replace(/^#/, ""))}`}>#{tag}</Link>)}</div>
+    <footer className={`post-actions ${detailView ? "post-actions-detail" : ""}`}><button className={post.liked_by_me ? "liked" : ""} onClick={() => onLike(post)} aria-label={post.liked_by_me ? "Убрать лайк" : "Поставить лайк"}><Heart size={19} fill={post.liked_by_me ? "currentColor" : "none"} /> <b>{detailView ? "Нравится" : post.like_count}</b>{detailView && <span>{post.like_count}</span>}</button><Link to={`/posts/${post.id}`}><MessageCircle size={19} /> <b>{detailView ? "Ответить" : post.comment_count}</b>{detailView && <span>{post.comment_count}</span>}</Link><button onClick={copy} aria-label="Поделиться публикацией"><Send size={19} /> <b>{detailView ? "Копировать" : post.share_count}</b>{detailView && <span>{post.share_count}</span>}</button>{detailView && onReport && <button onClick={() => onReport()} aria-label="Пожаловаться на публикацию"><Flag size={17} /> <b>Жалоба</b></button>}<button className={`bookmark ${post.bookmarked_by_me ? "bookmarked" : ""}`} onClick={() => onBookmark(post)} aria-label={post.bookmarked_by_me ? "Убрать из закладок" : "Добавить в закладки"}><Bookmark size={19} fill={post.bookmarked_by_me ? "currentColor" : "none"} /></button></footer>
     {copied && <div className="copy-notice" role="status">Ссылка на пост скопирована</div>}
     {mediaIndex !== null && <MediaViewer media={post.media} currentIndex={mediaIndex} onClose={() => setMediaIndex(null)} onChange={shiftMedia} />}
   </article>;

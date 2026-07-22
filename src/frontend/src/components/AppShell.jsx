@@ -50,7 +50,7 @@ function Sidebar({ theme, onThemeToggle }) {
 
 export function AppShell({ children, title = "Лента", right }) {
   const { user, isStaff, logout } = useSession();
-  const { navigate } = useRouter();
+  const { location, navigate } = useRouter();
   const [mobileMenu, setMobileMenu] = useState(false);
   const [guestNotice, setGuestNotice] = useState("");
   const [theme, setTheme] = useState(() => localStorage.getItem("simple-theme") || "light");
@@ -58,7 +58,17 @@ export function AppShell({ children, title = "Лента", right }) {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("simple-theme", theme);
   }, [theme]);
-  useEffect(() => { document.title = title === "Лента" ? "Simple — идеи и обсуждения" : `${title} — Simple`; }, [title]);
+  useEffect(() => {
+    const pageTitle = title === "Лента" ? "Simple — идеи и обсуждения" : `${title} — Simple`;
+    const description = title === "Лента" ? "Идеи и обсуждения сообщества без лишнего шума." : `${title} в Simple — идеи и обсуждения сообщества.`;
+    document.title = pageTitle;
+    document.querySelector('meta[name="description"]')?.setAttribute("content", description);
+    document.querySelector('meta[property="og:title"]')?.setAttribute("content", pageTitle);
+    document.querySelector('meta[property="og:description"]')?.setAttribute("content", description);
+    document.querySelector('meta[property="og:url"]')?.setAttribute("content", `${window.location.origin}${location.pathname}`);
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.href = `${window.location.origin}${location.pathname}`;
+  }, [title, location.pathname]);
   const toggleTheme = () => setTheme((value) => value === "dark" ? "light" : "dark");
   const go = (to) => { setMobileMenu(false); navigate(to); };
   const guestOnly = (action) => { setMobileMenu(false); setGuestNotice(`Чтобы ${action}, войдите в аккаунт.`); };

@@ -9,7 +9,10 @@ export function SessionProvider({ children }) {
 
   async function refreshMe() {
     try {
-      const profile = await api.me();
+      const profile = await Promise.race([
+        api.me(),
+        new Promise((_, reject) => window.setTimeout(() => reject(new Error("Session check timeout")), 4000))
+      ]);
       setUser(profile);
       return profile;
     } catch (error) {

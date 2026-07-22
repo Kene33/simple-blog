@@ -11,3 +11,7 @@
 .post-actions .liked,
 .trend-post-copy small svg { color: var(--like); }
 .trend-topic{width:100%;border:0;background:transparent;text-align:left;cursor:pointer}
+:root .tags .topic-link{display:inline-flex;padding:3px 7px;border-radius:10px;background:#f6f7fb;color:var(--muted);font-size:10px;text-decoration:none}
+:root .category-pill.topic-link{text-decoration:none}
+:root .tags .topic-link:hover,:root .category-pill.topic-link:hover{color:var(--accent);text-decoration:underline}
+:root .mobile-header>.brand{flex:0 0 auto}:root .mobile-header>b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}:root .mobile-header-actions{flex:0 0 auto}:root .filter-tabs{scrollbar-width:thin}:root .filter-tabs button{flex:0 0 auto}

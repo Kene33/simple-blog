@@ -4,5 +4,6 @@ export const isBannedUser = (user) => user?.is_banned || user?.status === "banne
 export function Avatar({ user }) {
   const deleted = isDeletedUser(user);
   const initials = user?.username?.slice(0, 2).toUpperCase() || "";
-  return <span className={`avatar${deleted ? " avatar-deleted" : ""}`}>{!deleted && (user?.avatar_url ? <img src={user.avatar_url} alt="" /> : initials)}</span>;
+  const name = user?.display_name || user?.username || "Пользователь";
+  return <span className={`avatar${deleted ? " avatar-deleted" : ""}`}>{!deleted && (user?.avatar_url ? <img src={user.avatar_url} alt={`Аватар пользователя ${name}`} loading="lazy" decoding="async" /> : initials)}</span>;
 }
