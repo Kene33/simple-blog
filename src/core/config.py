@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,6 +35,20 @@ class Settings(BaseSettings):
     s3_access_key: str = "minio"
     s3_secret_key: str = "minio-password"
     s3_region: str = "us-east-1"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: object) -> object:
+        if isinstance(value, str):
+            return (
+                value.replace("postgresql://", "postgresql+asyncpg://", 1)
+                .replace("postgres://", "postgresql+asyncpg://", 1)
+                .replace("sslmode=require", "ssl=require")
+                .replace("channel_binding=require&", "")
+                .replace("&channel_binding=require", "")
+                .replace("?channel_binding=require", "?")
+            )
+        return value
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
