@@ -58,6 +58,7 @@ export function AppShell({ children, title = "Лента", right }) {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("simple-theme", theme);
   }, [theme]);
+  useEffect(() => { document.title = title === "Лента" ? "Simple — идеи и обсуждения" : `${title} — Simple`; }, [title]);
   const toggleTheme = () => setTheme((value) => value === "dark" ? "light" : "dark");
   const go = (to) => { setMobileMenu(false); navigate(to); };
   const guestOnly = (action) => { setMobileMenu(false); setGuestNotice(`Чтобы ${action}, войдите в аккаунт.`); };
