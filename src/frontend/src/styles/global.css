@@ -105,3 +105,4 @@ button { cursor: pointer; }
 :root[data-theme="dark"] .profile-private b { color: var(--text) !important; }
 :root[data-theme="dark"] .post-actions button,
 :root[data-theme="dark"] .post-actions a { color: var(--muted) !important; }
+:root[data-theme="dark"] .post-actions button:first-child { color: var(--like) !important; }
