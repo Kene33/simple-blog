@@ -7,9 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
 from src.core.errors import AppError
+from src.db.models import Post, User
 from src.db.session import get_session
 from src.modules.auth.dependencies import CurrentAuth, get_current_auth, require_csrf
-from src.db.models import Post, User
 from src.modules.auth.schemas import ActiveAuthorRead, PublicUserProfile, UserProfile, UserUpdateRequest
 from src.modules.auth.service import user_summary
 from src.modules.comments.schemas import CommentPage

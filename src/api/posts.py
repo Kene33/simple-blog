@@ -6,9 +6,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
+from src.db.models import Post, PostTag, Tag
 from src.db.session import get_session
 from src.modules.auth.dependencies import CurrentAuth, get_optional_auth, require_unmuted_csrf
-from src.db.models import Post, PostTag, Tag
 from src.modules.posts.schemas import PostCreateRequest, PostPage, PostRead, PostUpdateRequest, TrendingRead, TrendingTerm
 from src.modules.posts.service import create_post, get_post, list_posts, serialize_post, serialize_posts, update_post
 
