@@ -1,4 +1,5 @@
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
 export class ApiError extends Error {
   constructor(message, status, payload = null) {
@@ -43,7 +44,7 @@ async function send(path, options = {}) {
     if (csrf) headers.set("X-CSRF-Token", decodeURIComponent(csrf));
   }
 
-  return fetch(`/api/v1${path}`, {
+  return fetch(`${API_BASE}${path}`, {
     ...options,
     method,
     headers,
