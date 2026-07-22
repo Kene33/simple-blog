@@ -10,3 +10,4 @@
 .post-actions button:first-child,
 .post-actions .liked,
 .trend-post-copy small svg { color: var(--like); }
+.trend-topic{width:100%;border:0;background:transparent;text-align:left;cursor:pointer}
