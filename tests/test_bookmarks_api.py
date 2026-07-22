@@ -29,6 +29,20 @@ async def test_bookmark_is_idempotent_and_in_post_read(client: AsyncClient) -> N
 
 
 @pytest.mark.asyncio
+async def test_other_users_can_bookmark_a_public_post(client: AsyncClient) -> None:
+    owner_csrf = await register(client, "bookmarkowner")
+    post_id = await create_post(client, owner_csrf, "Public post")
+    other = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        other_csrf = await register(other, "otherbookmarker")
+        bookmarked = await other.put(f"/api/v1/posts/{post_id}/bookmark", headers={"X-CSRF-Token": other_csrf})
+        assert bookmarked.status_code == 200
+        assert (await other.get("/api/v1/bookmarks")).json()["items"][0]["id"] == post_id
+    finally:
+        await other.aclose()
+
+
+@pytest.mark.asyncio
 async def test_bookmarks_are_private_and_paginated(client: AsyncClient) -> None:
     csrf = await register(client, "bookmarklist")
     post_ids = [await create_post(client, csrf, f"Post {index}") for index in range(3)]

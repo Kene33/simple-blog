@@ -70,6 +70,22 @@ async def test_comment_rejects_parent_from_another_post(client: AsyncClient) -> 
 
 
 @pytest.mark.asyncio
+async def test_other_users_can_comment_and_read_comment(client: AsyncClient) -> None:
+    owner_csrf = await register(client, "postowner")
+    post_id = await create_post(client, owner_csrf)
+    other = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        other_csrf = await register(other, "othercommenter")
+        created = await other.post(f"/api/v1/posts/{post_id}/comments", json={"body": "From another user"}, headers={"X-CSRF-Token": other_csrf})
+        assert created.status_code == 201
+        read = await client.get(f"/api/v1/comments/{created.json()['id']}")
+        assert read.status_code == 200
+        assert read.json()["body"] == "From another user"
+    finally:
+        await other.aclose()
+
+
+@pytest.mark.asyncio
 async def test_comment_edit_delete_and_tombstone(client: AsyncClient) -> None:
     csrf = await register(client, "owner")
     post_id = await create_post(client, csrf)

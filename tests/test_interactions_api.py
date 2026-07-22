@@ -29,6 +29,20 @@ async def test_likes_are_idempotent_and_visible_to_current_user(client: AsyncCli
 
 
 @pytest.mark.asyncio
+async def test_other_users_can_like_a_public_post(client: AsyncClient) -> None:
+    owner_csrf = await register(client, "likeowner")
+    post = await client.post("/api/v1/posts", json={"title": "Post", "content": "content", "category": "tech"}, headers={"X-CSRF-Token": owner_csrf})
+    other = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        other_csrf = await register(other, "otherliker")
+        liked = await other.put(f"/api/v1/posts/{post.json()['id']}/like", headers={"X-CSRF-Token": other_csrf})
+        assert liked.status_code == 200
+        assert liked.json()["like_count"] == 1
+    finally:
+        await other.aclose()
+
+
+@pytest.mark.asyncio
 async def test_shares_support_anonymous_and_authenticated_events(client: AsyncClient) -> None:
     csrf = await register(client, "sharer")
     post = await client.post("/api/v1/posts", json={"title": "Post", "content": "content", "category": "tech"}, headers={"X-CSRF-Token": csrf})

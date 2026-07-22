@@ -44,7 +44,7 @@ def _decode_cursor(value: str, scope: str, settings: Settings) -> tuple[datetime
 
 
 async def create_comment(session: AsyncSession, post_id: UUID, author: User, payload: CommentCreateRequest) -> Comment:
-    await get_post(session, post_id, author.id)
+    await get_post(session, post_id)
     if payload.parent_id is not None:
         parent = await session.scalar(select(Comment).where(Comment.id == payload.parent_id, Comment.post_id == post_id, Comment.deleted_at.is_(None)))
         if parent is None:
