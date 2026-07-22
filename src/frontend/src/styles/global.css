@@ -96,3 +96,12 @@ button { cursor: pointer; }
 :root[data-theme="dark"] .draft-card p,
 :root[data-theme="dark"] .profile-meta b,
 :root[data-theme="dark"] .profile-private b { color: var(--text); }
+:root[data-theme="dark"] .trend-post-copy b,
+:root[data-theme="dark"] .trend-topic b,
+:root[data-theme="dark"] .post-body-link p,
+:root[data-theme="dark"] .post-page > .post-card .post-body-link p,
+:root[data-theme="dark"] .draft-card p,
+:root[data-theme="dark"] .profile-meta b,
+:root[data-theme="dark"] .profile-private b { color: var(--text) !important; }
+:root[data-theme="dark"] .post-actions button,
+:root[data-theme="dark"] .post-actions a { color: var(--muted) !important; }
