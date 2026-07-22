@@ -35,6 +35,12 @@ async def test_auth_lifecycle_and_csrf(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_registration_rejects_short_username(client: AsyncClient) -> None:
+    response = await client.post("/api/v1/auth/register", json={"username": "abcd", "email": "short@example.com", "password": "strong-password"})
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_duplicate_identity_and_profile_privacy(client: AsyncClient) -> None:
     payload = {"username": "alice", "email": "alice@example.com", "password": "strong-password"}
     assert (await client.post("/api/v1/auth/register", json=payload)).status_code == 201

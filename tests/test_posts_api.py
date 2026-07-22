@@ -41,7 +41,7 @@ async def test_post_crud_filters_pagination_and_ownership(client: AsyncClient) -
 
     other = AsyncClient(transport=client._transport, base_url="http://testserver")
     try:
-        other_csrf = await register(other, "bob")
+        other_csrf = await register(other, "bobby")
         forbidden = await other.patch(f"/api/v1/posts/{created[1]['id']}", json={"title": "stolen"}, headers={"X-CSRF-Token": other_csrf})
         assert forbidden.status_code == 404
     finally:

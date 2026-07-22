@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class RegisterRequest(BaseModel):
-    username: str = Field(min_length=3, max_length=30)
+    username: str = Field(min_length=5, max_length=30)
     email: EmailStr
     password: str = Field(min_length=10, max_length=128)
 
@@ -75,7 +75,7 @@ class ActiveAuthorRead(BaseModel):
 
 
 class UserUpdateRequest(BaseModel):
-    username: str | None = Field(default=None, min_length=3, max_length=30)
+    username: str | None = Field(default=None, min_length=5, max_length=30)
     email: EmailStr | None = None
     avatar_media_id: UUID | None = None
     cover_media_id: UUID | None = None

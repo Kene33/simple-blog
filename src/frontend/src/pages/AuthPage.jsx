@@ -36,7 +36,7 @@ export function AuthPage({ mode }) {
       <h2>{isLogin ? "Вход" : "Регистрация"}</h2>
       <p>{isLogin ? "Введите данные аккаунта" : "Это займёт меньше минуты"}</p>
       <form onSubmit={submit} noValidate>
-        {!isLogin && <label>Username<input value={form.username} onChange={set("username")} minLength="3" maxLength="30" required autoComplete="username" /></label>}
+        {!isLogin && <label>Username<input value={form.username} onChange={set("username")} minLength="5" maxLength="30" required autoComplete="username" /></label>}
         {!isLogin && <label>Email<input type="email" value={form.email} onChange={set("email")} required autoComplete="email" /></label>}
         {isLogin && <label>Username или email<input value={form.identifier} onChange={set("identifier")} required autoComplete="username" /></label>}
         <label>Пароль<span className="password-input"><input type={showPassword ? "text" : "password"} value={form.password} onChange={set("password")} minLength="10" required autoComplete={isLogin ? "current-password" : "new-password"} /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label="Показать пароль">{showPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
