@@ -31,12 +31,24 @@ function cookie(name) {
     .join("=");
 }
 
+function readableValidationMessage(field) {
+  if (field.code === "MISSING") return "обязательное поле";
+  if (field.code === "STRING_TOO_SHORT") return `минимум ${field.message.match(/at least (\d+)/i)?.[1] || "несколько"} символа`;
+  if (field.code === "STRING_TOO_LONG") return `максимум ${field.message.match(/at most (\d+)/i)?.[1] || "допустимое количество"} символов`;
+  if (field.field === "email" && field.code === "VALUE_ERROR") return "укажите корректный email";
+  return field.message;
+}
+
 async function parse(response) {
   const isJson = response.headers.get("content-type")?.includes("application/json");
   const payload = isJson ? await response.json() : null;
 
   if (!response.ok) {
-    const message = payload?.error?.message || payload?.message || payload?.detail || "Не удалось выполнить запрос";
+    const fields = payload?.error?.fields;
+    const fieldLabels = { username: "Username", email: "Email", password: "Пароль", identifier: "Username или email" };
+    const message = fields?.length
+      ? `Проверьте: ${fields.map((field) => { const name = field.field.split(".").pop(); return `${fieldLabels[name] || name}: ${readableValidationMessage({ ...field, field: name })}`; }).join("; ")}`
+      : payload?.error?.message || payload?.message || payload?.detail || "Не удалось выполнить запрос";
     throw new ApiError(message, response.status, payload);
   }
 

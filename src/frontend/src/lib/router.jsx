@@ -14,7 +14,11 @@ export function RouterProvider({ children }) {
 
   const value = useMemo(() => ({
     location,
-    navigate(to) {
+    navigate(to, options = {}) {
+      if (to === "/login" && !options.allowAuth) {
+        window.dispatchEvent(new CustomEvent("simple:guest-action", { detail: { action: "продолжить" } }));
+        return;
+      }
       if (to === `${window.location.pathname}${window.location.search}${window.location.hash}`) return;
       window.history.pushState({}, "", to);
       setLocation(currentLocation());
@@ -42,6 +46,6 @@ export function Link({ to, children, onClick, ...props }) {
     onClick?.(event);
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.button !== 0) return;
     event.preventDefault();
-    navigate(to);
+    navigate(to, { allowAuth: true });
   }} {...props}>{children}</a>;
 }

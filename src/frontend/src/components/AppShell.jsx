@@ -6,6 +6,10 @@ import { api } from "../lib/api";
 import { Link, useRouter } from "../lib/router";
 import { useSession } from "../session";
 
+export function notifyGuest(action) {
+  window.dispatchEvent(new CustomEvent("simple:guest-action", { detail: { action } }));
+}
+
 const links = [
   ["/", "Лента", House],
   ["/search", "Поиск", Search],
@@ -69,6 +73,11 @@ export function AppShell({ children, title = "Лента", right }) {
     const canonical = document.querySelector('link[rel="canonical"]');
     if (canonical) canonical.href = `${window.location.origin}${location.pathname}`;
   }, [title, location.pathname]);
+  useEffect(() => {
+    const onGuestAction = (event) => setGuestNotice(`Чтобы ${event.detail?.action || "продолжить"}, войдите в аккаунт.`);
+    window.addEventListener("simple:guest-action", onGuestAction);
+    return () => window.removeEventListener("simple:guest-action", onGuestAction);
+  }, []);
   const toggleTheme = () => setTheme((value) => value === "dark" ? "light" : "dark");
   const go = (to) => { setMobileMenu(false); navigate(to); };
   const guestOnly = (action) => { setMobileMenu(false); setGuestNotice(`Чтобы ${action}, войдите в аккаунт.`); };
@@ -79,7 +88,7 @@ export function AppShell({ children, title = "Лента", right }) {
     {mobileMenu && <div className="mobile-menu"><button onClick={() => go("/")}>Лента</button><button onClick={() => go("/search")}>Поиск</button><button onClick={() => user ? go("/posts/new") : guestOnly("создать публикацию")}>Новый пост</button><button onClick={() => user ? go("/me") : guestOnly("открыть профиль")}>Профиль</button>{user && <button onClick={() => go("/bookmarks")}>Закладки</button>}{isStaff && <button onClick={() => go("/moderation")}>Модерация</button>}{user && <button onClick={signOut}>Выйти</button>}</div>}
     <main className="main-content">{children}</main>
     {right && <aside className="right-rail">{right}</aside>}
-    {guestNotice && <div className="guest-notice" role="alert">{guestNotice}<button onClick={() => setGuestNotice("")} aria-label="Закрыть уведомление"><X size={16} /></button></div>}
+    {guestNotice && <div className="guest-notice" role="alert"><span>{guestNotice}</span><button className="guest-login" onClick={() => { setGuestNotice(""); navigate("/login", { allowAuth: true }); }}>Войти</button><button onClick={() => setGuestNotice("")} aria-label="Закрыть уведомление"><X size={16} /></button></div>}
     <nav className="mobile-nav">
       <button onClick={() => navigate("/")} aria-label="Лента"><House /></button>
       <button className="mobile-create" onClick={() => user ? navigate("/posts/new") : guestOnly("создать публикацию")} aria-label="Новый пост"><Plus /></button>
