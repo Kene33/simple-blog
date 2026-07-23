@@ -27,6 +27,7 @@ jobs:
       ENVIRONMENT: test
       JWT_SECRET_KEY: test-secret-that-is-long-enough-for-ci
       RELOAD: "false"
+      COOKIE_SECURE: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
