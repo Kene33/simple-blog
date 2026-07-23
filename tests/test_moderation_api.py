@@ -131,6 +131,24 @@ async def test_moderator_resolves_report_hides_target_bans_author_and_admin_rest
 
 
 @pytest.mark.asyncio
+async def test_moderator_can_hide_post(client: AsyncClient) -> None:
+    moderator_csrf = await register(client, "postmoder")
+    author = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        author_csrf = await register(author, "postauthor")
+        post = await author.post("/api/v1/posts", json={"title": "Hidden", "content": "content", "category": "tech"}, headers={"X-CSRF-Token": author_csrf})
+        async with client._transport.app.state.session_factory() as session:
+            moderator = await session.scalar(select(User).where(User.username_normalized == "postmoder"))
+            moderator.role = "moderator"
+            await session.commit()
+        hidden = await client.patch(f"/api/v1/admin/posts/{post.json()['id']}/hide", json={"reason": "spam"}, headers={"X-CSRF-Token": moderator_csrf})
+        assert hidden.status_code == 204
+        assert (await author.get(f"/api/v1/posts/{post.json()['id']}")).status_code == 404
+    finally:
+        await author.aclose()
+
+
+@pytest.mark.asyncio
 async def test_banned_author_and_post_remain_public(client: AsyncClient) -> None:
     admin_csrf = await register(client, "visibilityadmin")
     author = AsyncClient(transport=client._transport, base_url="http://testserver")

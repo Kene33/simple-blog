@@ -120,8 +120,8 @@ async def remove_user(user_id: UUID, auth: CurrentAuth = Depends(require_csrf), 
 
 @router.patch("/admin/posts/{post_id}/hide", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def hide_admin_post(post_id: UUID, payload: ContentModerationRequest, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
-    if auth.user.role != "admin":
-        raise AppError("FORBIDDEN", "Administrator role is required", 403)
+    if auth.user.role not in {"admin", "moderator"}:
+        raise AppError("FORBIDDEN", "Moderator role is required", 403)
     await hide_post(session, auth.user, post_id, payload.reason)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
