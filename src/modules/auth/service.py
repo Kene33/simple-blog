@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import Settings
 from src.core.errors import AppError
 from src.core.security import TokenData, create_access_token, create_refresh_token, hash_password, token_hash, verify_password
-from src.db.models import PasswordResetToken, RefreshSession, User
-from src.modules.auth.schemas import LoginRequest, PasswordResetConfirmRequest, RegisterRequest, SessionRead, UserSummary
+from src.db.models import EmailVerificationToken, PasswordResetToken, RefreshSession, User
+from src.modules.auth.schemas import AuthUserSummary, LoginRequest, PasswordResetConfirmRequest, RegisterRequest, SessionRead, UserSummary
 
 
 @dataclass(frozen=True)
@@ -45,6 +45,10 @@ def user_summary(user: User) -> UserSummary:
     return UserSummary(id=user.id, username="Deleted user" if deleted else user.username, avatar_url=None if deleted else (f"/api/v1/media/{user.avatar_media_id}" if user.avatar_media_id else None), status=user.status, is_banned=user.status == "banned", is_deleted=deleted)
 
 
+def auth_user_summary(user: User) -> AuthUserSummary:
+    return AuthUserSummary(**user_summary(user).model_dump(), email_verified=user.email_verified)
+
+
 async def register_user(session: AsyncSession, payload: RegisterRequest) -> User:
     username_normalized = normalize_username(payload.username)
     email_normalized = normalize_email(str(payload.email))
@@ -72,7 +76,26 @@ async def create_session(session: AsyncSession, settings: Settings, user: User, 
     refresh = create_refresh_token(settings, user.id, session_id, csrf_token)
     session.add(RefreshSession(id=session_id, user_id=user.id, token_hash=token_hash(refresh.value), expires_at=refresh.expires_at))
     await session.flush()
-    return AuthSession(access=access, refresh=refresh, csrf_token=csrf_token, response=SessionRead(user=user_summary(user), access_expires_at=access.expires_at, refresh_expires_at=refresh.expires_at))
+    return AuthSession(access=access, refresh=refresh, csrf_token=csrf_token, response=SessionRead(user=auth_user_summary(user), access_expires_at=access.expires_at, refresh_expires_at=refresh.expires_at))
+
+
+async def create_email_verification(session: AsyncSession, settings: Settings, user: User) -> str:
+    await session.execute(update(EmailVerificationToken).where(EmailVerificationToken.user_id == user.id, EmailVerificationToken.used_at.is_(None)).values(used_at=datetime.now(timezone.utc)))
+    token = secrets.token_urlsafe(32)
+    session.add(EmailVerificationToken(user_id=user.id, token_hash=token_hash(token), expires_at=datetime.now(timezone.utc) + timedelta(hours=settings.email_verification_hours)))
+    await session.flush()
+    return token
+
+
+async def verify_email(session: AsyncSession, token: str) -> None:
+    verification = await session.scalar(select(EmailVerificationToken).where(EmailVerificationToken.token_hash == token_hash(token)).with_for_update())
+    if verification is None or verification.used_at is not None or _is_expired(verification.expires_at):
+        raise AppError("EMAIL_VERIFICATION_INVALID", "Email verification link is invalid or expired", 400)
+    user = await session.get(User, verification.user_id)
+    if user is None:
+        raise AppError("EMAIL_VERIFICATION_INVALID", "Email verification link is invalid or expired", 400)
+    user.email_verified = True
+    verification.used_at = datetime.now(timezone.utc)
 
 
 async def rotate_session(session: AsyncSession, settings: Settings, refresh_value: str, csrf_header: str | None, csrf_cookie: str | None, csrf_token: str) -> AuthSession:

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, desc, func
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, desc, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,6 +17,7 @@ class User(Base):
     username_normalized: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     email_normalized: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="user", server_default="user")
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="active", server_default="active")
@@ -48,6 +49,17 @@ class RefreshSession(Base):
 
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class EmailVerificationToken(Base):
+    __tablename__ = "email_verification_tokens"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)

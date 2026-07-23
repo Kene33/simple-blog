@@ -1,6 +1,8 @@
 import pytest
 from httpx import AsyncClient
 
+import src.api.auth as auth_api
+
 
 @pytest.mark.asyncio
 async def test_auth_lifecycle_and_csrf(client: AsyncClient) -> None:
@@ -38,6 +40,24 @@ async def test_auth_lifecycle_and_csrf(client: AsyncClient) -> None:
 async def test_registration_rejects_short_username(client: AsyncClient) -> None:
     response = await client.post("/api/v1/auth/register", json={"username": "abcd", "email": "short@example.com", "password": "strong-password"})
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_email_verification_is_optional_until_confirmed(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    sent: dict[str, str] = {}
+
+    async def fake_send(settings: object, recipient: str, token: str) -> None:
+        sent[recipient] = token
+
+    monkeypatch.setattr(auth_api, "send_email_verification", fake_send)
+    response = await client.post("/api/v1/auth/register", json={"username": "verifyuser", "email": "verify@example.com", "password": "strong-password"})
+    assert response.status_code == 201
+    assert response.json()["user"]["email_verified"] is False
+
+    verified = await client.get(f"/api/v1/auth/verify-email?token={sent['verify@example.com']}")
+    assert verified.status_code == 200
+    assert (await client.get("/api/v1/users/me")).json()["email_verified"] is True
+    assert (await client.get(f"/api/v1/auth/verify-email?token={sent['verify@example.com']}")).status_code == 400
 
 
 @pytest.mark.asyncio

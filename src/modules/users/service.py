@@ -1,11 +1,11 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.errors import AppError
 from src.core.security import hash_password, verify_password
-from src.db.models import Media, Post, User
+from src.db.models import EmailVerificationToken, Media, Post, User
 from src.modules.auth.schemas import PublicUserProfile, UserProfile, UserUpdateRequest
 from src.modules.auth.service import normalize_email, normalize_username, user_summary
 
@@ -15,7 +15,7 @@ async def profile_for_user(session: AsyncSession, user: User, include_private: b
     posts_count = 0 if not include_private and user.posts_visibility != "public" else await session.scalar(select(func.count()).select_from(Post).where(*post_filter))
     values = user_summary(user).model_dump() | {"display_name": user.display_name, "bio": user.bio, "cover_url": f"/api/v1/media/{user.cover_media_id}" if user.cover_media_id else None, "posts_count": posts_count or 0, "created_at": user.created_at, "updated_at": user.updated_at}
     if include_private:
-        return UserProfile(**values, email=user.email, role=user.role, profile_visibility=user.profile_visibility, posts_visibility=user.posts_visibility, comments_visibility=user.comments_visibility)
+        return UserProfile(**values, email=user.email, email_verified=user.email_verified, role=user.role, profile_visibility=user.profile_visibility, posts_visibility=user.posts_visibility, comments_visibility=user.comments_visibility)
     return PublicUserProfile(**values)
 
 
@@ -42,6 +42,9 @@ async def update_user(session: AsyncSession, user: User, payload: UserUpdateRequ
             raise AppError("RESOURCE_CONFLICT", "Username or email is already in use", 409)
         for field, value in values.items():
             setattr(user, field, value)
+        if "email" in values:
+            user.email_verified = False
+            await session.execute(update(EmailVerificationToken).where(EmailVerificationToken.user_id == user.id, EmailVerificationToken.used_at.is_(None)).values(used_at=datetime.now(timezone.utc)))
     if "avatar_media_id" in payload.model_fields_set:
         previous_media = await session.get(Media, user.avatar_media_id) if user.avatar_media_id else None
         if payload.avatar_media_id is None:

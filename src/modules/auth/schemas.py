@@ -45,11 +45,16 @@ class UserSummary(BaseModel):
     is_deleted: bool
 
 
+class AuthUserSummary(UserSummary):
+    email_verified: bool
+
+
 class UserProfile(UserSummary):
     display_name: str | None = None
     bio: str | None = None
     cover_url: str | None = None
     email: EmailStr | None = None
+    email_verified: bool
     role: str | None = None
     profile_visibility: Literal["public", "private"]
     posts_visibility: Literal["public", "private"]
@@ -104,6 +109,6 @@ class UserUpdateRequest(BaseModel):
 
 
 class SessionRead(BaseModel):
-    user: UserSummary
+    user: AuthUserSummary
     access_expires_at: datetime
     refresh_expires_at: datetime

@@ -118,6 +118,7 @@ export const api = {
   me: () => request("/users/me"),
   login: (data) => request("/auth/login", { method: "POST", body: JSON.stringify(data) }),
   register: (data) => request("/auth/register", { method: "POST", body: JSON.stringify(data) }),
+  resendEmailVerification: () => request("/auth/email-verification/resend", { method: "POST" }),
   requestPasswordReset: (data) => request("/auth/password-reset/request", { method: "POST", body: JSON.stringify(data) }),
   confirmPasswordReset: (data) => request("/auth/password-reset/confirm", { method: "POST", body: JSON.stringify(data) }),
   logout: () => request("/auth/logout", { method: "POST" }),

@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
-from src.core.email import send_password_reset_email
+from src.core.email import send_email_verification, send_password_reset_email
 from src.core.errors import AppError
 from src.core.security import new_csrf_token
 from src.db.session import get_session
@@ -15,12 +15,14 @@ from src.modules.auth.service import (
     AuthSession,
     RefreshReplayDetected,
     authenticate_user,
+    create_email_verification,
     create_password_reset,
     create_session,
     register_user,
     reset_password,
     revoke_session,
     rotate_session,
+    verify_email,
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -44,13 +46,39 @@ async def register(payload: RegisterRequest, request: Request, response: Respons
     await request.app.state.rate_limiter.check(request, "register", 5, 3600)
     try:
         user = await register_user(session, payload)
+        verification_token = await create_email_verification(session, settings, user)
         auth_session = await create_session(session, settings, user, new_csrf_token())
         await session.commit()
     except IntegrityError:
         await session.rollback()
         raise AppError("RESOURCE_CONFLICT", "Username or email is already in use", 409) from None
     set_session_cookies(response, settings, auth_session)
+    try:
+        await send_email_verification(settings, user.email, verification_token)
+    except Exception:
+        logger.exception("Email verification delivery failed")
     return auth_session.response
+
+
+@router.get("/verify-email")
+async def verify_email_address(token: str, session: AsyncSession = Depends(get_session)) -> dict[str, str]:
+    await verify_email(session, token)
+    await session.commit()
+    return {"message": "Email verified"}
+
+
+@router.post("/email-verification/resend", response_model=PasswordResetRequestRead)
+async def resend_email_verification(request: Request, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PasswordResetRequestRead:
+    await request.app.state.rate_limiter.check(request, "email-verification-resend", 3, 900, str(auth.user.id))
+    if auth.user.email_verified:
+        return PasswordResetRequestRead(message="Email is already verified.")
+    token = await create_email_verification(session, settings, auth.user)
+    await session.commit()
+    try:
+        await send_email_verification(settings, auth.user.email, token)
+    except Exception:
+        logger.exception("Email verification delivery failed")
+    return PasswordResetRequestRead(message="If email delivery is configured, a verification link has been sent.")
 
 
 @router.post("/login", response_model=SessionRead)

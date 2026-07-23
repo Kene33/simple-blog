@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     access_token_minutes: int = 15
     refresh_token_days: int = 30
     password_reset_minutes: int = 30
+    email_verification_hours: int = 24
     access_cookie_name: str = "access_token"
     refresh_cookie_name: str = "refresh_token"
     csrf_cookie_name: str = "csrf_token"
