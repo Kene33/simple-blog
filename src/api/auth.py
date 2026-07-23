@@ -67,6 +67,13 @@ async def verify_email_address(token: str, session: AsyncSession = Depends(get_s
     return {"message": "Email verified"}
 
 
+@router.get("/verify-email/{token}")
+async def verify_email_address_from_path(token: str, session: AsyncSession = Depends(get_session)) -> dict[str, str]:
+    await verify_email(session, token)
+    await session.commit()
+    return {"message": "Email verified"}
+
+
 @router.post("/email-verification/resend", response_model=PasswordResetRequestRead)
 async def resend_email_verification(request: Request, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> PasswordResetRequestRead:
     await request.app.state.rate_limiter.check(request, "email-verification-resend", 3, 900, str(auth.user.id))

@@ -61,6 +61,20 @@ async def test_email_verification_is_optional_until_confirmed(client: AsyncClien
 
 
 @pytest.mark.asyncio
+async def test_email_verification_link_can_use_path_token(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    sent: dict[str, str] = {}
+
+    async def fake_send(settings: object, recipient: str, token: str) -> None:
+        sent[recipient] = token
+
+    monkeypatch.setattr(auth_api, "send_email_verification", fake_send)
+    response = await client.post("/api/v1/auth/register", json={"username": "pathverify", "email": "pathverify@example.com", "password": "strong-password"})
+    assert response.status_code == 201
+    verified = await client.get(f"/api/v1/auth/verify-email/{sent['pathverify@example.com']}")
+    assert verified.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_duplicate_identity_and_profile_privacy(client: AsyncClient) -> None:
     payload = {"username": "alice", "email": "alice@example.com", "password": "strong-password"}
     assert (await client.post("/api/v1/auth/register", json=payload)).status_code == 201
