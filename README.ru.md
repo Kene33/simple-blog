@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="docs/readme-assets/logo.svg" width="128" alt="Simple Blog logo" />
+  <img src="docs/readme-assets/logo.svg" width="180" alt="Логотип Simple Blog" />
   <h1>Simple Blog</h1>
   <p><a href="./README.md">🇬🇧 English</a> · <a href="./README.ru.md">🇷🇺 Русский</a></p>
-  <p><strong>Self-hosted social publishing with a versioned API, real PostgreSQL data, and a React client.</strong></p>
-  <p>Соберите блог с постами, комментариями, медиа и модерацией. Контракт API остаётся прозрачным и проверяемым.</p>
+  <p><strong>Самостоятельно размещаемый социальный блог с версионируемым API, PostgreSQL и React-клиентом.</strong></p>
+  <p>Публикации, обсуждения, медиа, настройки приватности и модерация в одном проекте.</p>
   <p>
     <a href="https://github.com/Kene33/simple-blog/actions/workflows/backend.yml"><img src="https://github.com/Kene33/simple-blog/actions/workflows/backend.yml/badge.svg" alt="Backend CI" /></a>
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12" /></a>
@@ -14,35 +14,34 @@
   </p>
   <p>
     <a href="#быстрый-старт">Быстрый старт</a> ·
-    <a href="#что-внутри">Возможности</a> ·
+    <a href="#возможности">Возможности</a> ·
     <a href="#api-first-flow">API flow</a> ·
     <a href="./docs/api-v1.md">API docs</a> ·
-    <a href="./docs/architecture.md">Architecture</a> ·
+    <a href="./docs/architecture.md">Архитектура</a> ·
     <a href="./CONTRIBUTING.md">Contributing</a>
   </p>
 </div>
 
-> Simple Blog: рабочая база для social publishing продукта. Запустите API и
-> PostgreSQL одной командой, откройте Swagger, подключите клиент и развивайте
-> собственные правила публикации.
+Simple Blog — модульное приложение для публикаций. FastAPI обслуживает backend,
+PostgreSQL хранит связанные данные, MinIO даёт S3-compatible storage для локальной
+разработки, а React-клиент работает с API `/api/v1`.
 
 ## Почему Simple Blog
 
-Проект закрывает тот участок, где обычный CRUD быстро превращается в набор
-разрозненных решений:
-
-- **API с границами.** FastAPI routers, domain services и PostgreSQL-модели
-  разделяют transport, use cases и хранение.
-- **Безопасная browser-сессия.** HttpOnly access/refresh cookies, CSRF header,
-  роли `user` и `admin`, стабильный error envelope и `X-Request-ID`.
-- **Готовые социальные сценарии.** Feed, cursor pagination, comments,
-  likes, bookmarks, shares, reports и moderation уже входят в контракт.
-- **Медиа без привязки к провайдеру.** Upload-проверки работают с S3-compatible
-  storage; локальная разработка использует MinIO.
+- **Социальные сценарии:** лента, тренды, категории, черновики, полнотекстовый
+  поиск, комментарии, лайки, закладки и sharing.
+- **Аккаунты и приватность:** подтверждение email, восстановление пароля,
+  refresh-сессии, видимость профиля, постов и комментариев, HttpOnly cookies.
+- **Модерация:** жалобы с snapshots, заявки на категории, блокировки и mute
+  пользователей, роли, скрытие и восстановление контента, audit actions.
+- **Эксплуатационная безопасность:** CSRF, security headers, request IDs,
+  structured errors, gzip и rate limiting.
+- **Медиа без привязки к провайдеру:** проверка MIME и размеров, MinIO локально,
+  S3-compatible storage.
 
 ## Быстрый старт
 
-### 1. Поднимите API и зависимости
+### Backend
 
 Нужны Docker Desktop и Docker Compose v2.
 
@@ -52,57 +51,58 @@ cd simple-blog
 docker compose up --build
 ```
 
-Compose запускает FastAPI, PostgreSQL, MinIO и миграции с development-настройками
-из `docker-compose.yml`. Перед публичным deployment замените `JWT_SECRET_KEY` и
-остальные секреты.
+Compose запускает FastAPI, PostgreSQL 16, MinIO и отдельный контейнер с Alembic
+миграциями. Development-параметры находятся в `docker-compose.yml`.
 
-Проверьте API:
+Проверьте сервисы:
 
 ```bash
 curl http://localhost:8000/health/live
+curl http://localhost:8000/health/ready
 ```
 
-```json
-{"status":"ok","service":"Simple Blog API","version":"0.1.0"}
-```
+Контракт API доступен в [Swagger UI](http://localhost:8000/docs).
 
-Откройте интерактивный контракт в [Swagger UI](http://localhost:8000/docs).
-
-| Service | URL |
+| Сервис | URL |
 | --- | --- |
 | API | <http://localhost:8000> |
 | Swagger UI | <http://localhost:8000/docs> |
 | MinIO API | <http://localhost:9000> |
 | MinIO Console | <http://localhost:9001> |
 
-### 2. Запустите React-клиент
+### React-клиент
 
 Откройте второй терминал:
 
 ```bash
 cd src/frontend
-npm install
+npm ci
 npm run dev
 ```
 
-Клиент откроется на <http://localhost:5173>. Vite проксирует `/api` на
-`localhost:8000`, поэтому cookies и CSRF flow работают на одном origin.
+Vite запустит клиент на <http://localhost:5173> и направит `/api` на локальный
+backend. Собрать клиент можно командой:
+
+```bash
+npm --prefix src/frontend run build
+```
 
 ## API-first flow
 
-Начните с health check, затем изучите полный контракт в Swagger. Все ресурсы
-используют `/api/v1`, а коллекции возвращают `items` и `next_cursor`.
+API использует базовый путь `/api/v1`, JSON в `snake_case`, UUID, UTC timestamps и
+`items` с `next_cursor` для коллекций.
 
 ```mermaid
 flowchart LR
-    A[Register] --> B[Login]
-    B --> C[Create post]
-    C --> D[Comment or like]
-    D --> E[Report content]
-    E --> F[Admin resolves report]
+    Register[Регистрация] --> Verify[Подтверждение email]
+    Verify --> Login[Вход]
+    Login --> Publish[Пост или черновик]
+    Publish --> Discuss[Комментарий, лайк, закладка, share]
+    Discuss --> Report[Жалоба]
+    Report --> Moderate[Обработка staff]
 ```
 
-Регистрация создаёт browser session и выставляет cookies:
+Зарегистрируйте пользователя и сохраните cookies:
 
 ```bash
 curl -i -c cookies.txt \
@@ -111,21 +111,26 @@ curl -i -c cookies.txt \
   http://localhost:8000/api/v1/auth/register
 ```
 
-После регистрации сервер возвращает `csrf_token` в cookie. Для изменяющих
-запросов передайте его также в `X-CSRF-Token`. Схемы и все ответы описаны в
-[REST API v1](./docs/api-v1.md) и [API schemas](./docs/api-schemas.md).
+Изменяющие запросы браузера используют header `X-CSRF-Token`. Полный контракт
+запросов и ответов описан в [REST API v1](./docs/api-v1.md) и
+[API schemas](./docs/api-schemas.md).
 
-## Что внутри
+## Возможности
 
-| Area | Includes |
+| Область | Актуальные возможности |
 | --- | --- |
-| Auth | Register, login, refresh, logout, HttpOnly cookies, CSRF, roles |
-| Content | Posts, drafts, categories, tags, full-text search, cursor pagination |
-| Media | MIME validation, image/video limits, S3-compatible storage |
-| Discussion | Root comments, nested replies, edit, soft-delete tombstones |
-| Interactions | Likes, bookmarks, copy/native shares |
-| Moderation | Reports, admin queue, target snapshots, resolve/reject workflow |
-| Client | React 19, Vite, JSX, vanilla CSS, `lucide-react`, fetch API layer |
+| Auth | Регистрация, подтверждение email, вход, refresh, logout, password reset |
+| Профили | Публичная и приватная видимость, поля профиля, комментарии автора |
+| Контент | Посты, черновики, категории, заявки категорий, тренды, поиск, pagination |
+| Медиа | Изображения, видео, cover media, ownership checks, S3/MinIO |
+| Обсуждения | Вложенные комментарии, редактирование, soft-delete tombstones, visibility |
+| Interactions | Идемпотентные likes, bookmarks, copy/native shares |
+| Moderation | Жалобы, staff queue, bans, mutes, роли, hide/restore, audit log |
+| Клиент | React 19, Vite, JSX, fetch API layer, responsive CSS |
+
+Приложение добавляет security headers, request IDs, structured logs, gzip,
+rate limiting и единый error envelope. Квоты и лимиты медиа находятся в
+`src/core/config.py`.
 
 ## Архитектура
 
@@ -133,53 +138,55 @@ curl -i -c cookies.txt \
 flowchart LR
     Browser[React + Vite client] -->|/api/v1| App[FastAPI application]
     App --> Auth[Auth and users]
-    App --> Content[Posts and comments]
-    App --> Social[Likes bookmarks shares]
-    App --> Moderation[Reports and moderation]
+    App --> Content[Posts, drafts, categories]
+    App --> Social[Comments and interactions]
+    App --> Moderation[Reports and staff actions]
     App --> DB[(PostgreSQL)]
     App --> Storage[S3 / MinIO]
+    App --> Redis[(Rate limiter)]
 ```
 
-FastAPI routers принимают HTTP-запросы. Domain services проверяют ownership,
-роли и бизнес-правила. PostgreSQL хранит связи и состояния, а S3-compatible
-storage принимает медиа. Клиент получает данные через обычный `fetch` и не
-хранит access tokens в `localStorage`.
+Routers отвечают за HTTP transport. Domain services проверяют ownership, роли и
+бизнес-правила. PostgreSQL хранит состояние, object storage — медиа, rate limiter
+защищает чувствительные endpoints.
 
-Подробные документы:
+Подробности:
 
-- [Architecture](./docs/architecture.md)
-- [Backend module boundaries](./docs/backend-module-boundaries.md)
-- [Database schema](./docs/database-schema.md)
-- [Error format](./docs/error-format.md)
-- [Pagination](./docs/pagination.md)
-- [API v1](./docs/api-v1.md)
+- [Архитектура](./docs/architecture.md)
+- [Границы backend-модулей](./docs/backend-module-boundaries.md)
+- [Схема базы данных](./docs/database-schema.md)
+- [Формат ошибок](./docs/error-format.md)
+- [Cursor pagination](./docs/pagination.md)
+- [Roadmap](./docs/roadmap.md)
 
 ## Проверки
 
-Перед pull request запустите:
+CI использует Python 3.12, PostgreSQL 16, locked dependencies, Alembic, Ruff,
+`pip-audit` и pytest.
 
 ```bash
 ruff check src tests
 pytest -q tests
 alembic upgrade head --sql
+pip-audit -r requirements.lock
+npm --prefix src/frontend run check:post-files
+npm --prefix src/frontend run check:comment-tree
 npm --prefix src/frontend run build
 ```
-
-GitHub Actions проверяет backend в Python 3.12 и PostgreSQL 16. Frontend
-собирается отдельно через Vite.
 
 ## Структура проекта
 
 ```text
 src/
-  api/       HTTP routers
-  core/      config, security, logging, errors
+  api/       FastAPI routers
+  core/      config, security, rate limits, logging, errors
   db/        async sessions, models, migrations glue
-  modules/   auth, users, posts, media, comments, interactions, moderation
+  modules/   auth, users, posts, categories, media, comments,
+             interactions, moderation
   frontend/  React/Vite client
 docs/        API contracts and architecture notes
 alembic/     PostgreSQL migrations
-tests/       API and PostgreSQL integration tests
+tests/       API, security и PostgreSQL integration tests
 ```
 
 ## Contributing
@@ -189,11 +196,12 @@ tests/       API and PostgreSQL integration tests
 
 1. Опишите проблему и ожидаемый результат.
 2. Обновите API-документы вместе с изменением контракта.
-3. Проверьте ownership, CSRF, роли и миграции.
-4. Добавьте команды проверки и известные ограничения в описание PR.
+3. Проверьте ownership, CSRF, роли, visibility и миграции.
+4. Запустите подходящие backend и frontend checks.
+5. Укажите известные ограничения в описании PR.
 
 Полные правила находятся в [CONTRIBUTING.md](./CONTRIBUTING.md).
 
-## License
+## Лицензия
 
 Simple Blog распространяется по [MIT License](./LICENSE).

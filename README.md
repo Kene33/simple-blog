@@ -2,8 +2,8 @@
   <img src="docs/readme-assets/logo.svg" width="180" alt="Simple Blog logo" />
   <h1>Simple Blog</h1>
   <p><a href="./README.md">🇬🇧 English</a> · <a href="./README.ru.md">🇷🇺 Русский</a></p>
-  <p><strong>Self-hosted social publishing with a versioned API, real PostgreSQL data, and a React client.</strong></p>
-  <p>Build a blog with posts, comments, media, and moderation on a contract you can inspect and extend.</p>
+  <p><strong>Self-hosted social publishing with a versioned API, PostgreSQL, and a React client.</strong></p>
+  <p>Build a blog with posts, discussions, media, privacy controls, and staff moderation.</p>
   <p>
     <a href="https://github.com/Kene33/simple-blog/actions/workflows/backend.yml"><img src="https://github.com/Kene33/simple-blog/actions/workflows/backend.yml/badge.svg" alt="Backend CI" /></a>
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python 3.12" /></a>
@@ -14,7 +14,7 @@
   </p>
   <p>
     <a href="#quick-start">Quick start</a> ·
-    <a href="#whats-included">Features</a> ·
+    <a href="#features">Features</a> ·
     <a href="#api-first-flow">API flow</a> ·
     <a href="./docs/api-v1.md">API docs</a> ·
     <a href="./docs/architecture.md">Architecture</a> ·
@@ -22,46 +22,29 @@
   </p>
 </div>
 
-## Product preview
-
-<p align="center">
-  <img src="design-reference/01-feed.png" alt="Simple Blog feed on desktop" width="900" />
-</p>
-
-<p align="center">
-  <img src="design-reference/03-create-post.png" alt="Create post screen" width="440" />
-  <img src="design-reference/08-moderation.png" alt="Moderation queue" width="440" />
-</p>
-
-<p align="center">
-  <img src="design-reference/11-mobile-feed.png" alt="Simple Blog feed on mobile" width="280" />
-</p>
-
-The preview covers the main product surfaces: feed, publishing, moderation, and
-mobile browsing. The source images live in [`design-reference/`](./design-reference/).
-
-> Simple Blog gives you a practical base for a social publishing product. Start
-> the API and PostgreSQL with one command, inspect the contract in Swagger, and
-> shape the publishing rules around your product.
+Simple Blog is a modular publishing application for teams that want to control
+their content model and API contract. FastAPI serves the backend,
+PostgreSQL stores relational state, MinIO provides local S3-compatible storage,
+and the React client consumes `/api/v1`.
 
 ## Why Simple Blog
 
-The project handles the work that turns a basic CRUD app into a social product:
-
-- **Clear API boundaries.** FastAPI routers, domain services, and PostgreSQL
-  models separate transport, use cases, and persistence.
-- **A browser-safe session.** HttpOnly access and refresh cookies, a CSRF header,
-  `user` and `admin` roles, a stable error envelope, and `X-Request-ID`.
-- **Social workflows in the contract.** Feed, cursor pagination, comments,
-  likes, bookmarks, shares, reports, and moderation.
-- **Provider-neutral media.** Upload validation works with S3-compatible storage;
-  local development uses MinIO.
+- **Social publishing primitives:** feeds, trending posts, categories, drafts,
+  full-text search, comments, likes, bookmarks, and shares.
+- **Account and privacy controls:** email verification, password reset, refresh
+  sessions, profile/post/comment visibility, and HttpOnly cookies.
+- **Staff moderation:** reports with target snapshots, category requests, user
+  bans and mutes, role management, content hide/restore, and audit actions.
+- **Operational safeguards:** CSRF protection, security headers, request IDs,
+  structured errors, gzip responses, and rate limiting.
+- **Provider-neutral media:** MIME and size validation with MinIO locally and
+  S3-compatible storage.
 
 ## Quick start
 
-### 1. Start the API and dependencies
+### Start the backend
 
-You need Docker Desktop and Docker Compose v2.
+Requirements: Docker Desktop and Docker Compose v2.
 
 ```bash
 git clone https://github.com/Kene33/simple-blog.git
@@ -69,21 +52,17 @@ cd simple-blog
 docker compose up --build
 ```
 
-Compose starts FastAPI, PostgreSQL, MinIO, and the migration job with the
- development defaults from `docker-compose.yml`. Replace `JWT_SECRET_KEY` and
-other secrets before a public deployment.
+Compose starts FastAPI, PostgreSQL 16, MinIO, and the Alembic migration job.
+Development connection values live in `docker-compose.yml`.
 
-Check the API:
+Check the service:
 
 ```bash
 curl http://localhost:8000/health/live
+curl http://localhost:8000/health/ready
 ```
 
-```json
-{"status":"ok","service":"Simple Blog API","version":"0.1.0"}
-```
-
-Open the interactive contract in [Swagger UI](http://localhost:8000/docs).
+Open the API contract in [Swagger UI](http://localhost:8000/docs).
 
 | Service | URL |
 | --- | --- |
@@ -92,58 +71,67 @@ Open the interactive contract in [Swagger UI](http://localhost:8000/docs).
 | MinIO API | <http://localhost:9000> |
 | MinIO Console | <http://localhost:9001> |
 
-### 2. Start the React client
+### Start the React client
 
 Open a second terminal:
 
 ```bash
 cd src/frontend
-npm install
+npm ci
 npm run dev
 ```
 
-The client runs at <http://localhost:5173>. Vite proxies `/api` to
-`localhost:8000`, so cookies and the CSRF flow stay on one origin.
+The Vite client runs at <http://localhost:5173> and proxies `/api` to the local
+backend. Build the client with:
+
+```bash
+npm --prefix src/frontend run build
+```
 
 ## API-first flow
 
-Start with the health check, then explore the full contract in Swagger. Every
-resource uses `/api/v1`; collection responses contain `items` and
-`next_cursor`.
+The API uses `/api/v1`, JSON `snake_case`, UUID identifiers, UTC timestamps, and
+`items` plus `next_cursor` for collection responses.
 
 ```mermaid
 flowchart LR
-    A[Register] --> B[Login]
-    B --> C[Create post]
-    C --> D[Comment or like]
-    D --> E[Report content]
-    E --> F[Admin resolves report]
+    Register[Register] --> Verify[Verify email]
+    Verify --> Login[Login]
+    Login --> Publish[Create post or draft]
+    Publish --> Discuss[Comment, like, bookmark, share]
+    Discuss --> Report[Report content]
+    Report --> Moderate[Staff resolves report]
 ```
 
-Registration creates a browser session and sets the cookies:
+Create an account and store its cookies:
 
 ```bash
-curl -i -c cookies.txt \\
-  -H 'Content-Type: application/json' \\
-  -d '{"username":"reader_01","email":"reader@example.com","password":"change-me-123"}' \\
+curl -i -c cookies.txt \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"reader_01","email":"reader@example.com","password":"change-me-123"}' \
   http://localhost:8000/api/v1/auth/register
 ```
 
-The server returns a `csrf_token` cookie. Send its value in `X-CSRF-Token`
-for state-changing requests. Find schemas and response details in
-[REST API v1](./docs/api-v1.md) and [API schemas](./docs/api-schemas.md).
+State-changing browser requests use the `X-CSRF-Token` header. The complete
+request/response contract is documented in [REST API v1](./docs/api-v1.md) and
+[API schemas](./docs/api-schemas.md).
 
-## What's included
+## Features
 
-| Area | Includes |
+| Area | Current capabilities |
 | --- | --- |
-| Auth | Register, login, refresh, logout, HttpOnly cookies, CSRF, roles |
-| Content | Posts, drafts, categories, tags, full-text search, cursor pagination |
-| Media | MIME validation, image/video limits, S3-compatible storage |
-| Discussion | Root comments, nested replies, edits, soft-delete tombstones |
-| Interactions | Likes, bookmarks, copy/native shares |
-| Moderation | Reports, admin queue, target snapshots, resolve/reject workflow |
-| Client | React 19, Vite, JSX, vanilla CSS, `lucide-react`, fetch API layer |
+| Auth | Register, email verification, login, refresh, logout, password reset |
+| Profiles | Public/private visibility, profile fields, author comments |
+| Content | Posts, drafts, categories, category requests, trending, search, pagination |
+| Media | Image/video uploads, cover media, ownership checks, S3/MinIO storage |
+| Discussion | Nested comments, edits, soft-delete tombstones, visibility controls |
+| Interactions | Idempotent likes, bookmarks, copy/native share events |
+| Moderation | Reports, staff queue, bans, mutes, roles, hide/restore, audit log |
+| Client | React 19, Vite, JSX, fetch API layer, responsive CSS |
+
+The app adds security headers, request IDs, structured logs, gzip compression,
+rate limiting, and one error envelope for API failures. Media quotas and upload
+limits are configurable in `src/core/config.py`.
 
 ## Architecture
 
@@ -151,64 +139,67 @@ for state-changing requests. Find schemas and response details in
 flowchart LR
     Browser[React + Vite client] -->|/api/v1| App[FastAPI application]
     App --> Auth[Auth and users]
-    App --> Content[Posts and comments]
-    App --> Social[Likes bookmarks shares]
-    App --> Moderation[Reports and moderation]
+    App --> Content[Posts, drafts, categories]
+    App --> Social[Comments and interactions]
+    App --> Moderation[Reports and staff actions]
     App --> DB[(PostgreSQL)]
     App --> Storage[S3 / MinIO]
+    App --> Redis[(Rate limiter)]
 ```
 
-FastAPI routers receive HTTP requests. Domain services enforce ownership, roles,
-and business rules. PostgreSQL stores relationships and state; S3-compatible
-storage accepts media. The client uses `fetch` and keeps access tokens out of
-`localStorage`.
+Routers handle HTTP transport. Domain services enforce ownership, roles, and
+business rules. PostgreSQL owns relational state; object storage owns media;
+The rate limiter protects sensitive endpoints. The detailed boundaries live in
+[architecture.md](./docs/architecture.md) and
+[backend-module-boundaries.md](./docs/backend-module-boundaries.md).
 
-Read the detailed docs:
+More documentation:
 
-- [Architecture](./docs/architecture.md)
-- [Backend module boundaries](./docs/backend-module-boundaries.md)
 - [Database schema](./docs/database-schema.md)
 - [Error format](./docs/error-format.md)
-- [Pagination](./docs/pagination.md)
-- [API v1](./docs/api-v1.md)
+- [Cursor pagination](./docs/pagination.md)
+- [Roadmap](./docs/roadmap.md)
 
 ## Checks
 
-Run these commands before opening a pull request:
+Backend CI uses Python 3.12, PostgreSQL 16, the locked Python dependencies,
+Alembic, Ruff, `pip-audit`, and pytest.
 
 ```bash
 ruff check src tests
 pytest -q tests
 alembic upgrade head --sql
+pip-audit -r requirements.lock
+npm --prefix src/frontend run check:post-files
+npm --prefix src/frontend run check:comment-tree
 npm --prefix src/frontend run build
 ```
-
-GitHub Actions checks the backend with Python 3.12 and PostgreSQL 16. Vite
-builds the frontend separately.
 
 ## Project structure
 
 ```text
 src/
-  api/       HTTP routers
-  core/      config, security, logging, errors
-  db/        async sessions, models, migration glue
-  modules/   auth, users, posts, media, comments, interactions, moderation
+  api/       versioned FastAPI routers
+  core/      config, security, rate limits, logging, errors
+  db/        async sessions, models, migrations glue
+  modules/   auth, users, posts, categories, media, comments,
+             interactions, moderation
   frontend/  React/Vite client
 docs/        API contracts and architecture notes
 alembic/     PostgreSQL migrations
-tests/       API and PostgreSQL integration tests
+tests/       API, security, and PostgreSQL integration tests
 ```
 
 ## Contributing
 
 Open an [issue](https://github.com/Kene33/simple-blog/issues) for a bug or idea.
-Before opening a pull request:
+Before a pull request:
 
-1. Describe the problem and the expected result.
+1. Describe the problem and expected result.
 2. Update API docs with contract changes.
-3. Check ownership, CSRF, roles, and migrations.
-4. List the checks you ran and any known limitations.
+3. Check ownership, CSRF, roles, visibility, and migrations.
+4. Run the relevant backend and frontend checks.
+5. List known limitations in the pull request.
 
 Read the full rules in [CONTRIBUTING.md](./CONTRIBUTING.md).
 
