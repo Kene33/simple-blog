@@ -157,7 +157,6 @@ Routers отвечают за HTTP transport. Domain services проверяют
 - [Схема базы данных](./docs/database-schema.md)
 - [Формат ошибок](./docs/error-format.md)
 - [Cursor pagination](./docs/pagination.md)
-- [Roadmap](./docs/roadmap.md)
 
 ## Проверки
 

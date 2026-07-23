@@ -158,7 +158,6 @@ More documentation:
 - [Database schema](./docs/database-schema.md)
 - [Error format](./docs/error-format.md)
 - [Cursor pagination](./docs/pagination.md)
-- [Roadmap](./docs/roadmap.md)
 
 ## Checks
 
