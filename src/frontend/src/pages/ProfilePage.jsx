@@ -88,8 +88,8 @@ export function ProfilePage({ username }) {
   };
   const resendVerification = async () => {
     try {
-      const result = await api.resendEmailVerification();
-      setVerificationMessage(result.message);
+      await api.resendEmailVerification();
+      setVerificationMessage("Письмо с подтверждением отправлено на ваш email.");
     } catch (cause) {
       setVerificationMessage(cause.message || "Не удалось отправить письмо");
     }
