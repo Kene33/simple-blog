@@ -83,7 +83,7 @@ export function PostPage({ postId }) {
   }
 
   async function loadRootReplies(roots) {
-    const pages = await Promise.all(roots.map((comment) => api.comments(postId, { parent_id: comment.id, limit: 3 })));
+    const pages = await Promise.all(roots.map((comment) => api.comments(postId, { parent_id: comment.id, limit: 4 })));
     return {
       items: pages.flatMap((page) => page.items),
       loaded: Object.fromEntries(roots.map((comment) => [comment.id, true])),
@@ -188,7 +188,7 @@ export function PostPage({ postId }) {
     if (loadingReplies[parentId]) return;
     setLoadingReplies((items) => ({ ...items, [parentId]: true }));
     try {
-      const page = await api.comments(postId, { parent_id: parentId, limit: 3, cursor: more ? replyCursors[parentId] : undefined });
+      const page = await api.comments(postId, { parent_id: parentId, limit: 4, cursor: more ? replyCursors[parentId] : undefined });
       setComments((items) => mergeComments(items, page.items));
       setLoadedReplies((items) => ({ ...items, [parentId]: true }));
       setExpandedReplies((items) => ({ ...items, [parentId]: true }));
