@@ -27,6 +27,9 @@ function Comment({ comment, replies, replyState, currentUser, onReply, onUpdate,
   const edited = comment.updated_at && comment.created_at && new Date(comment.updated_at).getTime() > new Date(comment.created_at).getTime() + 1000;
   const author = comment.author;
   const authorPath = author?.username && author.status !== "deleted" ? `/users/${author.username}` : null;
+  const hasReplies = comment.reply_count > 0 || replies.length > 0;
+
+  if (comment.is_deleted && !hasReplies) return null;
 
   function submitReply(event) {
     event.preventDefault();
@@ -45,7 +48,7 @@ function Comment({ comment, replies, replyState, currentUser, onReply, onUpdate,
     {authorPath ? <Link className="comment-author-avatar" to={authorPath}><Avatar user={author} /></Link> : <Avatar user={author} />}
     <div>
       <b>{authorPath ? <Link className="comment-author" to={authorPath}>{author.display_name || author.username}</Link> : author?.display_name || author?.username || "Удалённый аккаунт"}</b>
-      {comment.is_deleted ? <small>Комментарий удалён автором</small> : editing ? <form className="comment-inline-form" onSubmit={submitEdit}><textarea value={text} onChange={(event) => setText(event.target.value)} maxLength="2000" autoFocus /><button>Сохранить</button><button type="button" onClick={() => setEditing(false)}>Отмена</button></form> : <small><LinkifiedText>{comment.body}</LinkifiedText>{edited && <em className="comment-edited">изменено</em>}</small>}
+      {comment.is_deleted ? <small>Комментарий удалён автором или модераторами</small> : editing ? <form className="comment-inline-form" onSubmit={submitEdit}><textarea value={text} onChange={(event) => setText(event.target.value)} maxLength="2000" autoFocus /><button>Сохранить</button><button type="button" onClick={() => setEditing(false)}>Отмена</button></form> : <small><LinkifiedText>{comment.body}</LinkifiedText>{edited && <em className="comment-edited">изменено</em>}</small>}
       {!comment.is_deleted && <div className="comment-actions"><button className="comment-reply-button" onClick={() => currentUser ? setReply(!reply) : onLogin()} aria-label="Ответить"><MessageCircle size={15} /><span>Ответить</span></button><button className="comment-more-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Другие действия" aria-expanded={menuOpen}><MoreHorizontal size={17} /></button><div className={`comment-menu${menuOpen ? " open" : ""}`}>{own && <><button onClick={() => { setEditing(true); setMenuOpen(false); }}>Изменить</button><button onClick={() => { onDelete(comment.id); setMenuOpen(false); }}>Удалить</button></>}<button onClick={() => { onReport(comment.id); setMenuOpen(false); }}>Пожаловаться</button></div></div>}
       {reply && <form className="comment-inline-form" onSubmit={submitReply}><textarea name="body" placeholder="Написать ответ" maxLength="2000" autoFocus /><button>Ответить</button><button type="button" onClick={() => setReply(false)}>Отмена</button></form>}
       <div className="comment-thread-actions">
