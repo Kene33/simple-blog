@@ -34,7 +34,7 @@ async def read(comment_id: UUID, auth: CurrentAuth | None = Depends(get_optional
 
 @router.patch("/api/v1/comments/{comment_id}", response_model=CommentRead)
 async def update(comment_id: UUID, payload: CommentUpdateRequest, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> CommentRead:
-    comment = await update_comment(session, await get_comment(session, comment_id, auth.user.id), payload)
+    comment = await update_comment(session, await get_comment(session, comment_id, owner_id=auth.user.id, viewer_id=auth.user.id), payload)
     await session.commit()
     await session.refresh(comment)
     return (await serialize_comments(session, [comment]))[0]
@@ -42,6 +42,6 @@ async def update(comment_id: UUID, payload: CommentUpdateRequest, auth: CurrentA
 
 @router.delete("/api/v1/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def remove(comment_id: UUID, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> Response:
-    await delete_comment(session, await get_comment(session, comment_id, auth.user.id))
+    await delete_comment(session, await get_comment(session, comment_id, owner_id=auth.user.id, viewer_id=auth.user.id))
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -64,7 +64,7 @@ async def get_comment(session: AsyncSession, comment_id: UUID, owner_id: UUID | 
     comment = await session.scalar(query)
     if comment is None or owner_id is not None and comment.author_id != owner_id:
         raise AppError("RESOURCE_NOT_FOUND", "Comment not found", 404)
-    await get_post(session, comment.post_id, owner_id=owner_id, viewer_id=viewer_id)
+    await get_post(session, comment.post_id, viewer_id=viewer_id)
     return comment
 
 

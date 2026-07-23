@@ -81,6 +81,10 @@ async def test_other_users_can_comment_and_read_comment(client: AsyncClient) -> 
         read = await other.get(f"/api/v1/comments/{created.json()['id']}")
         assert read.status_code == 200
         assert read.json()["body"] == "From another user"
+        updated = await other.patch(f"/api/v1/comments/{created.json()['id']}", json={"body": "Updated by author"}, headers={"X-CSRF-Token": other_csrf})
+        assert updated.status_code == 200
+        deleted = await other.delete(f"/api/v1/comments/{created.json()['id']}", headers={"X-CSRF-Token": other_csrf})
+        assert deleted.status_code == 204
     finally:
         await other.aclose()
 
