@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Flag, Pencil, Send, Trash2 } from "lucide-react";
+import { ArrowLeft, Flag, MessageCircle, MoreHorizontal, Pencil, Send, Trash2 } from "lucide-react";
 import { AppShell } from "../components/AppShell";
 import { Avatar } from "../components/Avatar";
 import { LinkifiedText } from "../components/LinkifiedText";
@@ -17,6 +17,7 @@ import "../styles/comment-author.css";
 function Comment({ comment, replies, replyState, currentUser, onReply, onUpdate, onDelete, onReport, onLogin, onLoadReplies, onToggleReplies }) {
   const [reply, setReply] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [text, setText] = useState(comment.body);
   const own = comment.author.id === currentUser?.id;
   const loaded = replyState.loaded[comment.id];
@@ -45,7 +46,7 @@ function Comment({ comment, replies, replyState, currentUser, onReply, onUpdate,
     <div>
       <b>{authorPath ? <Link className="comment-author" to={authorPath}>{author.display_name || author.username}</Link> : author?.display_name || author?.username || "Удалённый аккаунт"}</b>
       {comment.is_deleted ? <small>Комментарий удалён автором</small> : editing ? <form className="comment-inline-form" onSubmit={submitEdit}><textarea value={text} onChange={(event) => setText(event.target.value)} maxLength="2000" autoFocus /><button>Сохранить</button><button type="button" onClick={() => setEditing(false)}>Отмена</button></form> : <small><LinkifiedText>{comment.body}</LinkifiedText>{edited && <em className="comment-edited">изменено</em>}</small>}
-      {!comment.is_deleted && <div className="comment-actions"><button onClick={() => currentUser ? setReply(!reply) : onLogin()}>Ответить</button>{own && <><button onClick={() => setEditing(true)}>Изменить</button><button onClick={() => onDelete(comment.id)}>Удалить</button></>}<button onClick={() => onReport(comment.id)}>Пожаловаться</button></div>}
+      {!comment.is_deleted && <div className="comment-actions"><button className="comment-reply-button" onClick={() => currentUser ? setReply(!reply) : onLogin()} aria-label="Ответить"><MessageCircle size={15} /><span>Ответить</span></button><button className="comment-more-button" onClick={() => setMenuOpen((value) => !value)} aria-label="Другие действия" aria-expanded={menuOpen}><MoreHorizontal size={17} /></button><div className={`comment-menu${menuOpen ? " open" : ""}`}>{own && <><button onClick={() => { setEditing(true); setMenuOpen(false); }}>Изменить</button><button onClick={() => { onDelete(comment.id); setMenuOpen(false); }}>Удалить</button></>}<button onClick={() => { onReport(comment.id); setMenuOpen(false); }}>Пожаловаться</button></div></div>}
       {reply && <form className="comment-inline-form" onSubmit={submitReply}><textarea name="body" placeholder="Написать ответ" maxLength="2000" autoFocus /><button>Ответить</button><button type="button" onClick={() => setReply(false)}>Отмена</button></form>}
       <div className="comment-thread-actions">
         {comment.reply_count > 0 && (!loaded ? <button disabled={loading} onClick={() => onLoadReplies(comment.id)}>{loading ? "Загружаем ответы…" : "Показать ответы"}</button> : replies.length > 0 ? <button aria-expanded={expanded} onClick={() => onToggleReplies(comment.id)}>{expanded ? "Скрыть ответы" : "Показать ответы"}</button> : null)}

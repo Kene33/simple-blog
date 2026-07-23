@@ -1,3 +1,6 @@
 .comment-author-avatar{display:block;height:max-content}
 .comment-author{color:inherit;text-decoration:none}
 .comment-author:hover{color:var(--accent)}
+.comment-more-button{display:none!important}
+.comment-menu{display:contents}
+@media(max-width:700px){.comment-actions{position:relative;align-items:center}.comment-reply-button{display:inline-flex!important;align-items:center;gap:4px}.comment-more-button{display:inline-flex!important;align-items:center;justify-content:center;width:34px;height:30px;padding:0!important}.comment-menu{position:absolute;z-index:10;top:34px;left:0;display:none;min-width:150px;padding:5px;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:0 12px 28px #0003}.comment-menu.open{display:grid}.comment-menu button{justify-content:flex-start!important;width:100%;padding:8px 10px!important;text-align:left}.comment-reply-button span{display:none}}
