@@ -57,7 +57,9 @@ async def test_email_verification_is_optional_until_confirmed(client: AsyncClien
     verified = await client.get(f"/api/v1/auth/verify-email?token={sent['verify@example.com']}")
     assert verified.status_code == 200
     assert (await client.get("/api/v1/users/me")).json()["email_verified"] is True
-    assert (await client.get(f"/api/v1/auth/verify-email?token={sent['verify@example.com']}")).status_code == 400
+    repeated = await client.get(f"/api/v1/auth/verify-email?token={sent['verify@example.com']}")
+    assert repeated.status_code == 200
+    assert repeated.json()["message"] == "Email already verified"
 
 
 @pytest.mark.asyncio

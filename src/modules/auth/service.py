@@ -87,15 +87,22 @@ async def create_email_verification(session: AsyncSession, settings: Settings, u
     return token
 
 
-async def verify_email(session: AsyncSession, token: str) -> None:
+async def verify_email(session: AsyncSession, token: str) -> bool:
     verification = await session.scalar(select(EmailVerificationToken).where(EmailVerificationToken.token_hash == token_hash(token)).with_for_update())
-    if verification is None or verification.used_at is not None or _is_expired(verification.expires_at):
+    if verification is None:
         raise AppError("EMAIL_VERIFICATION_INVALID", "Email verification link is invalid or expired", 400)
     user = await session.get(User, verification.user_id)
     if user is None:
         raise AppError("EMAIL_VERIFICATION_INVALID", "Email verification link is invalid or expired", 400)
+    if verification.used_at is not None:
+        if user.email_verified:
+            return False
+        raise AppError("EMAIL_VERIFICATION_INVALID", "Email verification link is invalid or expired", 400)
+    if _is_expired(verification.expires_at):
+        raise AppError("EMAIL_VERIFICATION_INVALID", "Email verification link is invalid or expired", 400)
     user.email_verified = True
     verification.used_at = datetime.now(timezone.utc)
+    return True
 
 
 async def rotate_session(session: AsyncSession, settings: Settings, refresh_value: str, csrf_header: str | None, csrf_cookie: str | None, csrf_token: str) -> AuthSession:

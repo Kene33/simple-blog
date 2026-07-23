@@ -12,7 +12,7 @@ export function EmailVerificationPage({ token }) {
 
   useEffect(() => {
     if (!token) { setState("error"); setError("В ссылке нет токена подтверждения."); return; }
-    api.verifyEmail(token).then(() => setState("success")).catch((cause) => { setState("error"); setError(cause.message || "Ссылка недействительна или устарела."); });
+    api.verifyEmail(token).then((result) => { setState(result.message === "Email already verified" ? "already" : "success"); }).catch((cause) => { setState("error"); setError(cause.message || "Ссылка недействительна или устарела."); });
   }, [token]);
 
   return <main className="email-verification-page">
@@ -20,7 +20,7 @@ export function EmailVerificationPage({ token }) {
       <Brand compact />
       <div className={`email-verification-card ${state}`}>
         {state === "loading" && <><span className="verification-icon"><LoaderCircle className="spin" size={28} /></span><h1>Проверяем email</h1><p>Подтверждаем адрес и подготавливаем ваш аккаунт.</p></>}
-        {state === "success" && <><span className="verification-icon success"><CheckCircle2 size={28} /></span><h1>Email подтверждён</h1><p>Готово — адрес подтверждён. Теперь можно вернуться в Simple и продолжить.</p><button className="primary" onClick={() => navigate("/", { allowAuth: true })}>Перейти в ленту</button></>}
+        {(state === "success" || state === "already") && <><span className="verification-icon success"><CheckCircle2 size={28} /></span><h1>{state === "already" ? "Email уже подтверждён" : "Email подтверждён"}</h1><p>{state === "already" ? "Этот адрес уже был успешно подтверждён ранее." : "Готово — адрес подтверждён."} Теперь можно вернуться в Simple.</p><button className="primary" onClick={() => navigate("/", { allowAuth: true })}>Перейти в ленту</button></>}
         {state === "error" && <><span className="verification-icon error"><MailCheck size={28} /></span><h1>Не удалось подтвердить email</h1><p>{error}</p><button className="outline-button" onClick={() => navigate("/login", { allowAuth: true })}>Войти в аккаунт</button></>}
       </div>
       <Link className="verification-back" to="/"><ArrowLeft size={15} /> Вернуться к Simple</Link>

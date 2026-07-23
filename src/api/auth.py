@@ -62,16 +62,16 @@ async def register(payload: RegisterRequest, request: Request, response: Respons
 
 @router.get("/verify-email")
 async def verify_email_address(token: str, session: AsyncSession = Depends(get_session)) -> dict[str, str]:
-    await verify_email(session, token)
+    verified = await verify_email(session, token)
     await session.commit()
-    return {"message": "Email verified"}
+    return {"message": "Email verified" if verified else "Email already verified"}
 
 
 @router.get("/verify-email/{token}")
 async def verify_email_address_from_path(token: str, session: AsyncSession = Depends(get_session)) -> dict[str, str]:
-    await verify_email(session, token)
+    verified = await verify_email(session, token)
     await session.commit()
-    return {"message": "Email verified"}
+    return {"message": "Email verified" if verified else "Email already verified"}
 
 
 @router.post("/email-verification/resend", response_model=PasswordResetRequestRead)
