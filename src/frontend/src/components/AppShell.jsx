@@ -37,7 +37,7 @@ function Sidebar({ theme, onThemeToggle }) {
   useEffect(() => { if (isStaff) api.reportCount().then((data) => setReportCount(data.open_count)).catch(() => setReportCount(0)); }, [isStaff]);
   const signOut = async () => { await logout(); navigate("/"); };
   return <aside className="sidebar">
-    <Brand />
+    <Link to="/" className="brand-link"><Brand /></Link>
     <nav className="sidebar-nav">
       {links.map(([to, label, Icon]) => <NavLink key={to} to={to} label={label} Icon={Icon} />)}
       {user && <NavLink to="/me" label="Профиль" Icon={CircleUserRound} />}
@@ -84,7 +84,7 @@ export function AppShell({ children, title = "Лента", right }) {
   const signOut = async () => { setMobileMenu(false); await logout(); navigate("/"); };
   return <div className="app-shell">
     <Sidebar theme={theme} onThemeToggle={toggleTheme} />
-    <header className="mobile-header"><Brand compact /><b>{title}</b><span className="mobile-header-actions"><ThemeButton theme={theme} onToggle={toggleTheme} /><button className="icon-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label={mobileMenu ? "Закрыть меню" : "Открыть меню"}>{mobileMenu ? <X /> : <Menu />}</button></span></header>
+    <header className="mobile-header"><Link to="/" className="brand-link"><Brand compact /></Link><b>{title}</b><span className="mobile-header-actions"><ThemeButton theme={theme} onToggle={toggleTheme} /><button className="icon-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label={mobileMenu ? "Закрыть меню" : "Открыть меню"}>{mobileMenu ? <X /> : <Menu />}</button></span></header>
     {mobileMenu && <div className="mobile-menu"><button onClick={() => go("/")}>Лента</button><button onClick={() => go("/search")}>Поиск</button><button onClick={() => user ? go("/posts/new") : guestOnly("создать публикацию")}>Новый пост</button><button onClick={() => user ? go("/me") : guestOnly("открыть профиль")}>Профиль</button>{user && <button onClick={() => go("/bookmarks")}>Закладки</button>}{isStaff && <button onClick={() => go("/moderation")}>Модерация</button>}{user && <button onClick={signOut}>Выйти</button>}</div>}
     <main className="main-content">{children}</main>
     {right && <aside className="right-rail">{right}</aside>}
