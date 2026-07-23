@@ -15,7 +15,8 @@ def _send(settings: Settings, recipient: str, link: str) -> None:
         if settings.smtp_starttls:
             client.starttls()
         if settings.smtp_username:
-            client.login(settings.smtp_username, settings.smtp_password or "")
+            password = "".join((settings.smtp_password or "").split())
+            client.login(settings.smtp_username, password)
         client.send_message(message)
 
 
