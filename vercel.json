@@ -38,6 +38,10 @@
       "status": 403
     },
     {
+      "src": "/(docs|docs/.*|redoc|redoc/.*|openapi.json)",
+      "status": 404
+    },
+    {
       "src": "/(health/live|health/ready|openapi.json|docs|docs/.*|robots.txt)",
       "dest": "/api/[...path].py"
     },
