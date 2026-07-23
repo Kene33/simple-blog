@@ -21,7 +21,7 @@ export function AuthPage({ mode }) {
     setBusy(true); setError("");
     try {
       if (isLogin) await login({ identifier: form.identifier, password: form.password });
-      else await register({ username: form.username, email: form.email, password: form.password });
+      else { await register({ username: form.username, email: form.email, password: form.password }); sessionStorage.setItem("simple:email-verification-notice", "1"); }
       navigate("/");
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : "Проверьте подключение и попробуйте ещё раз");
