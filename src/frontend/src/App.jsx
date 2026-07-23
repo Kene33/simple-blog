@@ -3,6 +3,7 @@ import { RouterProvider, useRouter } from "./lib/router";
 import { AppShell } from "./components/AppShell";
 import { AuthPage } from "./pages/AuthPage";
 import { PasswordResetPage } from "./pages/PasswordResetPage";
+import { EmailVerificationPage } from "./pages/EmailVerificationPage";
 import { FeedPage } from "./pages/FeedPage";
 import { CreatePostPage } from "./pages/CreatePostPage";
 import { PostPage } from "./pages/PostPage";
@@ -20,6 +21,8 @@ function AppContent() {
   if (location.pathname === "/login") return <AuthPage mode="login" />;
   if (location.pathname === "/register") return <AuthPage mode="register" />;
   if (location.pathname === "/password-reset") return <PasswordResetPage />;
+  const emailVerificationMatch = location.pathname.match(/^\/email-verification(?:\/([^/]+))?$/);
+  if (emailVerificationMatch) return <EmailVerificationPage token={emailVerificationMatch[1] || new URLSearchParams(location.search).get("token")} />;
   if (location.pathname === "/posts/new") return <CreatePostPage />;
   const draftEditMatch = location.pathname.match(/^\/drafts\/([^/]+)\/edit$/);
   if (draftEditMatch) return <CreatePostPage draftId={draftEditMatch[1]} />;

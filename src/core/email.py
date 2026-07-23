@@ -28,7 +28,7 @@ async def send_password_reset_email(settings: Settings, recipient: str, token: s
 async def send_email_verification(settings: Settings, recipient: str, token: str) -> None:
     # Keep the token in the path: some mail clients and link scanners drop
     # query parameters when opening a URL from a message.
-    link = f"{settings.public_base_url.rstrip('/')}/api/v1/auth/verify-email/{token}"
+    link = f"{settings.public_base_url.rstrip('/')}/email-verification/{token}"
     await asyncio.to_thread(_send_verification, settings, recipient, link)
 
 
