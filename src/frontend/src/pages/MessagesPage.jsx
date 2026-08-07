@@ -37,9 +37,12 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
   const [state, setState] = useState("loading");
   const [busy, setBusy] = useState(false);
   const [socketState, setSocketState] = useState("connecting");
+  const [typing, setTyping] = useState(false);
   const [notice, setNotice] = useState("");
   const [actionMenu, setActionMenu] = useState(false);
   const endRef = useRef(null);
+  const socketRef = useRef(null);
+  const typingTimer = useRef(null);
   const other = participantOf(conversation);
   useEffect(() => {
     let cancelled = false;
@@ -47,6 +50,7 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
     api.conversationMessages(conversation.id, { limit: 30 }).then((page) => { if (cancelled) return; setMessages(page.items || []); setCursor(page.next_cursor); setState("ready"); const last = page.items?.at(-1); if (last) api.markConversationRead(conversation.id, last.id).catch(() => {}); }).catch((error) => setState(errorStatus(error) === 404 ? "soon" : "error"));
     const socket = createMessagesSocket({ onState: setSocketState, onEvent: (event) => {
       if (event.conversation_id !== conversation.id) return;
+      if (event.type === "typing") { setTyping(Boolean(event.is_typing)); setNotice(event.is_typing ? "Собеседник печатает…" : ""); if (event.is_typing) { clearTimeout(typingTimer.current); typingTimer.current = setTimeout(() => { setTyping(false); setNotice(""); }, 2000); } return; }
       if (event.type === "message.read") {
         setMessages((items) => items.map((item) => item.id === event.message_id ? { ...item, read_by_recipient: true } : item));
         return;
@@ -59,11 +63,13 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
       setMessages((items) => mergeUniqueMessages(items, event.message));
       onChanged?.(event);
     } });
-    return () => { cancelled = true; socket.close(); };
+    socketRef.current = socket;
+    return () => { cancelled = true; clearTimeout(typingTimer.current); socketRef.current = null; socket.close(); };
   }, [conversation.id]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
-  useEffect(() => { if (socketState !== "connected" || state === "loading") return; api.conversationMessages(conversation.id, { limit: 30 }).then((page) => setMessages((items) => [...(page.items || []), ...items].filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index))).catch(() => {}); }, [socketState, conversation.id]);
-  const send = async (event) => { event.preventDefault(); const value = body.trim(); if (!value || busy) return; setBusy(true); try { const message = await api.sendMessage(conversation.id, { body: value }); setMessages((items) => mergeUniqueMessages(items, message)); setBody(""); } catch (error) { setNotice(errorStatus(error) === 403 ? "Отправка сообщений запрещена" : errorStatus(error) === 429 ? "Слишком много сообщений. Попробуйте позже." : "Не удалось отправить сообщение"); } finally { setBusy(false); } };
+  useEffect(() => { if (socketState !== "connected" || state === "loading") return; api.conversationMessages(conversation.id, { limit: 30 }).then((page) => setMessages((items) => [...(page.items || []), ...items].filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index))).catch(() => {}); }, [socketState, state, conversation.id]);
+  const send = async (event) => { event.preventDefault(); const value = body.trim(); if (!value || busy) return; socketRef.current?.send({ type: "typing", conversation_id: conversation.id, is_typing: false }); setBusy(true); try { const message = await api.sendMessage(conversation.id, { body: value }); setMessages((items) => mergeUniqueMessages(items, message)); setBody(""); } catch (error) { setNotice(errorStatus(error) === 403 ? "Отправка сообщений запрещена" : errorStatus(error) === 429 ? "Слишком много сообщений. Попробуйте позже." : "Не удалось отправить сообщение"); } finally { setBusy(false); } };
+  useEffect(() => { socketRef.current?.send({ type: "typing", conversation_id: conversation.id, is_typing: Boolean(body.trim()) }); clearTimeout(typingTimer.current); if (body.trim()) typingTimer.current = setTimeout(() => socketRef.current?.send({ type: "typing", conversation_id: conversation.id, is_typing: false }), 900); }, [body, conversation.id]);
   const loadOlder = async () => { if (!cursor || busy) return; setBusy(true); try { const page = await api.conversationMessages(conversation.id, { cursor, limit: 30 }); setMessages((items) => [...(page.items || []), ...items]); setCursor(page.next_cursor); } finally { setBusy(false); } };
   const edit = async (id, value) => { try { const updated = await api.updateMessage(id, { body: value }); setMessages((items) => items.map((item) => item.id === id ? updated : item)); } catch (error) { setNotice(errorStatus(error) === 403 ? "Нельзя изменить это сообщение" : "Не удалось изменить сообщение"); } };
   const remove = async (id) => { if (!window.confirm("Удалить сообщение?")) return; try { const updated = await api.deleteMessage(id); setMessages((items) => items.map((item) => item.id === id ? (updated || { ...item, is_deleted: true, body: "" }) : item)); } catch { setNotice("Не удалось удалить сообщение"); } };
