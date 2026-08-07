@@ -1,5 +1,8 @@
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
+
+from src.db.models import User
 
 
 async def register(client: AsyncClient, username: str) -> tuple[str, str]:
@@ -99,3 +102,27 @@ async def test_message_events_are_published_for_mutations(client: AsyncClient) -
         assert events[3][2]["message_id"] == message_id
     finally:
         await other.aclose()
+
+
+@pytest.mark.asyncio
+async def test_message_can_be_reported_and_hidden_by_moderator(client: AsyncClient) -> None:
+    owner_csrf, _ = await register(client, "reportmessageowner")
+    moderator = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        moderator_csrf, moderator_id = await register(moderator, "reportmessagemoderator")
+        conversation = await client.post(f"/api/v1/conversations/direct/{moderator_id}", headers={"X-CSRF-Token": owner_csrf})
+        message = await client.post(f"/api/v1/conversations/{conversation.json()['id']}/messages", json={"body": "Report me"}, headers={"X-CSRF-Token": owner_csrf})
+        report = await moderator.post("/api/v1/reports", json={"message_id": message.json()["id"], "reason": "harassment", "details": "abuse"}, headers={"X-CSRF-Token": moderator_csrf})
+        assert report.status_code == 201
+        assert report.json()["target"]["kind"] == "message"
+
+        async with client._transport.app.state.session_factory() as session:
+            user = await session.scalar(select(User).where(User.username_normalized == "reportmessagemoderator"))
+            user.role = "moderator"
+            await session.commit()
+
+        resolved = await moderator.patch(f"/api/v1/admin/reports/{report.json()['id']}", json={"status": "resolved", "resolution": "Removed", "hide_target": True}, headers={"X-CSRF-Token": moderator_csrf})
+        assert resolved.status_code == 200
+        assert resolved.json()["target"]["is_deleted"] is True
+    finally:
+        await moderator.aclose()

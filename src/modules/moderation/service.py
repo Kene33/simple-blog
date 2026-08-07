@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
 from src.core.errors import AppError
-from src.db.models import Comment, ModerationAction, PasswordResetToken, Post, PostBookmark, PostLike, RefreshSession, Report, ShareEvent, User
+from src.db.models import Comment, Message, ModerationAction, PasswordResetToken, Post, PostBookmark, PostLike, RefreshSession, Report, ShareEvent, User
 from src.modules.auth.service import user_summary
 from src.modules.comments.service import get_comment
 from src.modules.moderation.schemas import (
@@ -32,13 +32,17 @@ from src.modules.posts.service import get_post
 async def create_report(session: AsyncSession, reporter: User, payload: ReportCreateRequest) -> Report:
     if payload.post_id is not None:
         await get_post(session, payload.post_id)
-    else:
+    elif payload.comment_id is not None:
         await get_comment(session, payload.comment_id)
-    target_filter = Report.post_id == payload.post_id if payload.post_id is not None else Report.comment_id == payload.comment_id
+    else:
+        message = await session.scalar(select(Message).where(Message.id == payload.message_id))
+        if message is None:
+            raise AppError("RESOURCE_NOT_FOUND", "Message not found", 404)
+    target_filter = Report.post_id == payload.post_id if payload.post_id is not None else Report.comment_id == payload.comment_id if payload.comment_id is not None else Report.message_id == payload.message_id
     duplicate = await session.scalar(select(Report.id).where(Report.reporter_id == reporter.id, Report.status == "open", target_filter))
     if duplicate is not None:
         raise AppError("RESOURCE_CONFLICT", "An open report already exists for this target", 409)
-    report = Report(reporter_id=reporter.id, post_id=payload.post_id, comment_id=payload.comment_id, reason=payload.reason, details=payload.details, created_at=datetime.now(timezone.utc))
+    report = Report(reporter_id=reporter.id, post_id=payload.post_id, comment_id=payload.comment_id, message_id=payload.message_id, reason=payload.reason, details=payload.details, created_at=datetime.now(timezone.utc))
     session.add(report)
     await session.flush()
     return report
@@ -79,8 +83,10 @@ async def serialize_reports(session: AsyncSession, reports: list[Report]) -> lis
     reporters = {user.id: user for user in (await session.scalars(select(User).where(User.id.in_({report.reporter_id for report in reports})))).all()}
     post_ids = {report.post_id for report in reports if report.post_id is not None}
     comment_ids = {report.comment_id for report in reports if report.comment_id is not None}
+    message_ids = {report.message_id for report in reports if report.message_id is not None}
     posts = {post.id: post for post in (await session.scalars(select(Post).where(Post.id.in_(post_ids)))).all()} if post_ids else {}
     comments = {comment.id: comment for comment in (await session.scalars(select(Comment).where(Comment.id.in_(comment_ids)))).all()} if comment_ids else {}
+    messages = {message.id: message for message in (await session.scalars(select(Message).where(Message.id.in_(message_ids)))).all()} if message_ids else {}
     result = []
     for report in reports:
         target = None
@@ -90,7 +96,10 @@ async def serialize_reports(session: AsyncSession, reports: list[Report]) -> lis
         elif report.comment_id is not None and report.comment_id in comments:
             comment = comments[report.comment_id]
             target = ReportTarget(kind="comment", id=comment.id, body="[deleted]" if comment.deleted_at else comment.body, is_deleted=comment.deleted_at is not None)
-        result.append(ReportRead(id=report.id, reporter=user_summary(reporters[report.reporter_id]), post_id=report.post_id, comment_id=report.comment_id, reason=report.reason, details=report.details, status=report.status, resolution=report.resolution, created_at=report.created_at, resolved_at=report.resolved_at, target=target))
+        elif report.message_id is not None and report.message_id in messages:
+            message = messages[report.message_id]
+            target = ReportTarget(kind="message", id=message.id, body="[deleted]" if message.deleted_at else message.body, is_deleted=message.deleted_at is not None)
+        result.append(ReportRead(id=report.id, reporter=user_summary(reporters[report.reporter_id]), post_id=report.post_id, comment_id=report.comment_id, message_id=report.message_id, reason=report.reason, details=report.details, status=report.status, resolution=report.resolution, created_at=report.created_at, resolved_at=report.resolved_at, target=target))
     return result
 
 
@@ -262,6 +271,17 @@ async def hide_comment(session: AsyncSession, actor: User, comment_id: UUID, rea
     return comment
 
 
+async def hide_message(session: AsyncSession, actor: User, message_id: UUID, reason: str) -> Message:
+    message = await session.scalar(select(Message).where(Message.id == message_id).with_for_update())
+    if message is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Message not found", 404)
+    if message.deleted_at is None:
+        message.deleted_at = datetime.now(timezone.utc)
+    await log_action(session, actor, "message_hide", "message", message.id, reason)
+    await session.flush()
+    return message
+
+
 async def restore_comment(session: AsyncSession, actor: User, comment_id: UUID, reason: str) -> Comment:
     comment = await session.scalar(select(Comment).where(Comment.id == comment_id).with_for_update())
     if comment is None:
@@ -289,6 +309,12 @@ async def apply_report_actions(session: AsyncSession, actor: User, report: Repor
             target_author_id = comment.author_id
             if payload.hide_target:
                 await hide_comment(session, actor, comment.id, reason)
+    elif report.message_id is not None:
+        message = await session.get(Message, report.message_id)
+        if message:
+            target_author_id = message.sender_id
+            if payload.hide_target:
+                await hide_message(session, actor, message.id, reason)
     if payload.ban_author and target_author_id is not None:
         await moderate_user(session, actor, target_author_id, UserModerationRequest(action="ban", reason=reason))
 

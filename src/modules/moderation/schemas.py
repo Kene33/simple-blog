@@ -10,12 +10,13 @@ from src.modules.auth.schemas import UserSummary
 class ReportCreateRequest(BaseModel):
     post_id: UUID | None = None
     comment_id: UUID | None = None
+    message_id: UUID | None = None
     reason: Literal["spam", "harassment", "illegal", "other"]
     details: str | None = Field(default=None, max_length=2_000)
 
     @model_validator(mode="after")
     def validate_target(self) -> "ReportCreateRequest":
-        if (self.post_id is None) == (self.comment_id is None):
+        if sum(value is not None for value in (self.post_id, self.comment_id, self.message_id)) != 1:
             raise ValueError("Exactly one target is required")
         if self.details is not None:
             self.details = self.details.strip() or None
@@ -38,7 +39,7 @@ class ReportUpdateRequest(BaseModel):
 
 
 class ReportTarget(BaseModel):
-    kind: Literal["post", "comment"]
+    kind: Literal["post", "comment", "message"]
     id: UUID
     title: str | None = None
     body: str | None = None
@@ -50,6 +51,7 @@ class ReportRead(BaseModel):
     reporter: UserSummary
     post_id: UUID | None
     comment_id: UUID | None
+    message_id: UUID | None
     reason: str
     details: str | None
     status: str

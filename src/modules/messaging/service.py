@@ -220,6 +220,15 @@ async def delete_message(session: AsyncSession, message_id: UUID, actor: User) -
         raise AppError("RESOURCE_NOT_FOUND", "Message not found", 404)
 
 
+async def purge_deleted_messages(session: AsyncSession, older_than: datetime, batch_size: int = 500) -> int:
+    rows = (await session.scalars(select(Message.id).where(Message.deleted_at.is_not(None), Message.deleted_at < older_than).order_by(Message.deleted_at, Message.id).limit(batch_size))).all()
+    if not rows:
+        return 0
+    result = await session.execute(delete(Message).where(Message.id.in_(rows)))
+    await session.flush()
+    return result.rowcount or 0
+
+
 async def block_user(session: AsyncSession, actor: User, target_id: UUID) -> None:
     if actor.id == target_id:
         raise AppError("VALIDATION_ERROR", "A user cannot block themselves", 422)

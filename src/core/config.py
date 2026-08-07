@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     smtp_starttls: bool = True
     redis_url: str | None = None
     cron_secret: str | None = None
+    message_retention_days: int = Field(default=365, ge=30, le=3650)
     media_quota_bytes: int = 1_073_741_824
     media_quota_files: int = 100
     media_pending_limit: int = 10

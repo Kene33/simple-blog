@@ -4,7 +4,8 @@
   "buildCommand": "npm --prefix src/frontend run build",
   "outputDirectory": "src/frontend/dist",
   "crons": [
-    { "path": "/api/internal/keepalive", "schedule": "0 3 * * *" }
+    { "path": "/api/internal/keepalive", "schedule": "0 3 * * *" },
+    { "path": "/api/internal/message-retention", "schedule": "30 3 * * *" }
   ],
   "functions": {
     "api/[...path].py": {

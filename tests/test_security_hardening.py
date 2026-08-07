@@ -34,6 +34,14 @@ async def test_keepalive_requires_cron_secret(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_message_retention_requires_cron_secret(client: AsyncClient) -> None:
+    assert (await client.post("/api/internal/message-retention")).status_code == 404
+    response = await client.post("/api/internal/message-retention", headers={"Authorization": "Bearer test-cron-secret"})
+    assert response.status_code == 200
+    assert response.json() == {"deleted": 0}
+
+
+@pytest.mark.asyncio
 async def test_registration_rate_limit_is_enforced(client: AsyncClient) -> None:
     for index in range(5):
         assert (await client.post("/api/v1/auth/register", json={"username": f"limit{index}", "email": f"limit{index}@example.com", "password": "strong-password"})).status_code == 201

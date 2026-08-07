@@ -249,13 +249,14 @@ class ShareEvent(Base):
 class Report(Base):
     __tablename__ = "reports"
     __table_args__ = (
-        CheckConstraint("(post_id IS NOT NULL) <> (comment_id IS NOT NULL)", name="ck_reports_one_target"),
+        CheckConstraint("(post_id IS NOT NULL AND comment_id IS NULL AND message_id IS NULL) OR (post_id IS NULL AND comment_id IS NOT NULL AND message_id IS NULL) OR (post_id IS NULL AND comment_id IS NULL AND message_id IS NOT NULL)", name="ck_reports_one_target"),
         Index("ix_reports_status_created_at", "status", "created_at"),
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     reporter_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     post_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("posts.id", ondelete="CASCADE"), nullable=True)
     comment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("comments.id", ondelete="CASCADE"), nullable=True)
+    message_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"), nullable=True)
     reason: Mapped[str] = mapped_column(String(50), nullable=False)
     details: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", server_default="open")
