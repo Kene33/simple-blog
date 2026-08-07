@@ -4,10 +4,12 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 from src.modules.auth.schemas import UserSummary
+from src.modules.media.schemas import MediaRead
 
 
 class MessageCreateRequest(BaseModel):
     body: str = Field(min_length=1, max_length=4_000)
+    media_ids: list[UUID] = Field(default_factory=list, max_length=4)
 
     @field_validator("body")
     @classmethod
@@ -29,6 +31,7 @@ class MessageRead(BaseModel):
     body: str
     is_deleted: bool
     read_by_recipient: bool = False
+    media: list[MediaRead] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

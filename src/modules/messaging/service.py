@@ -11,8 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
 from src.core.errors import AppError
-from src.db.models import Conversation, ConversationMember, Message, User, UserBlock
+from src.db.models import Conversation, ConversationMember, Media, Message, MessageMedia, User, UserBlock
 from src.modules.auth.service import user_summary
+from src.modules.media.service import as_read
 from src.modules.messaging.policy import assert_can_contact
 from src.modules.messaging.schemas import ConversationMuteRequest, ConversationPage, ConversationRead, MessageCreateRequest, MessagePage, MessageRead, MessageUpdateRequest
 
@@ -134,7 +135,8 @@ async def serialize_message(session: AsyncSession, message: Message) -> MessageR
     sender = await session.get(User, message.sender_id)
     if sender is None:
         raise AppError("INTERNAL_ERROR", "Message sender is unavailable", 500)
-    return MessageRead(id=message.id, conversation_id=message.conversation_id, sender=user_summary(sender), body=TOMBSTONE_BODY if message.deleted_at else message.body, is_deleted=message.deleted_at is not None, read_by_recipient=await _read_by_recipient(session, message), created_at=message.created_at, updated_at=message.updated_at)
+    media = (await session.scalars(select(Media).join(MessageMedia, MessageMedia.media_id == Media.id).where(MessageMedia.message_id == message.id).order_by(MessageMedia.position))).all()
+    return MessageRead(id=message.id, conversation_id=message.conversation_id, sender=user_summary(sender), body=TOMBSTONE_BODY if message.deleted_at else message.body, is_deleted=message.deleted_at is not None, read_by_recipient=await _read_by_recipient(session, message), media=[as_read(item) for item in media], created_at=message.created_at, updated_at=message.updated_at)
 
 
 async def serialize_conversation(session: AsyncSession, conversation: Conversation, user_id: UUID) -> ConversationRead:
@@ -185,6 +187,16 @@ async def create_message(session: AsyncSession, conversation_id: UUID, actor: Us
     session.add(message)
     await session.execute(update(Conversation).where(Conversation.id == conversation_id).values(updated_at=now))
     await session.flush()
+    if payload.media_ids:
+        media = (await session.scalars(select(Media).where(Media.id.in_(payload.media_ids), Media.owner_id == actor.id, Media.purpose == "message", Media.status == "uploaded", Media.deleted_at.is_(None)))).all()
+        if len(media) != len(set(payload.media_ids)) or sum(item.kind == "video" for item in media) > 1:
+            raise AppError("VALIDATION_ERROR", "Message media must be owned active uploads with at most one video", 422)
+        for position, media_id in enumerate(payload.media_ids):
+            session.add(MessageMedia(message_id=message.id, media_id=media_id, position=position))
+        for item in media:
+            item.status = "attached"
+            item.attached_at = now
+        await session.flush()
     return message
 
 

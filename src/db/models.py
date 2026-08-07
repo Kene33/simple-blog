@@ -96,6 +96,15 @@ class Message(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class MessageMedia(Base):
+    __tablename__ = "message_media"
+    __table_args__ = (UniqueConstraint("message_id", "position", name="uq_message_media_position"),)
+
+    message_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"), primary_key=True)
+    media_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("media.id", ondelete="CASCADE"), primary_key=True)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class ConversationMember(Base):
     __tablename__ = "conversation_members"
     __table_args__ = (Index("ix_conversation_members_user_id", "user_id"),)

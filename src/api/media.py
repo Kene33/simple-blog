@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
 from src.core.errors import AppError
-from src.db.models import Media, Post, PostMedia, User
+from src.db.models import ConversationMember, Media, Message, MessageMedia, Post, PostMedia, User
 from src.db.session import get_session
 from src.modules.auth.dependencies import CurrentAuth, get_optional_auth, require_unmuted_csrf
 from src.modules.media.schemas import MediaPurpose, MediaRead
@@ -72,6 +72,8 @@ async def download(media_id: UUID, auth: CurrentAuth | None = Depends(get_option
     elif media.status == "attached":
         post = await session.scalar(select(Post).join(PostMedia, PostMedia.post_id == Post.id).join(User, User.id == Post.author_id).where(PostMedia.media_id == media.id, Post.status == "published", Post.deleted_at.is_(None), User.posts_visibility == "public"))
         public = post is not None or auth is not None and auth.user.id == media.owner_id
+        if auth is not None and not public and media.purpose == "message":
+            public = await session.scalar(select(ConversationMember.user_id).join(Message, Message.conversation_id == ConversationMember.conversation_id).join(MessageMedia, MessageMedia.message_id == Message.id).where(MessageMedia.media_id == media.id, ConversationMember.user_id == auth.user.id)) is not None
     if not public:
         raise AppError("RESOURCE_NOT_FOUND", "Media not found", 404)
     result = await storage.get(media.storage_key)

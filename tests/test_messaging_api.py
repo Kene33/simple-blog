@@ -1,3 +1,5 @@
+import base64
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -44,6 +46,28 @@ async def test_direct_messages_are_isolated_to_conversation_members(client: Asyn
         outsider_csrf, _ = await register(outsider, "messageoutsider")
         assert (await outsider.get(f"/api/v1/conversations/{conversation_id}/messages")).status_code == 404
         assert (await outsider.post(f"/api/v1/conversations/{conversation_id}/messages", json={"body": "intrusion"}, headers={"X-CSRF-Token": outsider_csrf})).status_code == 404
+    finally:
+        await other.aclose()
+        await outsider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_message_media_is_owned_and_private_to_conversation_members(client: AsyncClient) -> None:
+    owner_csrf, _ = await register(client, "attachmentowner")
+    other = AsyncClient(transport=client._transport, base_url="http://testserver")
+    outsider = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        _, other_id = await register(other, "attachmentreader")
+        _, _ = await register(outsider, "attachmentoutsider")
+        conversation = await client.post(f"/api/v1/conversations/direct/{other_id}", headers={"X-CSRF-Token": owner_csrf})
+        image = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+        upload = await client.post("/api/v1/media", data={"purpose": "message"}, files={"file": ("photo.png", image, "image/png")}, headers={"X-CSRF-Token": owner_csrf})
+        assert upload.status_code == 201
+        sent = await client.post(f"/api/v1/conversations/{conversation.json()['id']}/messages", json={"body": "Photo", "media_ids": [upload.json()["id"]]}, headers={"X-CSRF-Token": owner_csrf})
+        assert sent.status_code == 201
+        assert sent.json()["media"][0]["id"] == upload.json()["id"]
+        assert (await other.get(upload.json()["url"])).status_code == 200
+        assert (await outsider.get(upload.json()["url"])).status_code == 404
     finally:
         await other.aclose()
         await outsider.aclose()
