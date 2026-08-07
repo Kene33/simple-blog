@@ -2,7 +2,6 @@
 
 from alembic import op
 
-
 revision = "0015_email_verification"
 down_revision = "0014_user_status"
 branch_labels = None

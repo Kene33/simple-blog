@@ -1,9 +1,10 @@
 """add post bookmarks"""
 
-from alembic import op
 from sqlalchemy import Column, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
+
+from alembic import op
 
 revision = "0007_post_bookmarks"
 down_revision = "0006_post_status"

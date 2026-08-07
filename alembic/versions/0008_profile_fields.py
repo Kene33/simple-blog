@@ -1,8 +1,9 @@
 """add profile fields"""
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 revision = "0008_profile_fields"
 down_revision = "0007_post_bookmarks"
