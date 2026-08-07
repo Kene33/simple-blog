@@ -1,3 +1,5 @@
+import json
+from json import JSONDecodeError
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response, WebSocket, WebSocketDisconnect, status
@@ -29,7 +31,8 @@ router = APIRouter(tags=["messaging"])
 
 
 @router.post("/api/v1/conversations/direct/{user_id}", response_model=ConversationRead)
-async def create_direct(user_id: UUID, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> ConversationRead:
+async def create_direct(user_id: UUID, request: Request, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> ConversationRead:
+    await request.app.state.rate_limiter.check(request, "conversation-create", 20, 3600, str(auth.user.id))
     target = await session.scalar(select(User).where(User.id == user_id))
     if target is None:
         raise AppError("RESOURCE_NOT_FOUND", "User not found", 404)
@@ -84,7 +87,8 @@ async def remove_message(message_id: UUID, auth: CurrentAuth = Depends(require_u
 
 
 @router.post("/api/v1/users/{user_id}/block", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
-async def block(user_id: UUID, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+async def block(user_id: UUID, request: Request, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+    await request.app.state.rate_limiter.check(request, "user-block", 30, 600, str(auth.user.id))
     await block_user(session, auth.user, user_id)
     await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -101,6 +105,11 @@ async def unblock(user_id: UUID, auth: CurrentAuth = Depends(require_csrf), sess
 @router.websocket("/api/v1/ws")
 async def websocket_messages(websocket: WebSocket, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> None:
     try:
+        await websocket.app.state.rate_limiter.check(websocket, "websocket-connect", 30, 60)  # type: ignore[arg-type]
+    except AppError:
+        await websocket.close(code=4429)
+        return
+    try:
         auth = await get_websocket_auth(websocket, session, settings)
     except AppError as error:
         await websocket.close(code=4401 if error.status_code == 401 else 4403)
@@ -110,7 +119,18 @@ async def websocket_messages(websocket: WebSocket, session: AsyncSession = Depen
     await hub.connect(auth.user.id, websocket)
     try:
         while True:
-            event = await websocket.receive_json()
+            raw_event = await websocket.receive_text()
+            if len(raw_event) > 128:
+                await websocket.close(code=1009)
+                return
+            try:
+                event = json.loads(raw_event)
+            except JSONDecodeError:
+                await websocket.close(code=4400)
+                return
+            if not isinstance(event, dict):
+                await websocket.close(code=4400)
+                return
             if event.get("type") == "ping":
                 await websocket.send_json({"type": "pong"})
             else:
