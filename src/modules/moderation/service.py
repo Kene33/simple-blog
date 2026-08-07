@@ -273,6 +273,8 @@ async def restore_comment(session: AsyncSession, actor: User, comment_id: UUID, 
 
 
 async def apply_report_actions(session: AsyncSession, actor: User, report: Report, payload: ReportUpdateRequest) -> None:
+    if payload.status != "resolved":
+        return
     reason = payload.resolution or "Report resolved"
     target_author_id: UUID | None = None
     if report.post_id is not None:

@@ -149,6 +149,32 @@ async def test_moderator_can_hide_post(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_rejected_report_cannot_apply_content_or_author_actions(client: AsyncClient) -> None:
+    moderator_csrf = await register(client, "rejectmoder")
+    author = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        author_csrf = await register(author, "rejectauthor")
+        post = await author.post("/api/v1/posts", json={"title": "Keep", "content": "content", "category": "tech"}, headers={"X-CSRF-Token": author_csrf})
+        report = await client.post("/api/v1/reports", json={"post_id": post.json()["id"], "reason": "other"}, headers={"X-CSRF-Token": moderator_csrf})
+        async with client._transport.app.state.session_factory() as session:
+            moderator = await session.scalar(select(User).where(User.username_normalized == "rejectmoder"))
+            moderator.role = "moderator"
+            await session.commit()
+
+        rejected = await client.patch(
+            f"/api/v1/admin/reports/{report.json()['id']}",
+            json={"status": "rejected", "resolution": "not a violation", "hide_target": True, "ban_author": True},
+            headers={"X-CSRF-Token": moderator_csrf},
+        )
+
+        assert rejected.status_code == 422
+        assert (await author.get(f"/api/v1/posts/{post.json()['id']}")).status_code == 200
+        assert (await author.get("/api/v1/users/rejectauthor")).status_code == 200
+    finally:
+        await author.aclose()
+
+
+@pytest.mark.asyncio
 async def test_banned_author_and_post_remain_public(client: AsyncClient) -> None:
     admin_csrf = await register(client, "visibilityadmin")
     author = AsyncClient(transport=client._transport, base_url="http://testserver")

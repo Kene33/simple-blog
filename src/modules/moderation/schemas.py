@@ -32,6 +32,8 @@ class ReportUpdateRequest(BaseModel):
     def strip_resolution(self) -> "ReportUpdateRequest":
         if self.resolution is not None:
             self.resolution = self.resolution.strip() or None
+        if self.status == "rejected" and (self.hide_target or self.ban_author):
+            raise ValueError("Content or author actions require a resolved report")
         return self
 
 
