@@ -1,0 +1,36 @@
+# Messaging production checklist
+
+## Verified locally
+
+- PostgreSQL migrations reach `0021_push_subscriptions (head)`.
+- Two independent Uvicorn processes on ports `8101` and `8102` share one
+  Redis instance.
+- A WebSocket connected to instance B receives a message sent through REST on
+  instance A: `TWO_INSTANCE_REDIS_WSS=PASS`.
+- Redis bridge integration test passes with a real Redis service.
+- Retention service removes only soft-deleted messages older than the cutoff.
+
+## Verify authenticated production WSS
+
+Use a short-lived access-cookie value outside the repository:
+
+```bash
+MESSAGING_BASE_URL=https://your-production-domain \
+MESSAGING_ACCESS_COOKIE='redacted-value' \
+python scripts/check_production_wss.py
+```
+
+The check validates HTTPS base URL, the production reverse proxy, the
+authenticated WebSocket handshake, and the ping/pong protocol. The current
+public production domain responds to health checks and rejects unauthenticated
+WebSocket handshakes with `403`; an authenticated handshake still requires a
+real access cookie.
+
+## Required Vercel settings
+
+- `REDIS_URL` pointing to a shared production Redis, not an instance-local
+  Redis.
+- `CRON_SECRET` for keepalive and message retention jobs.
+- `MESSAGE_RETENTION_DAYS` according to the retention policy.
+- `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` for push.
+- Exact HTTPS `CORS_ORIGINS` and `PUBLIC_BASE_URL`.
