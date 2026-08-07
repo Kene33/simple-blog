@@ -1,5 +1,7 @@
 export function mergeUniqueMessages(items, incoming) {
-  return items.some((item) => item.id === incoming.id || (incoming.client_id && item.client_id === incoming.client_id)) ? items : [...items, incoming];
+  const index = items.findIndex((item) => item.id === incoming.id || (incoming.client_id && item.client_id === incoming.client_id));
+  if (index < 0) return [...items, incoming];
+  return items.map((item, itemIndex) => itemIndex === index ? { ...item, ...incoming } : item);
 }
 
 export function normalizeMessageEvent(event) {

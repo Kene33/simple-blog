@@ -7,4 +7,6 @@ assert.equal(mergeUniqueMessages([], { id: "2", client_id: "c1" }).length, 1);
 assert.equal(mergeUniqueMessages([{ id: "old", client_id: "c1" }], { id: "new", client_id: "c1" }).length, 1);
 assert.equal(normalizeMessageEvent({ type: "message.created", data: { id: "3", conversation_id: "c1", body: "hi" } }).message.id, "3");
 assert.equal(normalizeMessageEvent({ type: "message.read", data: { conversation_id: "c1", message_id: "3" } }).message_id, "3");
+assert.equal(normalizeMessageEvent({ type: "message.deleted", conversation_id: "c1", message_id: "3" }).message_id, "3");
+assert.deepEqual(mergeUniqueMessages([{ id: "1", body: "old" }], { id: "1", body: "new" }), [{ id: "1", body: "new" }]);
 console.log("messages checks passed");

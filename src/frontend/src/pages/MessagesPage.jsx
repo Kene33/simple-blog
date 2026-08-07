@@ -24,7 +24,7 @@ function MessageBubble({ message, own, onEdit, onDelete, onReport }) {
   const save = (event) => { event.preventDefault(); if (text.trim()) onEdit(message.id, text.trim()); setEditing(false); };
   return <div className={`message-row ${own ? "own" : ""}`}><div className={`message-bubble ${deleted ? "deleted" : ""}`}>
     {deleted ? <span>Сообщение удалено</span> : editing ? <form onSubmit={save}><textarea value={text} onChange={(event) => setText(event.target.value)} maxLength={4000} autoFocus /><button type="submit">Сохранить</button></form> : <><p>{message.body}</p>{edited && <small>изменено</small>}</>}
-    <footer><time>{message.created_at ? new Date(message.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : ""}</time>{own && !deleted && <span className="read-state">{message.read_at ? <CheckCheck size={14} /> : <Check size={14} />}</span>}{own && !deleted && <button className="message-menu-trigger" onClick={() => setMenu((value) => !value)} aria-label="Действия сообщения"><MoreHorizontal size={15} /></button>}</footer>
+    <footer><time>{message.created_at ? new Date(message.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" }) : ""}</time>{own && !deleted && <span className="read-state">{message.read_by_recipient ? <CheckCheck size={14} /> : <Check size={14} />}</span>}{own && !deleted && <button className="message-menu-trigger" onClick={() => setMenu((value) => !value)} aria-label="Действия сообщения"><MoreHorizontal size={15} /></button>}</footer>
     {menu && <div className="message-menu"><button onClick={() => { setEditing(true); setMenu(false); }}>Изменить</button><button onClick={() => { onDelete(message.id); setMenu(false); }}>Удалить</button><button onClick={() => { onReport(message.id); setMenu(false); }}>Пожаловаться</button></div>}
   </div></div>;
 }
@@ -44,7 +44,20 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
     let cancelled = false;
     setMessages([]); setCursor(null); setState("loading");
     api.conversationMessages(conversation.id, { limit: 30 }).then((page) => { if (cancelled) return; setMessages(page.items || []); setCursor(page.next_cursor); setState("ready"); const last = page.items?.at(-1); if (last) api.markConversationRead(conversation.id, last.id).catch(() => {}); }).catch((error) => setState(errorStatus(error) === 404 ? "soon" : "error"));
-    const socket = createMessagesSocket({ onState: setSocketState, onEvent: (event) => { if (event.conversation_id !== conversation.id || !event.message) return; setMessages((items) => mergeUniqueMessages(items, event.message)); onChanged?.(event); } });
+    const socket = createMessagesSocket({ onState: setSocketState, onEvent: (event) => {
+      if (event.conversation_id !== conversation.id) return;
+      if (event.type === "message.read") {
+        setMessages((items) => items.map((item) => item.id === event.message_id ? { ...item, read_by_recipient: true } : item));
+        return;
+      }
+      if (event.type === "message.deleted") {
+        setMessages((items) => items.map((item) => item.id === event.message_id ? { ...item, is_deleted: true, body: "" } : item));
+        return;
+      }
+      if (!event.message) return;
+      setMessages((items) => mergeUniqueMessages(items, event.message));
+      onChanged?.(event);
+    } });
     return () => { cancelled = true; socket.close(); };
   }, [conversation.id]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
