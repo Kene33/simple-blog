@@ -1,8 +1,8 @@
-# E2EE decision required
+# E2EE decision implemented
 
-The current messaging implementation uses authenticated TLS/WSS and stores
-plaintext message bodies in PostgreSQL. End-to-end encryption must replace the
-message body contract before production messaging is advertised as private.
+The approved E2EE MVP uses authenticated TLS/WSS plus browser-side encryption.
+PostgreSQL and Redis receive only opaque encrypted envelopes and public device
+keys.
 
 ## Recommended policy
 
@@ -17,9 +17,12 @@ message body contract before production messaging is advertised as private.
 - Search is client-side over locally decrypted history; server-side plaintext
   search is removed.
 
-## Required product decision
+## Approved implementation
 
-Approve or reject the recommended recovery-phrase model. Rejecting recovery
-means losing every device key permanently loses access to the corresponding
-messages. After approval, the API needs device-key, key-bundle, encrypted
-envelope, rotation, and device-revocation contracts before implementation.
+The recovery-phrase model is approved. Device private keys are held in
+IndexedDB, and recovery backups are encrypted with PBKDF2 + AES-GCM before
+they can leave the browser. The server never receives the phrase.
+
+The current MVP does not implement a Signal-style ratchet, automatic key
+rotation, or server-side plaintext search. Those require an independent audited
+protocol before claiming forward secrecy.

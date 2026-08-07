@@ -3,10 +3,13 @@
 ## Scope
 
 The current messaging release supports direct and group text conversations,
-private attachments, and push delivery. Messages
-are stored in PostgreSQL and delivered over authenticated HTTPS/WebSocket
-connections. End-to-end encryption is not part of this release; it requires a
-separate audited key-management design.
+private attachments, push delivery, and browser-side E2EE envelopes. Messages
+are stored as opaque envelopes in PostgreSQL and delivered over authenticated
+HTTPS/WebSocket connections.
+
+The E2EE migration replaces pre-E2EE message bodies with a legacy-unavailable
+placeholder because old plaintext cannot be encrypted retroactively without the
+users' device keys.
 
 ## Security requirements
 
@@ -16,8 +19,9 @@ separate audited key-management design.
 - The handshake validates the configured `Origin` allowlist.
 - Every conversation read and message write verifies membership server-side.
 - Banned, muted, or blocked users cannot send messages.
-- Message bodies are plain text, trimmed, bounded, and never rendered as HTML.
-- Message text is excluded from logs, metrics, traces, and error responses.
+- Message envelopes are bounded JSON and never rendered as HTML.
+- Plaintext is excluded from API requests, PostgreSQL, Redis, logs, metrics,
+  traces, and error responses.
 - REST and WebSocket message operations have independent rate limits.
 - A message is committed to PostgreSQL before its realtime event is published.
 - Redis Pub/Sub transports events only; it is not the source of message history.
@@ -39,7 +43,11 @@ message attachments and reports.
 - Lost realtime events during reconnects.
 - Cross-instance delivery failures on Vercel.
 
-## Deferred
+## E2EE limits
 
-- End-to-end encryption.
-- Multi-device key recovery and encrypted message search.
+- P-256 ECDH + HKDF + AES-GCM is implemented with browser Web Crypto.
+- Private keys live in IndexedDB; recovery backups are encrypted locally with
+  a PBKDF2-derived key and the recovery phrase never leaves the browser.
+- Search is client-side over decrypted history.
+- This release is not a full Signal ratchet: forward secrecy and automatic
+  conversation-key rotation require a separately audited protocol.

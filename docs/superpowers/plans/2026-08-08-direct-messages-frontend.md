@@ -6,7 +6,7 @@ backend-контрактом.
 ## Реализовано
 
 - [x] Direct и group conversations с cursor pagination.
-- [x] История и поиск сообщений только для участников.
+- [x] История для участников и client-side поиск по расшифрованной истории.
 - [x] Отправка, редактирование, soft-delete и read markers.
 - [x] HttpOnly-cookie auth, CSRF, membership/ban/mute/block проверки.
 - [x] WebSocket `/api/v1/ws/messages` с Origin allowlist, heartbeat и typing.
@@ -20,15 +20,17 @@ backend-контрактом.
 
 ## Проверки
 
-- Backend: `76 passed, 3 skipped`.
+- Backend: `78 passed, 3 skipped`.
 - Frontend message checks, build и production dependency audit проходят.
 - Локальная проверка двух процессов: `TWO_INSTANCE_REDIS_WSS=PASS`.
 - Browser smoke: без error overlay и console errors.
 - Authenticated production WSS требует отдельного production cookie/account.
 
-## Отдельно для E2EE
+## E2EE
 
-E2EE не включается автоматически: он меняет схему сообщения, поиск и
-восстановление доступа. Требуется выбрать модель ключей. Рекомендуемый
-вариант: per-device keys, recovery phrase для локально зашифрованного backup,
-только encrypted envelopes на сервере и client-side search.
+- [x] Per-device P-256 keys with public-key registry.
+- [x] AES-GCM encrypted envelopes for direct and group messages.
+- [x] Private keys in IndexedDB and encrypted recovery backup helpers.
+- [x] Client-side decryption; server-side plaintext search disabled.
+- [ ] Signal-style ratchet and automatic key rotation require a separately
+  audited protocol.

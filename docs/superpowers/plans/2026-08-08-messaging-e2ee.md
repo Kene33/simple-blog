@@ -24,6 +24,7 @@
 - Add authenticated create/list/revoke endpoints for the current user's devices.
 - Add a member-only endpoint returning active public devices for a conversation.
 - Reject malformed public JWK and revoked devices.
+- [x] Completed in `1ce3c56`.
 
 ### Task 2: Encrypted message contract
 
@@ -34,6 +35,7 @@
 - Return envelopes unchanged to authorized members and tombstones for deleted messages.
 - Remove server-side plaintext search and return a clear `409` contract error for the old endpoint.
 - Preserve media, ownership, edit/delete, read markers, retention, and WebSocket events.
+- [x] Completed in `f934525`.
 
 ### Task 3: Browser key storage and encryption
 
@@ -45,6 +47,7 @@
 - Encrypt each message with AES-GCM and derive recipient keys with ECDH + HKDF.
 - Decrypt incoming/history envelopes locally; show an explicit unavailable-message state if a private key is missing.
 - Keep typing and read events unencrypted because they contain no message content.
+- [x] Completed in `f934525`.
 
 ### Task 4: Recovery and product contract
 
@@ -53,6 +56,7 @@
 - Add a local recovery phrase flow that encrypts the device private-key backup before it can leave the browser.
 - Never send or persist the recovery phrase itself.
 - Document device loss, revocation, legacy messages, local-only search, and current MVP limitation: this is authenticated E2EE at rest/in transit, not a full Signal ratchet.
+- [x] Completed in `f934525`.
 
 ### Task 5: Verification and release
 
@@ -62,3 +66,4 @@
 - Verify two production accounts can exchange encrypted messages over WSS.
 - Update graphify and mark only evidenced roadmap items complete.
 - Commit each task and push `main`.
+- [x] Local verification completed; production encrypted message exchange remains the final deployment check.

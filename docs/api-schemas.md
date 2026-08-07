@@ -277,8 +277,8 @@ The tombstone behavior applies to collection responses for a visible post.
 }
 ```
 
-`body` is trimmed plain text with a maximum of 4,000 characters. HTML is not a
-supported message format.
+`envelope` is an opaque versioned E2EE object. Plaintext is never sent to the
+API; the browser encrypts and decrypts message content with Web Crypto.
 
 ### `MessageRead`
 
@@ -287,15 +287,19 @@ supported message format.
   "id": "uuid",
   "conversation_id": "uuid",
   "sender": {"id": "uuid", "username": "alice", "avatar_url": null},
-  "body": "Hello",
+  "envelope": {
+    "version": 1,
+    "sender_device_id": "uuid",
+    "recipients": [{"device_id": "uuid", "iv": "base64", "ciphertext": "base64"}]
+  },
   "is_deleted": false,
   "created_at": "2026-08-08T12:30:00Z",
   "updated_at": "2026-08-08T12:30:00Z"
 }
 ```
 
-Deleted messages remain addressable in history as `[deleted]` tombstones. A
-message is visible only to members of its conversation.
+Deleted messages remain addressable in history as tombstones with a null
+envelope. A message is visible only to members of its conversation.
 
 ### `ConversationRead`
 

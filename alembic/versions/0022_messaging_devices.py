@@ -13,6 +13,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.add_column("messages", sa.Column("encrypted_body", postgresql.JSON(), nullable=True))
+    op.execute("UPDATE messages SET body = '[legacy-unavailable]' WHERE encrypted_body IS NULL")
     op.create_table(
         "messaging_devices",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),

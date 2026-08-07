@@ -161,6 +161,7 @@ erDiagram
         uuid conversation_id FK
         uuid sender_id FK
         varchar body
+        json encrypted_body
         timestamptz created_at
         timestamptz updated_at
         timestamptz deleted_at
@@ -195,8 +196,9 @@ erDiagram
   by replies, reports, and interaction history.
 - `conversations.direct_key` uniquely identifies one direct conversation for a
   pair of users. Membership is the access boundary for messages and read state.
-- `messages.body` is bounded to 4,000 characters by both request validation and
-  a database check constraint. Deleted messages retain a tombstone row.
+- `messages.encrypted_body` stores the opaque E2EE envelope. `messages.body` is
+  retained only as a bounded legacy placeholder for the database constraint;
+  plaintext is never returned by the API. Deleted messages retain a tombstone.
 - `user_blocks` has a composite primary key and rejects self-blocks. The
   messaging policy treats a block in either direction as a generic not-found
   response to avoid disclosing relationship state.

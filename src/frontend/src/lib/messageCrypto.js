@@ -19,6 +19,11 @@ async function deriveKey(privateKey, publicKey, conversationId) {
   return crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: encoder.encode(conversationId), info: encoder.encode("simple-blog-e2ee-v1") }, shared, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
 
+async function recoveryKey(phrase, salt, usages) {
+  const material = await crypto.subtle.importKey("raw", encoder.encode(phrase), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 200000, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, usages);
+}
+
 async function importPublicKey(jwk) {
   return crypto.subtle.importKey("jwk", jwk, { name: "ECDH", namedCurve: "P-256" }, true, []);
 }
@@ -45,6 +50,22 @@ export async function decryptEnvelope(envelope, identity, devices, conversationI
   const key = await deriveKey(identity.privateKey, await importPublicKey(sender.public_key), conversationId);
   const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(recipient.iv) }, key, base64ToBytes(recipient.ciphertext));
   return decoder.decode(plaintext);
+}
+
+export async function createRecoveryBackup(identity, phrase) {
+  if (!phrase || phrase.length < 12) throw new Error("Recovery phrase must contain at least 12 characters");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await recoveryKey(phrase, salt, ["encrypt"]);
+  const privateKey = await crypto.subtle.exportKey("pkcs8", identity.privateKey);
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, privateKey);
+  return { version: 1, public_key: identity.publicKeyJwk, salt: bytesToBase64(salt), iv: bytesToBase64(iv), ciphertext: bytesToBase64(new Uint8Array(ciphertext)) };
+}
+
+export async function restoreIdentity(backup, phrase, id) {
+  const key = await recoveryKey(phrase, base64ToBytes(backup.salt), ["decrypt"]);
+  const privateKey = await crypto.subtle.importKey("pkcs8", await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(backup.iv) }, key, base64ToBytes(backup.ciphertext)), { name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  return { id, privateKey, publicKey: await importPublicKey(backup.public_key), publicKeyJwk: backup.public_key };
 }
 
 function openDb() {

@@ -195,9 +195,13 @@ moderation reasons are never included in public author data.
 | `POST` | `/conversations/direct/{user_id}` | Access cookie + CSRF | Create or return a direct conversation | `201`/`200` |
 | `POST` | `/conversations/groups` | Access cookie + CSRF | Create a group conversation | `201` |
 | `GET` | `/conversations` | Access cookie | List the current user's conversations | `200` |
+| `POST` | `/messaging/devices` | Access cookie + CSRF | Register a browser device public key | `201` |
+| `GET` | `/messaging/devices` | Access cookie | List current user's active devices | `200` |
+| `DELETE` | `/messaging/devices/{device_id}` | Access cookie + CSRF | Revoke own device | `204` |
+| `GET` | `/conversations/{conversation_id}/devices` | Member | List active public keys for conversation members | `200` |
 | `GET` | `/conversations/{conversation_id}/messages` | Member | List messages by cursor | `200` |
-| `GET` | `/conversations/{conversation_id}/messages/search?q=...` | Member | Search visible message bodies | `200` |
-| `POST` | `/conversations/{conversation_id}/messages` | Member + CSRF | Send a text message | `201` |
+| `GET` | `/conversations/{conversation_id}/messages/search?q=...` | Member | Deprecated plaintext search; client-side search is required | `409` |
+| `POST` | `/conversations/{conversation_id}/messages` | Member + CSRF | Send an encrypted message envelope | `201` |
 | `POST` | `/conversations/{conversation_id}/members` | Group admin + CSRF | Add a group member | `204` |
 | `DELETE` | `/conversations/{conversation_id}/members/{user_id}` | Group admin/member + CSRF | Remove a member or leave | `204` |
 | `POST` | `/conversations/{conversation_id}/mute` | Member + CSRF | Mute or unmute a conversation | `200` |
@@ -214,7 +218,8 @@ cookie, checks `Origin`, and emits only events for conversations the current
 user may access. PostgreSQL remains the source of truth; clients resync from
 the REST cursor after reconnecting.
 
-Message attachments use `media` uploads with `purpose=message`; media URLs are
+Messages contain only encrypted envelopes. The API never receives or searches
+plaintext content. Message attachments use `media` uploads with `purpose=message`; media URLs are
 private and readable only by conversation members. Typing events are ephemeral
 WebSocket events and are never stored in PostgreSQL. Group conversations use
 `kind=group`, `title`, and `participants` in `ConversationRead`.
