@@ -31,7 +31,7 @@ async def main() -> None:
             raise SystemExit(f"Conversation creation failed: HTTP {conversation.status_code}")
         conversation_id = conversation.json()["id"]
         access_cookie = client_b.cookies.get("access_token")
-        ws_url = instance_b.replace("https://", "wss://").replace("http://", "ws:") + "/api/v1/ws/messages"
+        ws_url = instance_b.replace("https://", "wss://").replace("http://", "ws://") + "/api/v1/ws/messages"
         async with websockets.connect(ws_url, origin=instance_b, additional_headers={"Cookie": f"access_token={access_cookie}"}) as socket:
             body = f"cross-instance-{uuid.uuid4().hex}"
             sent = await client_a.post(f"/api/v1/conversations/{conversation_id}/messages", json={"body": body}, headers={"X-CSRF-Token": client_a.cookies.get("csrf_token")})
