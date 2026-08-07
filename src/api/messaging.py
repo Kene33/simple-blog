@@ -17,6 +17,7 @@ from src.modules.messaging.schemas import (
     ConversationPage,
     ConversationRead,
     ConversationReadMarker,
+    GroupCreateRequest,
     MessageCreateRequest,
     MessagePage,
     MessageRead,
@@ -24,6 +25,7 @@ from src.modules.messaging.schemas import (
 )
 from src.modules.messaging.service import (
     block_user,
+    create_group,
     create_message,
     delete_message,
     get_or_create_direct,
@@ -33,6 +35,7 @@ from src.modules.messaging.service import (
     message_context,
     mute_conversation,
     recipient_id,
+    recipient_ids,
     serialize_conversation,
     serialize_message,
     unblock_user,
@@ -53,6 +56,14 @@ async def create_direct(user_id: UUID, request: Request, auth: CurrentAuth = Dep
     return await serialize_conversation(session, conversation, auth.user.id)
 
 
+@router.post("/api/v1/conversations/groups", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
+async def create_group_conversation(payload: GroupCreateRequest, request: Request, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> ConversationRead:
+    await request.app.state.rate_limiter.check(request, "conversation-create", 20, 3600, str(auth.user.id))
+    conversation = await create_group(session, auth.user, payload)
+    await session.commit()
+    return await serialize_conversation(session, conversation, auth.user.id)
+
+
 @router.get("/api/v1/conversations", response_model=ConversationPage)
 async def conversations(cursor: str | None = None, limit: int = 20, auth: CurrentAuth = Depends(get_current_auth), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> ConversationPage:
     return await list_conversations(session, auth.user.id, settings, cursor, min(max(limit, 1), 50))
@@ -68,11 +79,12 @@ async def send_message(conversation_id: UUID, payload: MessageCreateRequest, req
     await request.app.state.rate_limiter.check(request, "message-create", 30, 600, str(auth.user.id))
     await request.app.state.rate_limiter.check(request, "message-create", 60, 600)
     message = await create_message(session, conversation_id, auth.user, payload)
-    target_id = await recipient_id(session, conversation_id, auth.user.id)
+    target_ids = await recipient_ids(session, conversation_id, auth.user.id)
     await session.commit()
     await session.refresh(message)
     response = await serialize_message(session, message)
-    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.created", "conversation_id": str(conversation_id), "message": response.model_dump(mode="json")})
+    for target_id in target_ids:
+        await request.app.state.realtime_bridge.publish(target_id, {"type": "message.created", "conversation_id": str(conversation_id), "message": response.model_dump(mode="json")})
     return response
 
 

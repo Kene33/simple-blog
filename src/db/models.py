@@ -71,10 +71,13 @@ class EmailVerificationToken(Base):
 
 class Conversation(Base):
     __tablename__ = "conversations"
-    __table_args__ = (CheckConstraint("length(direct_key) > 0", name="ck_conversations_direct_key"),)
+    __table_args__ = (CheckConstraint("kind IN ('direct', 'group')", name="ck_conversations_kind"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    direct_key: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
+    direct_key: Mapped[str | None] = mapped_column(String(80), nullable=True, unique=True)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False, default="direct", server_default="direct")
+    title: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_by_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
 
@@ -113,6 +116,7 @@ class ConversationMember(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     last_read_message_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("messages.id", ondelete="SET NULL"), nullable=True)
     muted_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="member", server_default="member")
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 

@@ -51,7 +51,10 @@ class ConversationMuteRequest(BaseModel):
 
 class ConversationRead(BaseModel):
     id: UUID
+    kind: str = "direct"
+    title: str | None = None
     participant: UserSummary
+    participants: list[UserSummary] = Field(default_factory=list)
     last_message: MessageRead | None = None
     unread_count: int = 0
     muted: bool = False
@@ -63,3 +66,16 @@ class ConversationRead(BaseModel):
 class ConversationPage(BaseModel):
     items: list[ConversationRead]
     next_cursor: str | None = None
+
+
+class GroupCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    member_ids: list[UUID] = Field(default_factory=list, max_length=49)
+
+    @field_validator("title")
+    @classmethod
+    def strip_title(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Title must not be blank")
+        return value

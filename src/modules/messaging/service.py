@@ -15,7 +15,16 @@ from src.db.models import Conversation, ConversationMember, Media, Message, Mess
 from src.modules.auth.service import user_summary
 from src.modules.media.service import as_read
 from src.modules.messaging.policy import assert_can_contact
-from src.modules.messaging.schemas import ConversationMuteRequest, ConversationPage, ConversationRead, MessageCreateRequest, MessagePage, MessageRead, MessageUpdateRequest
+from src.modules.messaging.schemas import (
+    ConversationMuteRequest,
+    ConversationPage,
+    ConversationRead,
+    GroupCreateRequest,
+    MessageCreateRequest,
+    MessagePage,
+    MessageRead,
+    MessageUpdateRequest,
+)
 
 TOMBSTONE_BODY = "[deleted]"
 
@@ -84,9 +93,18 @@ async def _participant(session: AsyncSession, conversation_id: UUID, user_id: UU
     return participant
 
 
+async def _participants(session: AsyncSession, conversation_id: UUID, user_id: UUID) -> list[User]:
+    return (await session.scalars(select(User).join(ConversationMember, ConversationMember.user_id == User.id).where(ConversationMember.conversation_id == conversation_id, User.id != user_id).order_by(User.username_normalized))).all()
+
+
 async def recipient_id(session: AsyncSession, conversation_id: UUID, user_id: UUID) -> UUID:
     participant = await _participant(session, conversation_id, user_id)
     return participant.id
+
+
+async def recipient_ids(session: AsyncSession, conversation_id: UUID, user_id: UUID) -> list[UUID]:
+    await _member(session, conversation_id, user_id)
+    return [participant.id for participant in await _participants(session, conversation_id, user_id)]
 
 
 async def message_context(session: AsyncSession, message_id: UUID, user_id: UUID) -> tuple[Message, UUID]:
@@ -102,7 +120,7 @@ async def get_or_create_direct(session: AsyncSession, actor: User, target: User)
     conversation = await session.scalar(select(Conversation).where(Conversation.direct_key == key))
     if conversation is not None:
         return conversation
-    conversation = Conversation(direct_key=key)
+    conversation = Conversation(direct_key=key, kind="direct", created_by_id=actor.id)
     session.add(conversation)
     await session.flush()
     session.add_all([ConversationMember(conversation_id=conversation.id, user_id=actor.id), ConversationMember(conversation_id=conversation.id, user_id=target.id)])
@@ -113,6 +131,26 @@ async def get_or_create_direct(session: AsyncSession, actor: User, target: User)
         conversation = await session.scalar(select(Conversation).where(Conversation.direct_key == key))
         if conversation is None:
             raise
+    return conversation
+
+
+async def create_group(session: AsyncSession, actor: User, payload: GroupCreateRequest) -> Conversation:
+    member_ids = list(dict.fromkeys(payload.member_ids))
+    if actor.id in member_ids:
+        member_ids.remove(actor.id)
+    if not member_ids:
+        raise AppError("VALIDATION_ERROR", "A group needs at least one other member", 422)
+    members = (await session.scalars(select(User).where(User.id.in_(member_ids), User.status == "active", User.disabled_at.is_(None)))).all()
+    if len(members) != len(member_ids):
+        raise AppError("RESOURCE_NOT_FOUND", "A group member was not found", 404)
+    for member in members:
+        await assert_can_contact(session, actor, member)
+    conversation = Conversation(kind="group", title=payload.title, created_by_id=actor.id)
+    session.add(conversation)
+    await session.flush()
+    session.add(ConversationMember(conversation_id=conversation.id, user_id=actor.id, role="admin"))
+    session.add_all(ConversationMember(conversation_id=conversation.id, user_id=member.id) for member in members)
+    await session.flush()
     return conversation
 
 
@@ -140,7 +178,10 @@ async def serialize_message(session: AsyncSession, message: Message) -> MessageR
 
 
 async def serialize_conversation(session: AsyncSession, conversation: Conversation, user_id: UUID) -> ConversationRead:
-    participant = await _participant(session, conversation.id, user_id)
+    participants = await _participants(session, conversation.id, user_id)
+    if not participants:
+        raise AppError("RESOURCE_NOT_FOUND", "Conversation not found", 404)
+    participant = participants[0]
     member = await _member(session, conversation.id, user_id)
     last_message = await session.scalar(select(Message).where(Message.conversation_id == conversation.id).order_by(Message.created_at.desc(), Message.id.desc()).limit(1))
     unread_query = select(func.count()).select_from(Message).where(Message.conversation_id == conversation.id, Message.sender_id != user_id, Message.deleted_at.is_(None))
@@ -150,7 +191,7 @@ async def serialize_conversation(session: AsyncSession, conversation: Conversati
             unread_query = unread_query.where(or_(Message.created_at > marker.created_at, and_(Message.created_at == marker.created_at, Message.id > marker.id)))
     unread_count = await session.scalar(unread_query) or 0
     blocked = await session.scalar(select(UserBlock.blocker_id).where(or_(and_(UserBlock.blocker_id == user_id, UserBlock.blocked_id == participant.id), and_(UserBlock.blocker_id == participant.id, UserBlock.blocked_id == user_id)))) is not None
-    return ConversationRead(id=conversation.id, participant=user_summary(participant), last_message=await serialize_message(session, last_message) if last_message else None, unread_count=unread_count, muted=_is_future(member.muted_until), blocked=blocked, created_at=conversation.created_at, updated_at=conversation.updated_at)
+    return ConversationRead(id=conversation.id, kind=conversation.kind, title=conversation.title, participant=user_summary(participant), participants=[user_summary(item) for item in participants], last_message=await serialize_message(session, last_message) if last_message else None, unread_count=unread_count, muted=_is_future(member.muted_until), blocked=blocked, created_at=conversation.created_at, updated_at=conversation.updated_at)
 
 
 async def list_conversations(session: AsyncSession, user_id: UUID, settings: Settings, cursor: str | None, limit: int) -> ConversationPage:
@@ -180,8 +221,8 @@ async def list_messages(session: AsyncSession, conversation_id: UUID, user_id: U
 
 async def create_message(session: AsyncSession, conversation_id: UUID, actor: User, payload: MessageCreateRequest) -> Message:
     await _member(session, conversation_id, actor.id)
-    target = await _participant(session, conversation_id, actor.id)
-    await assert_can_contact(session, actor, target)
+    for target in await _participants(session, conversation_id, actor.id):
+        await assert_can_contact(session, actor, target)
     now = datetime.now(timezone.utc)
     message = Message(conversation_id=conversation_id, sender_id=actor.id, body=payload.body, created_at=now, updated_at=now)
     session.add(message)

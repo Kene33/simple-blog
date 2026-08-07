@@ -100,6 +100,27 @@ async def test_conversation_mute_and_block_state_are_scoped_to_member(client: As
 
 
 @pytest.mark.asyncio
+async def test_group_messages_are_delivered_to_all_members(client: AsyncClient) -> None:
+    owner_csrf, owner_id = await register(client, "groupowner")
+    first = AsyncClient(transport=client._transport, base_url="http://testserver")
+    second = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        _, first_id = await register(first, "groupfirst")
+        _, second_id = await register(second, "groupsecond")
+        conversation = await client.post("/api/v1/conversations/groups", json={"title": "Team", "member_ids": [first_id, second_id]}, headers={"X-CSRF-Token": owner_csrf})
+        assert conversation.status_code == 201
+        assert conversation.json()["kind"] == "group"
+        assert len(conversation.json()["participants"]) == 2
+        message = await client.post(f"/api/v1/conversations/{conversation.json()['id']}/messages", json={"body": "Hello team"}, headers={"X-CSRF-Token": owner_csrf})
+        assert message.status_code == 201
+        assert (await first.get(f"/api/v1/conversations/{conversation.json()['id']}/messages")).json()["items"][0]["body"] == "Hello team"
+        assert (await second.get(f"/api/v1/conversations/{conversation.json()['id']}/messages")).json()["items"][0]["sender"]["id"] == owner_id
+    finally:
+        await first.aclose()
+        await second.aclose()
+
+
+@pytest.mark.asyncio
 async def test_message_events_are_published_for_mutations(client: AsyncClient) -> None:
     owner_csrf, _ = await register(client, "eventowner")
     other = AsyncClient(transport=client._transport, base_url="http://testserver")
