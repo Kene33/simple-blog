@@ -195,7 +195,7 @@ moderation reasons are never included in public author data.
 | `PATCH` | `/messages/{message_id}` | Sender + CSRF | Edit a message | `200` |
 | `DELETE` | `/messages/{message_id}` | Sender + CSRF | Soft-delete a message | `204` |
 
-The WebSocket endpoint is `/api/v1/ws`. It authenticates with the access
+The WebSocket endpoint is `/api/v1/ws/messages`. It authenticates with the access
 cookie, checks `Origin`, and emits only events for conversations the current
 user may access. PostgreSQL remains the source of truth; clients resync from
 the REST cursor after reconnecting.
