@@ -10,6 +10,8 @@
 - Redis bridge integration test passes with a real Redis service.
 - `scripts/check_two_instance_realtime.py` verifies a message sent through
   instance A arrives on a WebSocket connected to instance B.
+- Browser smoke passed locally for `/`, `/login`, `/messages`, and `/search`;
+  no Vite error overlay or console errors were detected.
 - Retention service removes only soft-deleted messages older than the cutoff.
 
 ## Verify authenticated production WSS
@@ -35,8 +37,9 @@ python scripts/check_production_wss.py
 The check validates HTTPS base URL, the production reverse proxy, the
 authenticated WebSocket handshake, and the ping/pong protocol. The current
 public production domain responds to health checks and rejects unauthenticated
-WebSocket handshakes with `403`; an authenticated handshake still requires a
-real access cookie.
+WebSocket handshakes with `403`. Authenticated WSS remains the only external
+check pending: the local `kene` credentials are not accepted by the current
+deployment, so use a dedicated production account or short-lived access cookie.
 
 ## Required Vercel settings
 
