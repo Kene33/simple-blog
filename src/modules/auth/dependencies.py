@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from urllib.parse import urlparse
 
-from fastapi import Depends, Request
+from fastapi import Depends, Request, WebSocket
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,7 +42,10 @@ def _validate_request_origin(request: Request, settings: Settings) -> None:
 
 
 async def get_current_auth(request: Request, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> CurrentAuth:
-    token = request.cookies.get(settings.access_cookie_name)
+    return await authenticate_access_token(request.cookies.get(settings.access_cookie_name), session, settings)
+
+
+async def authenticate_access_token(token: str | None, session: AsyncSession, settings: Settings) -> CurrentAuth:
     if not token:
         raise AppError("AUTH_REQUIRED", "Authentication is required", 401)
     try:
@@ -59,6 +62,12 @@ async def get_current_auth(request: Request, session: AsyncSession = Depends(get
     if refresh_session is None or refresh_session.revoked_at is not None or _is_expired(refresh_session.expires_at):
         raise AppError("AUTH_INVALID", "Authentication is required", 401)
     return CurrentAuth(user=user, session_id=session_id, csrf_token=csrf_token)
+
+
+async def get_websocket_auth(websocket: WebSocket, session: AsyncSession, settings: Settings) -> CurrentAuth:
+    if settings.environment == "production" and websocket.headers.get("origin") not in settings.cors_origin_list:
+        raise AppError("CSRF_FAILED", "Request origin is not allowed", 403)
+    return await authenticate_access_token(websocket.cookies.get(settings.access_cookie_name), session, settings)
 
 
 async def get_optional_auth(request: Request, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> CurrentAuth | None:

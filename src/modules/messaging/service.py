@@ -83,6 +83,11 @@ async def _participant(session: AsyncSession, conversation_id: UUID, user_id: UU
     return participant
 
 
+async def recipient_id(session: AsyncSession, conversation_id: UUID, user_id: UUID) -> UUID:
+    participant = await _participant(session, conversation_id, user_id)
+    return participant.id
+
+
 async def get_or_create_direct(session: AsyncSession, actor: User, target: User) -> Conversation:
     await assert_can_contact(session, actor, target)
     key = _direct_key(actor.id, target.id)
