@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import { decryptEnvelope, encryptMessage, generateIdentity } from "./messageCrypto.js";
+
+const sender = await generateIdentity("sender-device");
+const recipient = await generateIdentity("recipient-device");
+const devices = [
+  { id: sender.id, public_key: sender.publicKeyJwk },
+  { id: recipient.id, public_key: recipient.publicKeyJwk },
+];
+const envelope = await encryptMessage("secret message", sender, devices, "conversation-1");
+assert.equal(await decryptEnvelope(envelope, recipient, devices, "conversation-1"), "secret message");
+assert.equal(await decryptEnvelope(envelope, sender, devices, "conversation-1"), "secret message");
+console.log("message crypto checks passed");

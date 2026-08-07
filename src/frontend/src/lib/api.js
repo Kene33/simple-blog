@@ -174,6 +174,10 @@ export const api = {
   deleteDraft: (id) => request(`/drafts/${id}`, { method: "DELETE" }),
   publishDraft: (id) => request(`/drafts/${id}/publish`, { method: "POST" })
   ,conversations: (params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null && value !== "")); return request(`/conversations${query.size ? `?${query}` : ""}`); }
+  ,messageDevices: () => request("/messaging/devices")
+  ,registerMessageDevice: (data) => request("/messaging/devices", { method: "POST", body: JSON.stringify(data) })
+  ,revokeMessageDevice: (id) => request(`/messaging/devices/${id}`, { method: "DELETE" })
+  ,conversationDevices: (id) => request(`/conversations/${id}/devices`)
   ,createConversation: (userId) => request(`/conversations/direct/${userId}`, { method: "POST" })
   ,createGroup: (data) => request("/conversations/groups", { method: "POST", body: JSON.stringify(data) })
   ,conversationMessages: (id, params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null && value !== "")); return request(`/conversations/${id}/messages${query.size ? `?${query}` : ""}`); }

@@ -155,7 +155,7 @@ async def send_message(conversation_id: UUID, payload: MessageCreateRequest, req
     await session.commit()
     await session.refresh(message)
     response = await serialize_message(session, message)
-    await send_push_notifications(session, target_ids, "Новое сообщение", response.body, settings)
+    await send_push_notifications(session, target_ids, "Новое сообщение", "Откройте диалог", settings)
     for target_id in target_ids:
         await request.app.state.realtime_bridge.publish(target_id, {"type": "message.created", "conversation_id": str(conversation_id), "message": response.model_dump(mode="json")})
     return response

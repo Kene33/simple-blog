@@ -8,15 +8,17 @@ from src.modules.media.schemas import MediaRead
 
 
 class MessageCreateRequest(BaseModel):
-    body: str = Field(min_length=1, max_length=4_000)
+    envelope: dict[str, object] = Field(min_length=3, max_length=100)
     media_ids: list[UUID] = Field(default_factory=list, max_length=4)
 
-    @field_validator("body")
+    @field_validator("envelope")
     @classmethod
-    def strip_body(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError("Body must not be blank")
+    def validate_envelope(cls, value: dict[str, object]) -> dict[str, object]:
+        if value.get("version") != 1 or not isinstance(value.get("sender_device_id"), str) or not isinstance(value.get("recipients"), list) or not value["recipients"]:
+            raise ValueError("Envelope is invalid")
+        for recipient in value["recipients"]:
+            if not isinstance(recipient, dict) or not all(isinstance(recipient.get(key), str) and recipient[key] for key in ("device_id", "iv", "ciphertext")):
+                raise ValueError("Envelope recipient is invalid")
         return value
 
 
@@ -28,7 +30,7 @@ class MessageRead(BaseModel):
     id: UUID
     conversation_id: UUID
     sender: UserSummary
-    body: str
+    envelope: dict[str, object] | None = None
     is_deleted: bool
     read_by_recipient: bool = False
     media: list[MediaRead] = Field(default_factory=list)

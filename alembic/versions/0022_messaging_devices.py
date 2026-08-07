@@ -12,6 +12,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.add_column("messages", sa.Column("encrypted_body", postgresql.JSON(), nullable=True))
     op.create_table(
         "messaging_devices",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -28,5 +29,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_column("messages", "encrypted_body")
     op.drop_index("ix_messaging_devices_user_active", table_name="messaging_devices")
     op.drop_table("messaging_devices")

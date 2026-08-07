@@ -244,7 +244,7 @@ async def serialize_message(session: AsyncSession, message: Message) -> MessageR
     if sender is None:
         raise AppError("INTERNAL_ERROR", "Message sender is unavailable", 500)
     media = (await session.scalars(select(Media).join(MessageMedia, MessageMedia.media_id == Media.id).where(MessageMedia.message_id == message.id).order_by(MessageMedia.position))).all()
-    return MessageRead(id=message.id, conversation_id=message.conversation_id, sender=user_summary(sender), body=TOMBSTONE_BODY if message.deleted_at else message.body, is_deleted=message.deleted_at is not None, read_by_recipient=await _read_by_recipient(session, message), media=[as_read(item) for item in media], created_at=message.created_at, updated_at=message.updated_at)
+    return MessageRead(id=message.id, conversation_id=message.conversation_id, sender=user_summary(sender), envelope=None if message.deleted_at else message.encrypted_body, is_deleted=message.deleted_at is not None, read_by_recipient=await _read_by_recipient(session, message), media=[as_read(item) for item in media], created_at=message.created_at, updated_at=message.updated_at)
 
 
 async def serialize_conversation(session: AsyncSession, conversation: Conversation, user_id: UUID) -> ConversationRead:
@@ -291,12 +291,7 @@ async def list_messages(session: AsyncSession, conversation_id: UUID, user_id: U
 
 async def search_messages(session: AsyncSession, conversation_id: UUID, user_id: UUID, query_text: str, limit: int) -> MessagePage:
     await _member(session, conversation_id, user_id)
-    normalized = query_text.strip()
-    if not normalized:
-        raise AppError("VALIDATION_ERROR", "Search query must not be blank", 422)
-    query = select(Message).where(Message.conversation_id == conversation_id, Message.deleted_at.is_(None), Message.body.ilike(f"%{normalized}%")).order_by(Message.created_at.desc(), Message.id.desc()).limit(limit + 1)
-    rows = (await session.scalars(query)).all()
-    return MessagePage(items=[await serialize_message(session, row) for row in rows[:limit]], next_cursor=None)
+    raise AppError("ENCRYPTED_SEARCH_UNAVAILABLE", "Message search is available only on the client", 409)
 
 
 async def create_message(session: AsyncSession, conversation_id: UUID, actor: User, payload: MessageCreateRequest) -> Message:
@@ -304,7 +299,14 @@ async def create_message(session: AsyncSession, conversation_id: UUID, actor: Us
     for target in await _participants(session, conversation_id, actor.id):
         await assert_can_contact(session, actor, target)
     now = datetime.now(timezone.utc)
-    message = Message(conversation_id=conversation_id, sender_id=actor.id, body=payload.body, created_at=now, updated_at=now)
+    try:
+        sender_device_id = UUID(str(payload.envelope["sender_device_id"]))
+    except (KeyError, TypeError, ValueError):
+        raise AppError("VALIDATION_ERROR", "Envelope sender device is invalid", 422) from None
+    sender_device = await session.scalar(select(MessagingDevice).where(MessagingDevice.id == sender_device_id, MessagingDevice.user_id == actor.id, MessagingDevice.revoked_at.is_(None)))
+    if sender_device is None:
+        raise AppError("VALIDATION_ERROR", "Envelope sender device is unavailable", 422)
+    message = Message(conversation_id=conversation_id, sender_id=actor.id, body="[encrypted]", encrypted_body=payload.envelope, created_at=now, updated_at=now)
     session.add(message)
     await session.execute(update(Conversation).where(Conversation.id == conversation_id).values(updated_at=now))
     await session.flush()
@@ -341,7 +343,7 @@ async def update_message(session: AsyncSession, message_id: UUID, actor: User, p
     message = await session.scalar(select(Message).where(Message.id == message_id, Message.sender_id == actor.id, Message.deleted_at.is_(None)))
     if message is None:
         raise AppError("RESOURCE_NOT_FOUND", "Message not found", 404)
-    message.body = payload.body
+    message.encrypted_body = payload.envelope
     message.updated_at = datetime.now(timezone.utc)
     await session.flush()
     return message

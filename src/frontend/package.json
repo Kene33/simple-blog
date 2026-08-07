@@ -8,7 +8,7 @@
     "build": "vite build",
     "check:post-files": "node src/lib/postFiles.check.mjs && node src/lib/postTags.check.mjs",
     "check:comment-tree": "node src/lib/commentTree.check.mjs",
-    "check:messages": "node src/lib/messages.check.mjs",
+    "check:messages": "node src/lib/messages.check.mjs && node src/lib/messageCrypto.check.mjs",
     "test:browser": "playwright test",
     "preview": "vite preview"
   },

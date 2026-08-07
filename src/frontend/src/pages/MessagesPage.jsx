@@ -16,6 +16,13 @@ import { AppShell } from "../components/AppShell";
 import { Avatar } from "../components/Avatar";
 import { api } from "../lib/api";
 import {
+  decryptEnvelope,
+  encryptMessage,
+  generateIdentity,
+  loadIdentity,
+  saveIdentity,
+} from "../lib/messageCrypto";
+import {
   createMessagesSocket,
   mergeUniqueMessages,
 } from "../lib/messagesSocket";
@@ -36,6 +43,25 @@ const conversationLabel = (conversation) =>
     : participantOf(conversation).display_name ||
       participantOf(conversation).username ||
       "Пользователь";
+
+async function ensureRegisteredIdentity() {
+  let identity = await loadIdentity().catch(() => null);
+  const registered = await api.messageDevices();
+  const existing = identity && registered.items?.find((item) => item.public_key.x === identity.publicKeyJwk.x && item.public_key.y === identity.publicKeyJwk.y);
+  if (existing) return { ...identity, id: existing.id };
+  identity = await generateIdentity();
+  const device = await api.registerMessageDevice({ public_key: identity.publicKeyJwk, label: navigator.userAgent.slice(0, 80) });
+  identity.id = device.id;
+  await saveIdentity(identity);
+  return identity;
+}
+
+async function decryptMessages(items, identity, devices, conversationId) {
+  return Promise.all(items.map(async (item) => ({
+    ...item,
+    body: item.is_deleted ? "" : await decryptEnvelope(item.envelope, identity, devices, conversationId) || "Зашифрованное сообщение недоступно",
+  })));
+}
 
 function SoonState() {
   return (
@@ -78,7 +104,7 @@ function MessageBubble({ message, own, onEdit, onDelete, onReport }) {
           </form>
         ) : (
           <>
-            <p>{message.body}</p>
+            <p>{message.body || "Зашифрованное сообщение недоступно"}</p>
             {edited && <small>изменено</small>}
           </>
         )}
@@ -156,29 +182,29 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
   const endRef = useRef(null);
   const socketRef = useRef(null);
   const typingTimer = useRef(null);
+  const cryptoRef = useRef({ identity: null, devices: [] });
   const other = participantOf(conversation);
   useEffect(() => {
     let cancelled = false;
     setMessages([]);
     setCursor(null);
     setState("loading");
-    api
-      .conversationMessages(conversation.id, { limit: 30 })
-      .then((page) => {
-        if (cancelled) return;
-        setMessages(page.items || []);
-        setCursor(page.next_cursor);
-        setState("ready");
-        const last = page.items?.at(-1);
-        if (last)
-          api.markConversationRead(conversation.id, last.id).catch(() => {});
-      })
-      .catch((error) =>
-        setState(errorStatus(error) === 404 ? "soon" : "error"),
-      );
-    const socket = createMessagesSocket({
-      onState: setSocketState,
-      onEvent: (event) => {
+    let socket;
+    const load = async () => {
+      const identity = await ensureRegisteredIdentity();
+      const devices = (await api.conversationDevices(conversation.id)).items || [];
+      cryptoRef.current = { identity, devices };
+      const page = await api.conversationMessages(conversation.id, { limit: 30 });
+      if (cancelled) return;
+      const items = await decryptMessages(page.items || [], identity, devices, conversation.id);
+      setMessages(items);
+      setCursor(page.next_cursor);
+      setState("ready");
+      const last = items.at(-1);
+      if (last) api.markConversationRead(conversation.id, last.id).catch(() => {});
+      socket = createMessagesSocket({
+        onState: setSocketState,
+        onEvent: async (event) => {
         if (event.conversation_id !== conversation.id) return;
         if (event.type === "typing") {
           setTyping(Boolean(event.is_typing));
@@ -206,23 +232,26 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
           setMessages((items) =>
             items.map((item) =>
               item.id === event.message_id
-                ? { ...item, is_deleted: true, body: "" }
+                ? { ...item, is_deleted: true, body: "", envelope: null }
                 : item,
             ),
           );
           return;
         }
         if (!event.message) return;
-        setMessages((items) => mergeUniqueMessages(items, event.message));
+        const message = { ...event.message, body: await decryptEnvelope(event.message.envelope, cryptoRef.current.identity, cryptoRef.current.devices, conversation.id) || "Зашифрованное сообщение недоступно" };
+        setMessages((items) => mergeUniqueMessages(items, message));
         onChanged?.(event);
-      },
-    });
-    socketRef.current = socket;
+        },
+      });
+      socketRef.current = socket;
+    };
+    load().catch((error) => setState(errorStatus(error) === 404 ? "soon" : "error"));
     return () => {
       cancelled = true;
       clearTimeout(typingTimer.current);
       socketRef.current = null;
-      socket.close();
+      socket?.close();
     };
   }, [conversation.id]);
   useEffect(() => {
@@ -232,14 +261,16 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
     if (socketState !== "connected" || state === "loading") return;
     api
       .conversationMessages(conversation.id, { limit: 30 })
-      .then((page) =>
+      .then(async (page) => {
+        const { identity, devices } = cryptoRef.current;
+        const decrypted = await decryptMessages(page.items || [], identity, devices, conversation.id);
         setMessages((items) =>
-          [...(page.items || []), ...items].filter(
+          [...decrypted, ...items].filter(
             (item, index, all) =>
               all.findIndex((candidate) => candidate.id === item.id) === index,
           ),
-        ),
-      )
+        );
+      })
       .catch(() => {});
   }, [socketState, state, conversation.id]);
   const send = async (event) => {
@@ -253,8 +284,11 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
     });
     setBusy(true);
     try {
-      const message = await api.sendMessage(conversation.id, { body: value });
-      setMessages((items) => mergeUniqueMessages(items, message));
+      const { identity, devices } = cryptoRef.current;
+      const envelope = await encryptMessage(value, identity, devices, conversation.id);
+      const message = await api.sendMessage(conversation.id, { envelope });
+      const decrypted = { ...message, body: value };
+      setMessages((items) => mergeUniqueMessages(items, decrypted));
       setBody("");
     } catch (error) {
       setNotice(
@@ -294,7 +328,9 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
         cursor,
         limit: 30,
       });
-      setMessages((items) => [...(page.items || []), ...items]);
+      const { identity, devices } = cryptoRef.current;
+      const decrypted = await decryptMessages(page.items || [], identity, devices, conversation.id);
+      setMessages((items) => [...decrypted, ...items]);
       setCursor(page.next_cursor);
     } finally {
       setBusy(false);
@@ -302,10 +338,10 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
   };
   const edit = async (id, value) => {
     try {
-      const updated = await api.updateMessage(id, { body: value });
-      setMessages((items) =>
-        items.map((item) => (item.id === id ? updated : item)),
-      );
+      const { identity, devices } = cryptoRef.current;
+      const envelope = await encryptMessage(value, identity, devices, conversation.id);
+      const updated = await api.updateMessage(id, { envelope });
+      setMessages((items) => items.map((item) => (item.id === id ? { ...updated, body: value } : item)));
     } catch (error) {
       setNotice(
         errorStatus(error) === 403
@@ -321,7 +357,7 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
       setMessages((items) =>
         items.map((item) =>
           item.id === id
-            ? updated || { ...item, is_deleted: true, body: "" }
+            ? updated || { ...item, is_deleted: true, body: "", envelope: null }
             : item,
         ),
       );
