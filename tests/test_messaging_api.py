@@ -55,6 +55,31 @@ async def test_direct_messages_are_isolated_to_conversation_members(client: Asyn
 
 
 @pytest.mark.asyncio
+async def test_devices_are_registered_and_scoped_to_conversation_members(client: AsyncClient) -> None:
+    owner_csrf, owner_id = await register(client, "deviceowner")
+    other = AsyncClient(transport=client._transport, base_url="http://testserver")
+    outsider = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        other_csrf, other_id = await register(other, "devicereader")
+        _, _ = await register(outsider, "deviceoutsider")
+        owner_device = await client.post("/api/v1/messaging/devices", json={"public_key": {"kty": "EC", "crv": "P-256", "x": "owner", "y": "key"}, "label": "Laptop"}, headers={"X-CSRF-Token": owner_csrf})
+        assert owner_device.status_code == 201
+        conversation = await client.post(f"/api/v1/conversations/direct/{other_id}", headers={"X-CSRF-Token": owner_csrf})
+        conversation_id = conversation.json()["id"]
+        other_device = await other.post("/api/v1/messaging/devices", json={"public_key": {"kty": "EC", "crv": "P-256", "x": "other", "y": "key"}, "label": "Phone"}, headers={"X-CSRF-Token": other_csrf})
+        assert other_device.status_code == 201
+        devices = await client.get(f"/api/v1/conversations/{conversation_id}/devices")
+        assert devices.status_code == 200
+        assert {item["id"] for item in devices.json()["items"]} == {owner_device.json()["id"], other_device.json()["id"]}
+        assert (await outsider.get(f"/api/v1/conversations/{conversation_id}/devices")).status_code == 404
+        assert (await client.delete(f"/api/v1/messaging/devices/{owner_device.json()['id']}", headers={"X-CSRF-Token": owner_csrf})).status_code == 204
+        assert (await client.get("/api/v1/messaging/devices")).json()["items"] == []
+    finally:
+        await other.aclose()
+        await outsider.aclose()
+
+
+@pytest.mark.asyncio
 async def test_message_media_is_owned_and_private_to_conversation_members(client: AsyncClient) -> None:
     owner_csrf, _ = await register(client, "attachmentowner")
     other = AsyncClient(transport=client._transport, base_url="http://testserver")

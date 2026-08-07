@@ -83,3 +83,27 @@ class GroupCreateRequest(BaseModel):
 
 class GroupMemberRequest(BaseModel):
     user_id: UUID
+
+
+class DeviceCreateRequest(BaseModel):
+    public_key: dict[str, str] = Field(min_length=3, max_length=8)
+    label: str | None = Field(default=None, max_length=80)
+
+    @field_validator("public_key")
+    @classmethod
+    def validate_public_key(cls, value: dict[str, str]) -> dict[str, str]:
+        if value.get("kty") != "EC" or value.get("crv") != "P-256" or not value.get("x") or not value.get("y"):
+            raise ValueError("public_key must be a P-256 EC JWK")
+        return value
+
+
+class DeviceRead(BaseModel):
+    id: UUID
+    user_id: UUID
+    public_key: dict[str, str]
+    label: str | None = None
+    created_at: datetime
+
+
+class DevicePage(BaseModel):
+    items: list[DeviceRead]

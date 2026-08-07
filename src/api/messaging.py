@@ -19,6 +19,9 @@ from src.modules.messaging.schemas import (
     ConversationPage,
     ConversationRead,
     ConversationReadMarker,
+    DeviceCreateRequest,
+    DevicePage,
+    DeviceRead,
     GroupCreateRequest,
     GroupMemberRequest,
     MessageCreateRequest,
@@ -33,13 +36,17 @@ from src.modules.messaging.service import (
     create_message,
     delete_message,
     get_or_create_direct,
+    list_conversation_devices,
     list_conversations,
     list_messages,
+    list_user_devices,
     mark_read,
     message_context,
     mute_conversation,
     recipient_ids,
+    register_device,
     remove_group_member,
+    revoke_device,
     search_messages,
     serialize_conversation,
     serialize_message,
@@ -48,6 +55,25 @@ from src.modules.messaging.service import (
 )
 
 router = APIRouter(tags=["messaging"])
+
+
+@router.post("/api/v1/messaging/devices", response_model=DeviceRead, status_code=status.HTTP_201_CREATED)
+async def create_device(payload: DeviceCreateRequest, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> DeviceRead:
+    device = await register_device(session, auth.user.id, payload)
+    await session.commit()
+    return DeviceRead(id=device.id, user_id=device.user_id, public_key=device.public_key, label=device.label, created_at=device.created_at)
+
+
+@router.get("/api/v1/messaging/devices", response_model=DevicePage)
+async def devices(auth: CurrentAuth = Depends(get_current_auth), session: AsyncSession = Depends(get_session)) -> DevicePage:
+    return await list_user_devices(session, auth.user.id)
+
+
+@router.delete("/api/v1/messaging/devices/{device_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def delete_device(device_id: UUID, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+    await revoke_device(session, device_id, auth.user.id)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/api/v1/conversations/direct/{user_id}", response_model=ConversationRead)
@@ -86,6 +112,11 @@ async def remove_member(conversation_id: UUID, user_id: UUID, auth: CurrentAuth 
 @router.get("/api/v1/conversations", response_model=ConversationPage)
 async def conversations(cursor: str | None = None, limit: int = 20, auth: CurrentAuth = Depends(get_current_auth), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> ConversationPage:
     return await list_conversations(session, auth.user.id, settings, cursor, min(max(limit, 1), 50))
+
+
+@router.get("/api/v1/conversations/{conversation_id}/devices", response_model=DevicePage)
+async def conversation_devices(conversation_id: UUID, auth: CurrentAuth = Depends(get_current_auth), session: AsyncSession = Depends(get_session)) -> DevicePage:
+    return await list_conversation_devices(session, conversation_id, auth.user.id)
 
 
 @router.post("/api/v1/push/subscriptions", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)

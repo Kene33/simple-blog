@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings
 from src.core.errors import AppError
-from src.db.models import Conversation, ConversationMember, Media, Message, MessageMedia, User, UserBlock
+from src.db.models import Conversation, ConversationMember, Media, Message, MessageMedia, MessagingDevice, User, UserBlock
 from src.modules.auth.service import user_summary
 from src.modules.media.service import as_read
 from src.modules.messaging.policy import assert_can_contact
@@ -19,6 +19,9 @@ from src.modules.messaging.schemas import (
     ConversationMuteRequest,
     ConversationPage,
     ConversationRead,
+    DeviceCreateRequest,
+    DevicePage,
+    DeviceRead,
     GroupCreateRequest,
     GroupMemberRequest,
     MessageCreateRequest,
@@ -85,6 +88,32 @@ async def _member(session: AsyncSession, conversation_id: UUID, user_id: UUID) -
     if member is None:
         raise AppError("RESOURCE_NOT_FOUND", "Conversation not found", 404)
     return member
+
+
+async def register_device(session: AsyncSession, user_id: UUID, payload: DeviceCreateRequest) -> MessagingDevice:
+    device = MessagingDevice(user_id=user_id, public_key=payload.public_key, label=payload.label)
+    session.add(device)
+    await session.flush()
+    return device
+
+
+async def list_user_devices(session: AsyncSession, user_id: UUID) -> DevicePage:
+    rows = (await session.scalars(select(MessagingDevice).where(MessagingDevice.user_id == user_id, MessagingDevice.revoked_at.is_(None)).order_by(MessagingDevice.created_at, MessagingDevice.id))).all()
+    return DevicePage(items=[DeviceRead(id=item.id, user_id=item.user_id, public_key=item.public_key, label=item.label, created_at=item.created_at) for item in rows])
+
+
+async def list_conversation_devices(session: AsyncSession, conversation_id: UUID, user_id: UUID) -> DevicePage:
+    await _member(session, conversation_id, user_id)
+    rows = (await session.scalars(select(MessagingDevice).join(ConversationMember, ConversationMember.user_id == MessagingDevice.user_id).where(ConversationMember.conversation_id == conversation_id, MessagingDevice.revoked_at.is_(None)).order_by(MessagingDevice.created_at, MessagingDevice.id))).all()
+    return DevicePage(items=[DeviceRead(id=item.id, user_id=item.user_id, public_key=item.public_key, label=item.label, created_at=item.created_at) for item in rows])
+
+
+async def revoke_device(session: AsyncSession, device_id: UUID, user_id: UUID) -> None:
+    device = await session.scalar(select(MessagingDevice).where(MessagingDevice.id == device_id, MessagingDevice.user_id == user_id, MessagingDevice.revoked_at.is_(None)))
+    if device is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Device not found", 404)
+    device.revoked_at = datetime.now(timezone.utc)
+    await session.flush()
 
 
 async def _participant(session: AsyncSession, conversation_id: UUID, user_id: UUID) -> User:
