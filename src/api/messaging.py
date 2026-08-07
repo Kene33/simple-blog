@@ -12,6 +12,8 @@ from src.db.models import Conversation, User
 from src.db.session import get_session
 from src.modules.auth.dependencies import CurrentAuth, get_current_auth, get_websocket_auth, require_csrf, require_unmuted_csrf
 from src.modules.messaging.policy import assert_can_contact
+from src.modules.messaging.push import remove_subscription, save_subscription, send_push_notifications
+from src.modules.messaging.push_schemas import PushSubscriptionRequest
 from src.modules.messaging.schemas import (
     ConversationMuteRequest,
     ConversationPage,
@@ -69,13 +71,27 @@ async def conversations(cursor: str | None = None, limit: int = 20, auth: Curren
     return await list_conversations(session, auth.user.id, settings, cursor, min(max(limit, 1), 50))
 
 
+@router.post("/api/v1/push/subscriptions", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def subscribe_push(payload: PushSubscriptionRequest, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+    await save_subscription(session, auth.user.id, str(payload.endpoint), payload.p256dh, payload.auth)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/api/v1/push/subscriptions", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def unsubscribe_push(payload: PushSubscriptionRequest, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+    await remove_subscription(session, auth.user.id, str(payload.endpoint))
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/api/v1/conversations/{conversation_id}/messages", response_model=MessagePage)
 async def messages(conversation_id: UUID, cursor: str | None = None, limit: int = 50, auth: CurrentAuth = Depends(get_current_auth), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> MessagePage:
     return await list_messages(session, conversation_id, auth.user.id, settings, cursor, min(max(limit, 1), 100))
 
 
 @router.post("/api/v1/conversations/{conversation_id}/messages", response_model=MessageRead, status_code=status.HTTP_201_CREATED)
-async def send_message(conversation_id: UUID, payload: MessageCreateRequest, request: Request, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> MessageRead:
+async def send_message(conversation_id: UUID, payload: MessageCreateRequest, request: Request, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> MessageRead:
     await request.app.state.rate_limiter.check(request, "message-create", 30, 600, str(auth.user.id))
     await request.app.state.rate_limiter.check(request, "message-create", 60, 600)
     message = await create_message(session, conversation_id, auth.user, payload)
@@ -83,6 +99,7 @@ async def send_message(conversation_id: UUID, payload: MessageCreateRequest, req
     await session.commit()
     await session.refresh(message)
     response = await serialize_message(session, message)
+    await send_push_notifications(session, target_ids, "Новое сообщение", response.body, settings)
     for target_id in target_ids:
         await request.app.state.realtime_bridge.publish(target_id, {"type": "message.created", "conversation_id": str(conversation_id), "message": response.model_dump(mode="json")})
     return response

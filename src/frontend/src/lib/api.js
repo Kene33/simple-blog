@@ -175,6 +175,7 @@ export const api = {
   publishDraft: (id) => request(`/drafts/${id}/publish`, { method: "POST" })
   ,conversations: (params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null && value !== "")); return request(`/conversations${query.size ? `?${query}` : ""}`); }
   ,createConversation: (userId) => request(`/conversations/direct/${userId}`, { method: "POST" })
+  ,createGroup: (data) => request("/conversations/groups", { method: "POST", body: JSON.stringify(data) })
   ,conversationMessages: (id, params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null && value !== "")); return request(`/conversations/${id}/messages${query.size ? `?${query}` : ""}`); }
   ,sendMessage: (id, data) => request(`/conversations/${id}/messages`, { method: "POST", body: JSON.stringify(data) })
   ,updateMessage: (id, data) => request(`/messages/${id}`, { method: "PATCH", body: JSON.stringify(data) })
@@ -183,5 +184,7 @@ export const api = {
   ,muteConversation: (id, muted = true) => request(`/conversations/${id}/mute`, { method: "POST", body: JSON.stringify({ muted }) })
   ,blockUser: (id) => request(`/users/${id}/block`, { method: "POST" })
   ,unblockUser: (id) => request(`/users/${id}/block`, { method: "DELETE" })
-  ,reportMessage: (id, reason) => request(`/messages/${id}/report`, { method: "POST", body: JSON.stringify({ reason }) })
+  ,reportMessage: (id, reason) => request("/reports", { method: "POST", body: JSON.stringify({ message_id: id, reason }) })
+  ,subscribePush: (data) => request("/push/subscriptions", { method: "POST", body: JSON.stringify(data) })
+  ,unsubscribePush: (data) => request("/push/subscriptions", { method: "DELETE", body: JSON.stringify(data) })
 };

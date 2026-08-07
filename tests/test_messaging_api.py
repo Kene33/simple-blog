@@ -121,6 +121,14 @@ async def test_group_messages_are_delivered_to_all_members(client: AsyncClient) 
 
 
 @pytest.mark.asyncio
+async def test_push_subscription_is_scoped_to_authenticated_user(client: AsyncClient) -> None:
+    csrf, _ = await register(client, "pushowner")
+    payload = {"endpoint": "https://push.example/subscription", "p256dh": "p256dh-key-value", "auth": "auth-key-value"}
+    assert (await client.post("/api/v1/push/subscriptions", json=payload, headers={"X-CSRF-Token": csrf})).status_code == 204
+    assert (await client.request("DELETE", "/api/v1/push/subscriptions", json=payload, headers={"X-CSRF-Token": csrf})).status_code == 204
+
+
+@pytest.mark.asyncio
 async def test_message_events_are_published_for_mutations(client: AsyncClient) -> None:
     owner_csrf, _ = await register(client, "eventowner")
     other = AsyncClient(transport=client._transport, base_url="http://testserver")

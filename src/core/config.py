@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     redis_url: str | None = None
     cron_secret: str | None = None
     message_retention_days: int = Field(default=365, ge=30, le=3650)
+    vapid_public_key: str | None = None
+    vapid_private_key: str | None = None
+    vapid_subject: str | None = None
     media_quota_bytes: int = 1_073_741_824
     media_quota_files: int = 100
     media_pending_limit: int = 10
