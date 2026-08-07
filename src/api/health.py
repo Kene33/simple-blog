@@ -15,13 +15,19 @@ async def live() -> dict[str, str]:
 
 @router.get("/ready", response_model=None)
 async def ready(request: Request) -> dict[str, object] | JSONResponse:
+    checks: dict[str, str] = {}
     try:
         async with engine.connect() as connection:
             await connection.execute(text("SELECT 1"))
             await connection.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
+        checks["database"] = "ok"
     except Exception:
-        return JSONResponse(status_code=503, content={"status": "not_ready", "service": request.app.title, "checks": {"database": "unavailable"}})
-    return {"status": "ready", "service": request.app.title, "checks": {"database": "ok"}}
+        checks["database"] = "unavailable"
+    if request.app.state.settings.environment == "production":
+        checks["redis"] = "ok" if await request.app.state.rate_limiter.ping() else "unavailable"
+    if any(value != "ok" for value in checks.values()):
+        return JSONResponse(status_code=503, content={"status": "not_ready", "service": request.app.title, "checks": checks})
+    return {"status": "ready", "service": request.app.title, "checks": checks}
 
 
 @meta_router.get("/robots.txt", include_in_schema=False, response_class=PlainTextResponse)

@@ -46,6 +46,18 @@ class RateLimiter:
         except Exception as error:
             raise AppError("RATE_LIMIT_UNAVAILABLE", "Request protection is temporarily unavailable", 503) from error
 
+    async def ping(self) -> bool:
+        if not self._redis_url:
+            return True
+        try:
+            if self._redis is None:
+                from redis.asyncio import from_url
+
+                self._redis = from_url(self._redis_url, decode_responses=True)
+            return bool(await self._redis.ping())
+        except Exception:
+            return False
+
     async def close(self) -> None:
         if self._redis is not None:
             await self._redis.aclose()
