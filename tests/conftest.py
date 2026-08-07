@@ -53,7 +53,7 @@ async def client(storage: FakeStorage) -> AsyncIterator[AsyncClient]:
     async with session_factory() as session:
         session.add(Category(name="tech", name_normalized="tech", status="approved"))
         await session.commit()
-    settings = Settings(reload=False, jwt_secret_key="test-secret-that-is-long-enough-for-auth", database_url="sqlite+aiosqlite://", cron_secret="test-cron-secret", cookie_secure=False)
+    settings = Settings(reload=False, jwt_secret_key="test-secret-that-is-long-enough-for-auth", database_url="sqlite+aiosqlite://", cron_secret="test-cron-secret", cookie_secure=False, redis_url=None)
     application = create_app(settings)
 
     async def override_session() -> AsyncIterator[AsyncSession]:
