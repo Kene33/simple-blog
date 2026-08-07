@@ -40,6 +40,7 @@ src/
     users/
     posts/
     comments/
+    messaging/
     media/
     interactions/
     moderation/
@@ -62,6 +63,7 @@ another module's repository directly.
 | `media` | upload validation, object-storage keys, metadata, orphan cleanup, attachment ownership checks | `core`, `db`, storage adapter |
 | `interactions` | likes, share events, interaction counters/read state | `core`, `db`, public post existence service |
 | `moderation` | reports, report status, admin-only moderation actions | `core`, `db`, public post/comment lookup services |
+| `messaging` | direct conversations, memberships, messages, read state | `core`, `db`, auth principal, users policy |
 
 ## Dependency rules
 
@@ -106,4 +108,4 @@ PostgreSQL persistence layer.
 - Splitting the application into microservices.
 - Defining PostgreSQL columns or migrations.
 - Defining the public REST endpoint list.
-- Adding queues, Redis, WebSockets, recommendation systems, or notifications.
+- Adding recommendation systems or notifications.

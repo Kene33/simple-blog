@@ -183,6 +183,23 @@ Post, comment, and profile authors include `status=active|banned|deleted`,
 public. Deleted authors are shown as `Deleted user` without avatar or profile;
 moderation reasons are never included in public author data.
 
+## Direct messages
+
+| Method | Path | Auth | Purpose | Success |
+| --- | --- | --- | --- | --- |
+| `POST` | `/conversations/direct/{user_id}` | Access cookie + CSRF | Create or return a direct conversation | `201`/`200` |
+| `GET` | `/conversations` | Access cookie | List the current user's conversations | `200` |
+| `GET` | `/conversations/{conversation_id}/messages` | Member | List messages by cursor | `200` |
+| `POST` | `/conversations/{conversation_id}/messages` | Member + CSRF | Send a text message | `201` |
+| `PATCH` | `/conversations/{conversation_id}/read` | Member + CSRF | Mark a conversation as read | `204` |
+| `PATCH` | `/messages/{message_id}` | Sender + CSRF | Edit a message | `200` |
+| `DELETE` | `/messages/{message_id}` | Sender + CSRF | Soft-delete a message | `204` |
+
+The WebSocket endpoint is `/api/v1/ws`. It authenticates with the access
+cookie, checks `Origin`, and emits only events for conversations the current
+user may access. PostgreSQL remains the source of truth; clients resync from
+the REST cursor after reconnecting.
+
 ## Status and compatibility policy
 
 - `201` is used for newly created resources.
