@@ -2,7 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from sqlalchemy import and_, delete, func, or_, select, update
@@ -14,7 +14,7 @@ from src.core.errors import AppError
 from src.db.models import Conversation, ConversationMember, Message, User, UserBlock
 from src.modules.auth.service import user_summary
 from src.modules.messaging.policy import assert_can_contact
-from src.modules.messaging.schemas import ConversationPage, ConversationRead, MessageCreateRequest, MessagePage, MessageRead, MessageUpdateRequest
+from src.modules.messaging.schemas import ConversationMuteRequest, ConversationPage, ConversationRead, MessageCreateRequest, MessagePage, MessageRead, MessageUpdateRequest
 
 TOMBSTONE_BODY = "[deleted]"
 
@@ -115,11 +115,26 @@ async def get_or_create_direct(session: AsyncSession, actor: User, target: User)
     return conversation
 
 
+async def _read_by_recipient(session: AsyncSession, message: Message) -> bool:
+    member = await session.scalar(select(ConversationMember).where(ConversationMember.conversation_id == message.conversation_id, ConversationMember.user_id != message.sender_id))
+    if member is None or member.last_read_message_id is None:
+        return False
+    marker = await session.get(Message, member.last_read_message_id)
+    return marker is not None and (marker.created_at > message.created_at or (marker.created_at == message.created_at and marker.id >= message.id))
+
+
+def _is_future(value: datetime | None) -> bool:
+    if value is None:
+        return False
+    normalized = value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+    return normalized > datetime.now(timezone.utc)
+
+
 async def serialize_message(session: AsyncSession, message: Message) -> MessageRead:
     sender = await session.get(User, message.sender_id)
     if sender is None:
         raise AppError("INTERNAL_ERROR", "Message sender is unavailable", 500)
-    return MessageRead(id=message.id, conversation_id=message.conversation_id, sender=user_summary(sender), body=TOMBSTONE_BODY if message.deleted_at else message.body, is_deleted=message.deleted_at is not None, created_at=message.created_at, updated_at=message.updated_at)
+    return MessageRead(id=message.id, conversation_id=message.conversation_id, sender=user_summary(sender), body=TOMBSTONE_BODY if message.deleted_at else message.body, is_deleted=message.deleted_at is not None, read_by_recipient=await _read_by_recipient(session, message), created_at=message.created_at, updated_at=message.updated_at)
 
 
 async def serialize_conversation(session: AsyncSession, conversation: Conversation, user_id: UUID) -> ConversationRead:
@@ -132,7 +147,8 @@ async def serialize_conversation(session: AsyncSession, conversation: Conversati
         if marker is not None:
             unread_query = unread_query.where(or_(Message.created_at > marker.created_at, and_(Message.created_at == marker.created_at, Message.id > marker.id)))
     unread_count = await session.scalar(unread_query) or 0
-    return ConversationRead(id=conversation.id, participant=user_summary(participant), last_message=await serialize_message(session, last_message) if last_message else None, unread_count=unread_count, created_at=conversation.created_at, updated_at=conversation.updated_at)
+    blocked = await session.scalar(select(UserBlock.blocker_id).where(or_(and_(UserBlock.blocker_id == user_id, UserBlock.blocked_id == participant.id), and_(UserBlock.blocker_id == participant.id, UserBlock.blocked_id == user_id)))) is not None
+    return ConversationRead(id=conversation.id, participant=user_summary(participant), last_message=await serialize_message(session, last_message) if last_message else None, unread_count=unread_count, muted=_is_future(member.muted_until), blocked=blocked, created_at=conversation.created_at, updated_at=conversation.updated_at)
 
 
 async def list_conversations(session: AsyncSession, user_id: UUID, settings: Settings, cursor: str | None, limit: int) -> ConversationPage:
@@ -179,6 +195,13 @@ async def mark_read(session: AsyncSession, conversation_id: UUID, user_id: UUID,
         raise AppError("RESOURCE_NOT_FOUND", "Message not found", 404)
     member.last_read_message_id = message.id
     await session.flush()
+
+
+async def mute_conversation(session: AsyncSession, conversation_id: UUID, user_id: UUID, payload: ConversationMuteRequest) -> ConversationMember:
+    member = await _member(session, conversation_id, user_id)
+    member.muted_until = datetime.now(timezone.utc) + timedelta(days=30) if payload.muted else None
+    await session.flush()
+    return member
 
 
 async def update_message(session: AsyncSession, message_id: UUID, actor: User, payload: MessageUpdateRequest) -> Message:

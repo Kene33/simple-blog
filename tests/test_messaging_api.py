@@ -47,6 +47,32 @@ async def test_direct_messages_are_isolated_to_conversation_members(client: Asyn
 
 
 @pytest.mark.asyncio
+async def test_conversation_mute_and_block_state_are_scoped_to_member(client: AsyncClient) -> None:
+    owner_csrf, _ = await register(client, "stateowner")
+    other = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        _, other_id = await register(other, "statereader")
+        conversation = await client.post(f"/api/v1/conversations/direct/{other_id}", headers={"X-CSRF-Token": owner_csrf})
+        conversation_id = conversation.json()["id"]
+        assert conversation.json()["muted"] is False
+        assert conversation.json()["blocked"] is False
+
+        muted = await client.post(f"/api/v1/conversations/{conversation_id}/mute", json={"muted": True}, headers={"X-CSRF-Token": owner_csrf})
+        assert muted.status_code == 200
+        assert muted.json()["muted"] is True
+        owner_list = await client.get("/api/v1/conversations")
+        assert owner_list.json()["items"][0]["muted"] is True
+        assert (await other.get("/api/v1/conversations")).json()["items"][0]["muted"] is False
+
+        assert (await client.post(f"/api/v1/users/{other_id}/block", headers={"X-CSRF-Token": owner_csrf})).status_code == 204
+        blocked_list = await client.get("/api/v1/conversations")
+        assert blocked_list.json()["items"][0]["blocked"] is True
+        assert (await other.get("/api/v1/conversations")).json()["items"][0]["blocked"] is True
+    finally:
+        await other.aclose()
+
+
+@pytest.mark.asyncio
 async def test_message_events_are_published_for_mutations(client: AsyncClient) -> None:
     owner_csrf, _ = await register(client, "eventowner")
     other = AsyncClient(transport=client._transport, base_url="http://testserver")
@@ -67,5 +93,9 @@ async def test_message_events_are_published_for_mutations(client: AsyncClient) -
         await client.delete(f"/api/v1/messages/{message_id}", headers={"X-CSRF-Token": owner_csrf})
         await other.patch(f"/api/v1/conversations/{conversation_id}/read", json={"message_id": message_id}, headers={"X-CSRF-Token": other.cookies.get("csrf_token")})
         assert [event[1] for event in events] == ["message.created", "message.updated", "message.deleted", "message.read"]
+        assert events[0][2]["message"]["id"] == message_id
+        assert events[1][2]["message"]["body"] == "Edited"
+        assert events[2][2]["message_id"] == message_id
+        assert events[3][2]["message_id"] == message_id
     finally:
         await other.aclose()

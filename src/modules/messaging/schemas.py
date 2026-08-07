@@ -28,6 +28,7 @@ class MessageRead(BaseModel):
     sender: UserSummary
     body: str
     is_deleted: bool
+    read_by_recipient: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -41,11 +42,17 @@ class ConversationReadMarker(BaseModel):
     message_id: UUID
 
 
+class ConversationMuteRequest(BaseModel):
+    muted: bool
+
+
 class ConversationRead(BaseModel):
     id: UUID
     participant: UserSummary
     last_message: MessageRead | None = None
     unread_count: int = 0
+    muted: bool = False
+    blocked: bool = False
     created_at: datetime
     updated_at: datetime
 

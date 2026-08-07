@@ -8,10 +8,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import Settings, get_settings
 from src.core.errors import AppError
-from src.db.models import User
+from src.db.models import Conversation, User
 from src.db.session import get_session
 from src.modules.auth.dependencies import CurrentAuth, get_current_auth, get_websocket_auth, require_csrf, require_unmuted_csrf
-from src.modules.messaging.schemas import ConversationPage, ConversationRead, ConversationReadMarker, MessageCreateRequest, MessagePage, MessageRead, MessageUpdateRequest
+from src.modules.messaging.schemas import (
+    ConversationMuteRequest,
+    ConversationPage,
+    ConversationRead,
+    ConversationReadMarker,
+    MessageCreateRequest,
+    MessagePage,
+    MessageRead,
+    MessageUpdateRequest,
+)
 from src.modules.messaging.service import (
     block_user,
     create_message,
@@ -21,6 +30,7 @@ from src.modules.messaging.service import (
     list_messages,
     mark_read,
     message_context,
+    mute_conversation,
     recipient_id,
     serialize_conversation,
     serialize_message,
@@ -61,7 +71,7 @@ async def send_message(conversation_id: UUID, payload: MessageCreateRequest, req
     await session.commit()
     await session.refresh(message)
     response = await serialize_message(session, message)
-    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.created", "data": response.model_dump(mode="json")})
+    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.created", "conversation_id": str(conversation_id), "message": response.model_dump(mode="json")})
     return response
 
 
@@ -70,8 +80,18 @@ async def read_conversation(conversation_id: UUID, payload: ConversationReadMark
     target_id = await recipient_id(session, conversation_id, auth.user.id)
     await mark_read(session, conversation_id, auth.user.id, payload.message_id)
     await session.commit()
-    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.read", "data": {"conversation_id": str(conversation_id), "message_id": str(payload.message_id), "reader_id": str(auth.user.id)}})
+    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.read", "conversation_id": str(conversation_id), "message_id": str(payload.message_id), "reader_id": str(auth.user.id)})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/api/v1/conversations/{conversation_id}/mute", response_model=ConversationRead)
+async def mute(conversation_id: UUID, payload: ConversationMuteRequest, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> ConversationRead:
+    await mute_conversation(session, conversation_id, auth.user.id, payload)
+    await session.commit()
+    conversation = await session.get(Conversation, conversation_id)
+    if conversation is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Conversation not found", 404)
+    return await serialize_conversation(session, conversation, auth.user.id)
 
 
 @router.patch("/api/v1/messages/{message_id}", response_model=MessageRead)
@@ -81,7 +101,7 @@ async def edit_message(message_id: UUID, payload: MessageUpdateRequest, request:
     await session.commit()
     await session.refresh(message)
     response = await serialize_message(session, message)
-    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.updated", "data": response.model_dump(mode="json")})
+    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.updated", "conversation_id": str(message.conversation_id), "message": response.model_dump(mode="json")})
     return response
 
 
@@ -90,7 +110,7 @@ async def remove_message(message_id: UUID, request: Request, auth: CurrentAuth =
     message, target_id = await message_context(session, message_id, auth.user.id)
     await delete_message(session, message_id, auth.user)
     await session.commit()
-    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.deleted", "data": {"id": str(message.id), "conversation_id": str(message.conversation_id)}})
+    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.deleted", "conversation_id": str(message.conversation_id), "message_id": str(message.id)})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
