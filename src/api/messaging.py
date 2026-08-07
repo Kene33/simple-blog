@@ -38,7 +38,6 @@ from src.modules.messaging.service import (
     mark_read,
     message_context,
     mute_conversation,
-    recipient_id,
     recipient_ids,
     remove_group_member,
     search_messages,
@@ -133,10 +132,11 @@ async def send_message(conversation_id: UUID, payload: MessageCreateRequest, req
 
 @router.patch("/api/v1/conversations/{conversation_id}/read", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def read_conversation(conversation_id: UUID, payload: ConversationReadMarker, request: Request, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
-    target_id = await recipient_id(session, conversation_id, auth.user.id)
+    target_ids = await recipient_ids(session, conversation_id, auth.user.id)
     await mark_read(session, conversation_id, auth.user.id, payload.message_id)
     await session.commit()
-    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.read", "conversation_id": str(conversation_id), "message_id": str(payload.message_id), "reader_id": str(auth.user.id)})
+    for target_id in target_ids:
+        await request.app.state.realtime_bridge.publish(target_id, {"type": "message.read", "conversation_id": str(conversation_id), "message_id": str(payload.message_id), "reader_id": str(auth.user.id)})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -152,21 +152,25 @@ async def mute(conversation_id: UUID, payload: ConversationMuteRequest, auth: Cu
 
 @router.patch("/api/v1/messages/{message_id}", response_model=MessageRead)
 async def edit_message(message_id: UUID, payload: MessageUpdateRequest, request: Request, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> MessageRead:
-    _, target_id = await message_context(session, message_id, auth.user.id)
+    message, _ = await message_context(session, message_id, auth.user.id)
+    target_ids = await recipient_ids(session, message.conversation_id, auth.user.id)
     message = await update_message(session, message_id, auth.user, payload)
     await session.commit()
     await session.refresh(message)
     response = await serialize_message(session, message)
-    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.updated", "conversation_id": str(message.conversation_id), "message": response.model_dump(mode="json")})
+    for target_id in target_ids:
+        await request.app.state.realtime_bridge.publish(target_id, {"type": "message.updated", "conversation_id": str(message.conversation_id), "message": response.model_dump(mode="json")})
     return response
 
 
 @router.delete("/api/v1/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 async def remove_message(message_id: UUID, request: Request, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> Response:
-    message, target_id = await message_context(session, message_id, auth.user.id)
+    message, _ = await message_context(session, message_id, auth.user.id)
+    target_ids = await recipient_ids(session, message.conversation_id, auth.user.id)
     await delete_message(session, message_id, auth.user)
     await session.commit()
-    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.deleted", "conversation_id": str(message.conversation_id), "message_id": str(message.id)})
+    for target_id in target_ids:
+        await request.app.state.realtime_bridge.publish(target_id, {"type": "message.deleted", "conversation_id": str(message.conversation_id), "message_id": str(message.id)})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -223,13 +227,14 @@ async def websocket_messages(websocket: WebSocket, session: AsyncSession = Depen
                     is_typing = event["is_typing"]
                     if not isinstance(is_typing, bool):
                         raise ValueError
-                    target_id = await recipient_id(session, conversation_id, auth.user.id)
-                    target = await session.get(User, target_id)
-                    if target is None:
-                        raise AppError("RESOURCE_NOT_FOUND", "Conversation not found", 404)
-                    await assert_can_contact(session, auth.user, target)
+                    target_ids = await recipient_ids(session, conversation_id, auth.user.id)
                     await websocket.app.state.rate_limiter.check(websocket, "message-typing", 120, 60, str(auth.user.id))  # type: ignore[arg-type]
-                    await websocket.app.state.realtime_bridge.publish(target_id, {"type": "typing", "conversation_id": str(conversation_id), "user_id": str(auth.user.id), "is_typing": is_typing})
+                    for target_id in target_ids:
+                        target = await session.get(User, target_id)
+                        if target is None:
+                            raise AppError("RESOURCE_NOT_FOUND", "Conversation not found", 404)
+                        await assert_can_contact(session, auth.user, target)
+                        await websocket.app.state.realtime_bridge.publish(target_id, {"type": "typing", "conversation_id": str(conversation_id), "user_id": str(auth.user.id), "is_typing": is_typing})
                 except (KeyError, TypeError, ValueError):
                     await websocket.close(code=4400)
                     return
