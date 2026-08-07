@@ -6,3 +6,6 @@
 @media (min-width:701px) and (max-width:1100px){.messages-shell{grid-template-columns:210px minmax(0,1fr)}.messages-shell .messages-page{grid-template-columns:minmax(270px,320px) minmax(0,1fr)}.messages-shell .conversation-list header{padding-inline:16px}.messages-shell .conversation-search{margin-inline:12px}.messages-shell .message-history{padding-inline:28px}.messages-shell .message-composer{padding-inline:28px}}
 @media (min-width:701px) and (max-width:840px){.messages-shell .messages-page{grid-template-columns:280px minmax(0,1fr)}.messages-shell .conversation-item{padding-inline:10px}.messages-shell .conversation-item time{display:none}.messages-shell .message-history{padding-inline:18px}.messages-shell .message-composer{padding-inline:18px}}
 @media(max-width:700px){.messages-shell{padding-bottom:0}.messages-shell .mobile-nav{display:none}.messages-shell .messages-page,.messages-shell .conversation-list,.messages-shell .conversation-view{min-height:calc(100vh - 57px)}.messages-shell .messages-placeholder{min-height:calc(100vh - 125px)}}
+.messages-shell .main-content{position:fixed;inset:0 0 0 248px;overflow:hidden}
+@media (min-width:701px) and (max-width:1100px){.messages-shell .main-content{left:210px}}
+@media(max-width:700px){.messages-shell .main-content{position:static;inset:auto;overflow:visible}}
