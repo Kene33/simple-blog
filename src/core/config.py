@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     media_quota_bytes: int = 1_073_741_824
     media_quota_files: int = 100
     media_pending_limit: int = 10
+    media_public_cache_seconds: int = Field(default=300, ge=0, le=86_400)
     slow_request_ms: int = 1000
 
     @field_validator("database_url", mode="before")

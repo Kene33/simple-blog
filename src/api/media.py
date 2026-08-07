@@ -58,7 +58,7 @@ async def upload(request: Request, file: UploadFile = File(...), purpose: MediaP
 
 
 @router.get("/{media_id}")
-async def download(media_id: UUID, auth: CurrentAuth | None = Depends(get_optional_auth), session: AsyncSession = Depends(get_session), storage: S3Storage = Depends(get_storage)) -> StreamingResponse:
+async def download(media_id: UUID, auth: CurrentAuth | None = Depends(get_optional_auth), session: AsyncSession = Depends(get_session), storage: S3Storage = Depends(get_storage), settings: Settings = Depends(get_settings)) -> StreamingResponse:
     media = await session.get(Media, media_id)
     if media is None or media.deleted_at is not None:
         raise AppError("RESOURCE_NOT_FOUND", "Media not found", 404)
@@ -75,7 +75,7 @@ async def download(media_id: UUID, auth: CurrentAuth | None = Depends(get_option
     if not public:
         raise AppError("RESOURCE_NOT_FOUND", "Media not found", 404)
     result = await storage.get(media.storage_key)
-    cache = "public, max-age=31536000, immutable" if media.status == "attached" and public else "private, no-store"
+    cache = f"public, max-age={settings.media_public_cache_seconds}, stale-while-revalidate=60" if media.status == "attached" and public else "private, no-store"
     return StreamingResponse(result["Body"].iter_chunks(), media_type=media.mime_type, headers={"Content-Disposition": "attachment", "Cache-Control": cache, "X-Content-Type-Options": "nosniff"})
 
 

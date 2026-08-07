@@ -75,6 +75,24 @@ async def test_post_accepts_only_owned_post_uploads(client: AsyncClient) -> None
 
 
 @pytest.mark.asyncio
+async def test_public_media_uses_revocable_cache_ttl(client: AsyncClient) -> None:
+    csrf = await register(client)
+    upload = await client.post("/api/v1/media", data={"purpose": "post"}, files={"file": ("photo.png", PNG, "image/png")}, headers={"X-CSRF-Token": csrf})
+    assert upload.status_code == 201
+    post = await client.post("/api/v1/posts", json={"title": "Public", "content": "content", "category": "tech", "media_ids": [upload.json()["id"]]}, headers={"X-CSRF-Token": csrf})
+    assert post.status_code == 201
+
+    anonymous = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        response = await anonymous.get(upload.json()["url"])
+    finally:
+        await anonymous.aclose()
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "public, max-age=300, stale-while-revalidate=60"
+
+
+@pytest.mark.asyncio
 async def test_uploaded_media_is_private(client: AsyncClient) -> None:
     csrf = await register(client)
     upload = await client.post("/api/v1/media", data={"purpose": "post"}, files={"file": ("photo.png", PNG, "image/png")}, headers={"X-CSRF-Token": csrf})

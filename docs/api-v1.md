@@ -104,6 +104,11 @@ only to their owner; attached post media and selected avatars are public. It
 does not return `MediaRead` metadata; upload responses and embedded
 post/profile media use that schema.
 
+Public attached media uses a short, configurable cache lifetime
+(`MEDIA_PUBLIC_CACHE_SECONDS`, default 300 seconds) with stale-while-revalidate.
+It is intentionally not immutable because moderation or deletion must become
+effective without waiting a year for a shared cache to expire.
+
 `purpose=cover` is an image upload used by a profile cover. Post creation and update accept previously uploaded `media_ids`. The media
 service verifies ownership and attachment limits before the post transaction
 commits.
