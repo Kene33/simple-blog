@@ -394,7 +394,9 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
         <div>
           <b>{conversationLabel(conversation)}</b>
           <small>
-            {conversation.kind === "group"
+            {typing
+              ? "печатает…"
+              : conversation.kind === "group"
               ? `${(conversation.participants || []).length + 1} участника`
               : `@${other.username || ""}`}
           </small>
