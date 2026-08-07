@@ -8,6 +8,8 @@
 - A WebSocket connected to instance B receives a message sent through REST on
   instance A: `TWO_INSTANCE_REDIS_WSS=PASS`.
 - Redis bridge integration test passes with a real Redis service.
+- `scripts/check_two_instance_realtime.py` verifies a message sent through
+  instance A arrives on a WebSocket connected to instance B.
 - Retention service removes only soft-deleted messages older than the cutoff.
 
 ## Verify authenticated production WSS
@@ -44,3 +46,16 @@ real access cookie.
 - `MESSAGE_RETENTION_DAYS` according to the retention policy.
 - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT` for push.
 - Exact HTTPS `CORS_ORIGINS` and `PUBLIC_BASE_URL`.
+
+For the two-instance check, use dedicated test accounts outside the
+repository:
+
+```bash
+MESSAGING_INSTANCE_A=http://127.0.0.1:8101 \
+MESSAGING_INSTANCE_B=http://127.0.0.1:8102 \
+MESSAGING_IDENTIFIER_A=messaging-e2e-a \
+MESSAGING_PASSWORD_A='redacted' \
+MESSAGING_IDENTIFIER_B=messaging-e2e-b \
+MESSAGING_PASSWORD_B='redacted' \
+python scripts/check_two_instance_realtime.py
+```
