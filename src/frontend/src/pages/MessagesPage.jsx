@@ -3,7 +3,7 @@ import { ArrowLeft, Check, CheckCheck, LoaderCircle, MessageCircle, MoreHorizont
 import { AppShell } from "../components/AppShell";
 import { Avatar } from "../components/Avatar";
 import { api } from "../lib/api";
-import { createMessagesSocket } from "../lib/messagesSocket";
+import { createMessagesSocket, mergeUniqueMessages } from "../lib/messagesSocket";
 import { useRouter } from "../lib/router";
 import { useSession } from "../session";
 import "../styles/messages.css";
@@ -40,17 +40,16 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
   const [actionMenu, setActionMenu] = useState(false);
   const endRef = useRef(null);
   const other = participantOf(conversation);
-  const addUnique = (items, incoming) => items.some((item) => item.id === incoming.id || (incoming.client_id && item.client_id === incoming.client_id)) ? items : [...items, incoming];
   useEffect(() => {
     let cancelled = false;
     setMessages([]); setCursor(null); setState("loading");
     api.conversationMessages(conversation.id, { limit: 30 }).then((page) => { if (cancelled) return; setMessages(page.items || []); setCursor(page.next_cursor); setState("ready"); const last = page.items?.at(-1); if (last) api.markConversationRead(conversation.id, last.id).catch(() => {}); }).catch((error) => setState(errorStatus(error) === 404 ? "soon" : "error"));
-    const socket = createMessagesSocket({ onState: setSocketState, onEvent: (event) => { if (event.conversation_id !== conversation.id || !event.message) return; setMessages((items) => addUnique(items, event.message)); onChanged?.(event); } });
+    const socket = createMessagesSocket({ onState: setSocketState, onEvent: (event) => { if (event.conversation_id !== conversation.id || !event.message) return; setMessages((items) => mergeUniqueMessages(items, event.message)); onChanged?.(event); } });
     return () => { cancelled = true; socket.close(); };
   }, [conversation.id]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages.length]);
   useEffect(() => { if (socketState !== "connected" || state === "loading") return; api.conversationMessages(conversation.id, { limit: 30 }).then((page) => setMessages((items) => [...(page.items || []), ...items].filter((item, index, all) => all.findIndex((candidate) => candidate.id === item.id) === index))).catch(() => {}); }, [socketState, conversation.id]);
-  const send = async (event) => { event.preventDefault(); const value = body.trim(); if (!value || busy) return; setBusy(true); const clientId = crypto.randomUUID?.() || `${Date.now()}`; try { const message = await api.sendMessage(conversation.id, { body: value, client_id: clientId }); setMessages((items) => addUnique(items, message)); setBody(""); } catch (error) { setNotice(errorStatus(error) === 403 ? "Отправка сообщений запрещена" : errorStatus(error) === 429 ? "Слишком много сообщений. Попробуйте позже." : "Не удалось отправить сообщение"); } finally { setBusy(false); } };
+  const send = async (event) => { event.preventDefault(); const value = body.trim(); if (!value || busy) return; setBusy(true); try { const message = await api.sendMessage(conversation.id, { body: value }); setMessages((items) => mergeUniqueMessages(items, message)); setBody(""); } catch (error) { setNotice(errorStatus(error) === 403 ? "Отправка сообщений запрещена" : errorStatus(error) === 429 ? "Слишком много сообщений. Попробуйте позже." : "Не удалось отправить сообщение"); } finally { setBusy(false); } };
   const loadOlder = async () => { if (!cursor || busy) return; setBusy(true); try { const page = await api.conversationMessages(conversation.id, { cursor, limit: 30 }); setMessages((items) => [...(page.items || []), ...items]); setCursor(page.next_cursor); } finally { setBusy(false); } };
   const edit = async (id, value) => { try { const updated = await api.updateMessage(id, { body: value }); setMessages((items) => items.map((item) => item.id === id ? updated : item)); } catch (error) { setNotice(errorStatus(error) === 403 ? "Нельзя изменить это сообщение" : "Не удалось изменить сообщение"); } };
   const remove = async (id) => { if (!window.confirm("Удалить сообщение?")) return; try { const updated = await api.deleteMessage(id); setMessages((items) => items.map((item) => item.id === id ? (updated || { ...item, is_deleted: true, body: "" }) : item)); } catch { setNotice("Не удалось удалить сообщение"); } };

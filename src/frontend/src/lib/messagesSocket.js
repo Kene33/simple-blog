@@ -1,3 +1,7 @@
+export function mergeUniqueMessages(items, incoming) {
+  return items.some((item) => item.id === incoming.id || (incoming.client_id && item.client_id === incoming.client_id)) ? items : [...items, incoming];
+}
+
 export function createMessagesSocket({ onEvent, onState }) {
   let socket;
   let stopped = false;
