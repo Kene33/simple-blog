@@ -20,7 +20,7 @@ from src.core.lifespan import lifespan
 from src.core.logging import configure_logging
 from src.core.middleware import ObservabilityMiddleware, RequestIdMiddleware, SecurityHeadersMiddleware
 from src.core.rate_limit import RateLimiter
-from src.core.realtime import RealtimeHub
+from src.core.realtime import RealtimeHub, RedisRealtimeBridge
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -33,6 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.state.rate_limiter = RateLimiter(resolved_settings.redis_url)
     application.state.realtime_hub = RealtimeHub()
+    application.state.realtime_bridge = RedisRealtimeBridge(resolved_settings.redis_url, application.state.realtime_hub)
     application.state.settings = resolved_settings
     application.add_middleware(RequestIdMiddleware)
     application.add_middleware(ObservabilityMiddleware)

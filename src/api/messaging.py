@@ -57,7 +57,7 @@ async def send_message(conversation_id: UUID, payload: MessageCreateRequest, req
     await session.commit()
     await session.refresh(message)
     response = await serialize_message(session, message)
-    await request.app.state.realtime_hub.publish(target_id, {"type": "message.created", "data": response.model_dump(mode="json")})
+    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.created", "data": response.model_dump(mode="json")})
     return response
 
 
@@ -97,6 +97,7 @@ async def unblock(user_id: UUID, auth: CurrentAuth = Depends(require_csrf), sess
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.websocket("/api/v1/ws/messages")
 @router.websocket("/api/v1/ws")
 async def websocket_messages(websocket: WebSocket, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> None:
     try:
