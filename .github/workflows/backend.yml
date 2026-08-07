@@ -57,8 +57,8 @@ jobs:
           uvicorn src.main:app --host 127.0.0.1 --port 8102 >/tmp/simple-blog-b.log 2>&1 &
           echo $! >/tmp/simple-blog-b.pid
           trap 'kill $(cat /tmp/simple-blog-a.pid) $(cat /tmp/simple-blog-b.pid)' EXIT
-          curl --retry 20 --retry-delay 1 --fail http://127.0.0.1:8101/health/live
-          curl --retry 20 --retry-delay 1 --fail http://127.0.0.1:8102/health/live
+          curl --retry 20 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8101/health/live
+          curl --retry 20 --retry-connrefused --retry-delay 1 --fail http://127.0.0.1:8102/health/live
           curl --fail -o /dev/null -w '%{http_code}\n' -H 'content-type: application/json' -d '{"username":"ci_e2e_a","email":"ci_e2e_a@example.com","password":"strong-test-password"}' http://127.0.0.1:8101/api/v1/auth/register
           curl --fail -o /dev/null -w '%{http_code}\n' -H 'content-type: application/json' -d '{"username":"ci_e2e_b","email":"ci_e2e_b@example.com","password":"strong-test-password"}' http://127.0.0.1:8102/api/v1/auth/register
           MESSAGING_INSTANCE_A=http://127.0.0.1:8101 \
