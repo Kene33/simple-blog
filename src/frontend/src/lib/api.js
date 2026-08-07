@@ -174,12 +174,12 @@ export const api = {
   deleteDraft: (id) => request(`/drafts/${id}`, { method: "DELETE" }),
   publishDraft: (id) => request(`/drafts/${id}/publish`, { method: "POST" })
   ,conversations: (params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null && value !== "")); return request(`/conversations${query.size ? `?${query}` : ""}`); }
-  ,createConversation: (data) => request("/conversations", { method: "POST", body: JSON.stringify(data) })
+  ,createConversation: (userId) => request(`/conversations/direct/${userId}`, { method: "POST" })
   ,conversationMessages: (id, params = {}) => { const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value != null && value !== "")); return request(`/conversations/${id}/messages${query.size ? `?${query}` : ""}`); }
   ,sendMessage: (id, data) => request(`/conversations/${id}/messages`, { method: "POST", body: JSON.stringify(data) })
   ,updateMessage: (id, data) => request(`/messages/${id}`, { method: "PATCH", body: JSON.stringify(data) })
   ,deleteMessage: (id) => request(`/messages/${id}`, { method: "DELETE" })
-  ,markConversationRead: (id) => request(`/conversations/${id}/read`, { method: "POST" })
+  ,markConversationRead: (id, messageId) => request(`/conversations/${id}/read`, { method: "PATCH", body: JSON.stringify({ message_id: messageId }) })
   ,muteConversation: (id, muted = true) => request(`/conversations/${id}/mute`, { method: "POST", body: JSON.stringify({ muted }) })
   ,blockUser: (id) => request(`/users/${id}/block`, { method: "POST" })
   ,unblockUser: (id) => request(`/users/${id}/block`, { method: "DELETE" })
