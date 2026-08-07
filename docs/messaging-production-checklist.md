@@ -20,6 +20,16 @@ MESSAGING_ACCESS_COOKIE='redacted-value' \
 python scripts/check_production_wss.py
 ```
 
+Alternatively, provide a dedicated test account without exposing its password
+to the repository:
+
+```bash
+MESSAGING_BASE_URL=https://your-production-domain \
+MESSAGING_IDENTIFIER=messaging-e2e-user \
+MESSAGING_PASSWORD='redacted-value' \
+python scripts/check_production_wss.py
+```
+
 The check validates HTTPS base URL, the production reverse proxy, the
 authenticated WebSocket handshake, and the ping/pong protocol. The current
 public production domain responds to health checks and rejects unauthenticated
