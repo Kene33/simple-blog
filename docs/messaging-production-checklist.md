@@ -12,6 +12,8 @@
   instance A arrives on a WebSocket connected to instance B.
 - Browser smoke passed locally for `/`, `/login`, `/messages`, and `/search`;
   no Vite error overlay or console errors were detected.
+- Browser E2E covers offline state and WebSocket reconnect history resync; CI
+  installs Chromium before running it.
 - Retention service removes only soft-deleted messages older than the cutoff.
 
 ## Verify authenticated production WSS
