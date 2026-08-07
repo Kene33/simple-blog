@@ -38,6 +38,7 @@ from src.modules.messaging.service import (
     mute_conversation,
     recipient_id,
     recipient_ids,
+    search_messages,
     serialize_conversation,
     serialize_message,
     unblock_user,
@@ -88,6 +89,14 @@ async def unsubscribe_push(payload: PushSubscriptionRequest, auth: CurrentAuth =
 @router.get("/api/v1/conversations/{conversation_id}/messages", response_model=MessagePage)
 async def messages(conversation_id: UUID, cursor: str | None = None, limit: int = 50, auth: CurrentAuth = Depends(get_current_auth), session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> MessagePage:
     return await list_messages(session, conversation_id, auth.user.id, settings, cursor, min(max(limit, 1), 100))
+
+
+@router.get("/api/v1/conversations/{conversation_id}/messages/search", response_model=MessagePage)
+async def search(conversation_id: UUID, q: str, request: Request, limit: int = 20, auth: CurrentAuth = Depends(get_current_auth), session: AsyncSession = Depends(get_session)) -> MessagePage:
+    await request.app.state.rate_limiter.check(request, "message-search", 30, 60, str(auth.user.id))
+    if len(q) > 100:
+        raise AppError("VALIDATION_ERROR", "Search query is too long", 422)
+    return await search_messages(session, conversation_id, auth.user.id, q, min(max(limit, 1), 50))
 
 
 @router.post("/api/v1/conversations/{conversation_id}/messages", response_model=MessageRead, status_code=status.HTTP_201_CREATED)

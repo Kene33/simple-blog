@@ -219,6 +219,16 @@ async def list_messages(session: AsyncSession, conversation_id: UUID, user_id: U
     return MessagePage(items=[await serialize_message(session, row) for row in rows[:limit]], next_cursor=next_cursor)
 
 
+async def search_messages(session: AsyncSession, conversation_id: UUID, user_id: UUID, query_text: str, limit: int) -> MessagePage:
+    await _member(session, conversation_id, user_id)
+    normalized = query_text.strip()
+    if not normalized:
+        raise AppError("VALIDATION_ERROR", "Search query must not be blank", 422)
+    query = select(Message).where(Message.conversation_id == conversation_id, Message.deleted_at.is_(None), Message.body.ilike(f"%{normalized}%")).order_by(Message.created_at.desc(), Message.id.desc()).limit(limit + 1)
+    rows = (await session.scalars(query)).all()
+    return MessagePage(items=[await serialize_message(session, row) for row in rows[:limit]], next_cursor=None)
+
+
 async def create_message(session: AsyncSession, conversation_id: UUID, actor: User, payload: MessageCreateRequest) -> Message:
     await _member(session, conversation_id, actor.id)
     for target in await _participants(session, conversation_id, actor.id):

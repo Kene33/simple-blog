@@ -36,6 +36,9 @@ async def test_direct_messages_are_isolated_to_conversation_members(client: Asyn
         assert history.json()["items"][0]["body"] == "Hello"
         next_history = await other.get(f"/api/v1/conversations/{conversation_id}/messages", params={"limit": 1, "cursor": history.json()["next_cursor"]})
         assert next_history.json()["items"][0]["body"] == "Second"
+        search = await other.get(f"/api/v1/conversations/{conversation_id}/messages/search", params={"q": "hello"})
+        assert search.status_code == 200
+        assert [item["body"] for item in search.json()["items"]] == ["Hello"]
         assert (await client.post(f"/api/v1/users/{other_id}/block", headers={"X-CSRF-Token": owner_csrf})).status_code == 204
         blocked_send = await client.post(f"/api/v1/conversations/{conversation_id}/messages", json={"body": "blocked"}, headers={"X-CSRF-Token": owner_csrf})
         assert blocked_send.status_code == 404
