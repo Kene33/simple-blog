@@ -1,0 +1,55 @@
+from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, Field, field_validator
+
+from src.modules.auth.schemas import UserSummary
+
+
+class MessageCreateRequest(BaseModel):
+    body: str = Field(min_length=1, max_length=4_000)
+
+    @field_validator("body")
+    @classmethod
+    def strip_body(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Body must not be blank")
+        return value
+
+
+class MessageUpdateRequest(MessageCreateRequest):
+    pass
+
+
+class MessageRead(BaseModel):
+    id: UUID
+    conversation_id: UUID
+    sender: UserSummary
+    body: str
+    is_deleted: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class MessagePage(BaseModel):
+    items: list[MessageRead]
+    next_cursor: str | None = None
+
+
+class ConversationReadMarker(BaseModel):
+    message_id: UUID
+
+
+class ConversationRead(BaseModel):
+    id: UUID
+    participant: UserSummary
+    last_message: MessageRead | None = None
+    unread_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationPage(BaseModel):
+    items: list[ConversationRead]
+    next_cursor: str | None = None
