@@ -1,0 +1,21 @@
+name: Frontend
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - run: npm ci --prefix src/frontend
+      - run: npx --prefix src/frontend playwright install --with-deps chromium
+      - run: npm --prefix src/frontend run check:messages
+      - run: npm --prefix src/frontend run test:browser
+      - run: npm --prefix src/frontend run build
