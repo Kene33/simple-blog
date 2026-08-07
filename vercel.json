@@ -3,6 +3,9 @@
   "installCommand": "npm --prefix src/frontend ci",
   "buildCommand": "npm --prefix src/frontend run build",
   "outputDirectory": "src/frontend/dist",
+  "crons": [
+    { "path": "/api/internal/keepalive", "schedule": "0 3 * * *" }
+  ],
   "functions": {
     "api/[...path].py": {
       "maxDuration": 60

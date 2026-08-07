@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     smtp_starttls: bool = True
     redis_url: str | None = None
+    cron_secret: str | None = None
     media_quota_bytes: int = 1_073_741_824
     media_quota_files: int = 100
     media_pending_limit: int = 10
@@ -82,6 +83,8 @@ class Settings(BaseSettings):
             raise ValueError("SMTP_HOST and SMTP_FROM are required in production")
         if not self.redis_url:
             raise ValueError("REDIS_URL is required in production")
+        if not self.cron_secret:
+            raise ValueError("CRON_SECRET is required in production")
         return self
 
     @property
