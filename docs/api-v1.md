@@ -188,24 +188,36 @@ Post, comment, and profile authors include `status=active|banned|deleted`,
 public. Deleted authors are shown as `Deleted user` without avatar or profile;
 moderation reasons are never included in public author data.
 
-## Direct messages
+## Messaging
 
 | Method | Path | Auth | Purpose | Success |
 | --- | --- | --- | --- | --- |
 | `POST` | `/conversations/direct/{user_id}` | Access cookie + CSRF | Create or return a direct conversation | `201`/`200` |
+| `POST` | `/conversations/groups` | Access cookie + CSRF | Create a group conversation | `201` |
 | `GET` | `/conversations` | Access cookie | List the current user's conversations | `200` |
 | `GET` | `/conversations/{conversation_id}/messages` | Member | List messages by cursor | `200` |
+| `GET` | `/conversations/{conversation_id}/messages/search?q=...` | Member | Search visible message bodies | `200` |
 | `POST` | `/conversations/{conversation_id}/messages` | Member + CSRF | Send a text message | `201` |
+| `POST` | `/conversations/{conversation_id}/members` | Group admin + CSRF | Add a group member | `204` |
+| `DELETE` | `/conversations/{conversation_id}/members/{user_id}` | Group admin/member + CSRF | Remove a member or leave | `204` |
+| `POST` | `/conversations/{conversation_id}/mute` | Member + CSRF | Mute or unmute a conversation | `200` |
 | `PATCH` | `/conversations/{conversation_id}/read` | Member + CSRF | Mark a conversation as read | `204` |
 | `PATCH` | `/messages/{message_id}` | Sender + CSRF | Edit a message | `200` |
 | `DELETE` | `/messages/{message_id}` | Sender + CSRF | Soft-delete a message | `204` |
 | `POST` | `/users/{user_id}/block` | Access cookie + CSRF | Block a user from messaging | `204` |
 | `DELETE` | `/users/{user_id}/block` | Access cookie + CSRF | Remove a messaging block | `204` |
+| `POST` | `/push/subscriptions` | Access cookie + CSRF | Register a browser push subscription | `204` |
+| `DELETE` | `/push/subscriptions` | Access cookie + CSRF | Remove a browser push subscription | `204` |
 
 The WebSocket endpoint is `/api/v1/ws/messages`. It authenticates with the access
 cookie, checks `Origin`, and emits only events for conversations the current
 user may access. PostgreSQL remains the source of truth; clients resync from
 the REST cursor after reconnecting.
+
+Message attachments use `media` uploads with `purpose=message`; media URLs are
+private and readable only by conversation members. Typing events are ephemeral
+WebSocket events and are never stored in PostgreSQL. Group conversations use
+`kind=group`, `title`, and `participants` in `ConversationRead`.
 
 ## Status and compatibility policy
 

@@ -19,4 +19,5 @@ filetype>=1.2,<2.0
 redis>=5.0,<6.0
 Pillow>=12.3.0,<13.0
 pywebpush>=2.0,<3.0
+websockets>=13,<16
 python-multipart>=0.0.9,<1.0

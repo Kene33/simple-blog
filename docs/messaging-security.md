@@ -2,7 +2,8 @@
 
 ## Scope
 
-The first messaging release supports one-to-one text conversations. Messages
+The current messaging release supports direct and group text conversations,
+private attachments, and push delivery. Messages
 are stored in PostgreSQL and delivered over authenticated HTTPS/WebSocket
 connections. End-to-end encryption is not part of this release; it requires a
 separate audited key-management design.
@@ -24,9 +25,10 @@ separate audited key-management design.
 
 ## Data retention
 
-Messages use soft deletion for the first release so moderation and references
-remain consistent. A later retention job may permanently delete old content
-after the product policy and legal requirements are approved.
+Messages use soft deletion first so moderation and references remain consistent.
+The protected `/api/internal/message-retention` cron permanently removes
+messages older than `MESSAGE_RETENTION_DAYS` (default 365) and cascades their
+message attachments and reports.
 
 ## Threats explicitly covered
 
@@ -40,5 +42,4 @@ after the product policy and legal requirements are approved.
 ## Deferred
 
 - End-to-end encryption.
-- Group conversations.
-- File attachments, reactions, typing indicators, and message search.
+- Multi-device key recovery and encrypted message search.

@@ -19,6 +19,7 @@ dependencies = [
     "redis>=5.0,<6.0",
     "Pillow>=12.3.0,<13.0",
     "pywebpush>=2.0,<3.0",
+    "websockets>=13,<16",
 ]
 
 [tool.pytest.ini_options]

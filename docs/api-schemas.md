@@ -302,7 +302,10 @@ message is visible only to members of its conversation.
 ```json
 {
   "id": "uuid",
+  "kind": "direct",
+  "title": null,
   "participant": {"id": "uuid", "username": "bob", "avatar_url": null},
+  "participants": [],
   "last_message": null,
   "unread_count": 0,
   "created_at": "2026-08-08T12:30:00Z",
@@ -311,8 +314,9 @@ message is visible only to members of its conversation.
 ```
 
 Message history uses the standard opaque cursor. WebSocket events use
-`message.created`, `message.updated`, `message.deleted`, and `message.read`;
-the REST cursor is authoritative after reconnect.
+`message.created`, `message.updated`, `message.deleted`, `message.read`, and
+ephemeral `typing`; the REST cursor is authoritative after reconnect. Messages
+may contain a `media` array.
 
 ## Interaction schemas
 
