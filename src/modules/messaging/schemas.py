@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from uuid import UUID
 
@@ -14,9 +15,12 @@ class MessageCreateRequest(BaseModel):
     @field_validator("envelope")
     @classmethod
     def validate_envelope(cls, value: dict[str, object]) -> dict[str, object]:
-        if value.get("version") != 1 or not isinstance(value.get("sender_device_id"), str) or not isinstance(value.get("recipients"), list) or not value["recipients"]:
+        recipients = value.get("recipients")
+        if value.get("version") != 1 or not isinstance(value.get("sender_device_id"), str) or not isinstance(recipients, list) or not recipients or len(recipients) > 100:
             raise ValueError("Envelope is invalid")
-        for recipient in value["recipients"]:
+        if len(json.dumps(value, separators=(",", ":"))) > 100_000:
+            raise ValueError("Envelope is too large")
+        for recipient in recipients:
             if not isinstance(recipient, dict) or not all(isinstance(recipient.get(key), str) and recipient[key] for key in ("device_id", "iv", "ciphertext")):
                 raise ValueError("Envelope recipient is invalid")
         return value

@@ -294,18 +294,28 @@ async def search_messages(session: AsyncSession, conversation_id: UUID, user_id:
     raise AppError("ENCRYPTED_SEARCH_UNAVAILABLE", "Message search is available only on the client", 409)
 
 
+async def _validate_envelope(session: AsyncSession, conversation_id: UUID, user_id: UUID, envelope: dict[str, object]) -> None:
+    try:
+        sender_device_id = UUID(str(envelope["sender_device_id"]))
+        recipient_ids = [UUID(str(item["device_id"])) for item in envelope["recipients"] if isinstance(item, dict)]
+    except (KeyError, TypeError, ValueError):
+        raise AppError("VALIDATION_ERROR", "Envelope device is invalid", 422) from None
+    if sender_device_id not in recipient_ids:
+        raise AppError("VALIDATION_ERROR", "Envelope must include the sender device", 422)
+    sender_device = await session.scalar(select(MessagingDevice).where(MessagingDevice.id == sender_device_id, MessagingDevice.user_id == user_id, MessagingDevice.revoked_at.is_(None)))
+    if sender_device is None:
+        raise AppError("VALIDATION_ERROR", "Envelope sender device is unavailable", 422)
+    active_ids = set((await session.scalars(select(MessagingDevice.id).join(ConversationMember, ConversationMember.user_id == MessagingDevice.user_id).where(ConversationMember.conversation_id == conversation_id, MessagingDevice.revoked_at.is_(None), MessagingDevice.id.in_(recipient_ids)))).all())
+    if active_ids != set(recipient_ids):
+        raise AppError("VALIDATION_ERROR", "Envelope recipient device is unavailable", 422)
+
+
 async def create_message(session: AsyncSession, conversation_id: UUID, actor: User, payload: MessageCreateRequest) -> Message:
     await _member(session, conversation_id, actor.id)
     for target in await _participants(session, conversation_id, actor.id):
         await assert_can_contact(session, actor, target)
     now = datetime.now(timezone.utc)
-    try:
-        sender_device_id = UUID(str(payload.envelope["sender_device_id"]))
-    except (KeyError, TypeError, ValueError):
-        raise AppError("VALIDATION_ERROR", "Envelope sender device is invalid", 422) from None
-    sender_device = await session.scalar(select(MessagingDevice).where(MessagingDevice.id == sender_device_id, MessagingDevice.user_id == actor.id, MessagingDevice.revoked_at.is_(None)))
-    if sender_device is None:
-        raise AppError("VALIDATION_ERROR", "Envelope sender device is unavailable", 422)
+    await _validate_envelope(session, conversation_id, actor.id, payload.envelope)
     message = Message(conversation_id=conversation_id, sender_id=actor.id, body="[encrypted]", encrypted_body=payload.envelope, created_at=now, updated_at=now)
     session.add(message)
     await session.execute(update(Conversation).where(Conversation.id == conversation_id).values(updated_at=now))
@@ -343,6 +353,7 @@ async def update_message(session: AsyncSession, message_id: UUID, actor: User, p
     message = await session.scalar(select(Message).where(Message.id == message_id, Message.sender_id == actor.id, Message.deleted_at.is_(None)))
     if message is None:
         raise AppError("RESOURCE_NOT_FOUND", "Message not found", 404)
+    await _validate_envelope(session, message.conversation_id, actor.id, payload.envelope)
     message.encrypted_body = payload.envelope
     message.updated_at = datetime.now(timezone.utc)
     await session.flush()

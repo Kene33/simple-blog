@@ -92,7 +92,7 @@ async def test_messages_accept_only_encrypted_envelopes(client: AsyncClient) -> 
         _, other_id = await register(other, "envelopereader")
         conversation = await client.post(f"/api/v1/conversations/direct/{other_id}", headers={"X-CSRF-Token": owner_csrf})
         device = await client.post("/api/v1/messaging/devices", json={"public_key": {"kty": "EC", "crv": "P-256", "x": "owner", "y": "key"}, "label": "Test"}, headers={"X-CSRF-Token": owner_csrf})
-        payload = {"envelope": {"version": 1, "sender_device_id": device.json()["id"], "recipients": [{"device_id": "00000000-0000-0000-0000-000000000002", "iv": "a", "ciphertext": "b"}]}}
+        payload = {"envelope": {"version": 1, "sender_device_id": device.json()["id"], "recipients": [{"device_id": device.json()["id"], "iv": "a", "ciphertext": "b"}]}}
         sent = await client.post(f"/api/v1/conversations/{conversation.json()['id']}/messages", json=payload, headers={"X-CSRF-Token": owner_csrf})
         assert sent.status_code == 201
         assert sent.json()["envelope"] == payload["envelope"]
