@@ -19,6 +19,7 @@ from src.db.models import (
     ShareEvent,
     Tag,
     User,
+    UserBlock,
 )
 
 __all__ = [
@@ -42,4 +43,5 @@ __all__ = [
     "ShareEvent",
     "Tag",
     "User",
+    "UserBlock",
 ]

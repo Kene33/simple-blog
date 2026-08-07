@@ -107,6 +107,15 @@ class ConversationMember(Base):
     joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 
+class UserBlock(Base):
+    __tablename__ = "user_blocks"
+    __table_args__ = (CheckConstraint("blocker_id <> blocked_id", name="ck_user_blocks_distinct_users"),)
+
+    blocker_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    blocked_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
 class Post(Base):
     __tablename__ = "posts"
     __table_args__ = (
