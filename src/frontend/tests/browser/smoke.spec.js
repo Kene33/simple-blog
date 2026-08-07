@@ -15,6 +15,8 @@ test("messages page exposes offline state for a signed-in user", async ({ page, 
   await page.route(/\/api\/v1\/users\/me(?:\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: "u1", username: "alice", role: "user", status: "active" }) }));
   await page.route(/\/api\/v1\/conversations(?:\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [{ id: "c1", kind: "direct", participant: { id: "u2", username: "bob" }, participants: [{ id: "u2", username: "bob" }], muted: false, blocked: false, unread_count: 0, last_message: null }], next_cursor: null }) }));
   await page.route(/\/api\/v1\/conversations\/c1\/messages(?:\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [], next_cursor: null }) }));
+  await page.route(/\/api\/v1\/messaging\/devices(?:\?.*)?$/, (route) => route.fulfill({ status: route.request().method() === "POST" ? 201 : 200, contentType: "application/json", body: JSON.stringify(route.request().method() === "POST" ? { id: "d1", user_id: "u1", public_key: { kty: "EC", crv: "P-256", x: "x", y: "y" }, created_at: new Date().toISOString() } : { items: [] }) }));
+  await page.route(/\/api\/v1\/conversations\/c1\/devices$/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [{ id: "d1", user_id: "u1", public_key: { kty: "EC", crv: "P-256", x: "x", y: "y" } }] }) }));
   await page.goto("/messages", { waitUntil: "networkidle" });
   await page.getByRole("button", { name: /bob/i }).click();
   await context.setOffline(true);
@@ -47,6 +49,8 @@ test("messages page resyncs history after websocket reconnect", async ({ page })
     historyRequests += 1;
     return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [], next_cursor: null }) });
   });
+  await page.route(/\/api\/v1\/messaging\/devices(?:\?.*)?$/, (route) => route.fulfill({ status: route.request().method() === "POST" ? 201 : 200, contentType: "application/json", body: JSON.stringify(route.request().method() === "POST" ? { id: "d1", user_id: "u1", public_key: { kty: "EC", crv: "P-256", x: "x", y: "y" }, created_at: new Date().toISOString() } : { items: [] }) }));
+  await page.route(/\/api\/v1\/conversations\/c1\/devices$/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ items: [{ id: "d1", user_id: "u1", public_key: { kty: "EC", crv: "P-256", x: "x", y: "y" } }] }) }));
   await page.goto("/messages", { waitUntil: "networkidle" });
   await page.getByRole("button", { name: /bob/i }).click();
   await expect(page.locator(".socket-state")).toContainText("В сети");
