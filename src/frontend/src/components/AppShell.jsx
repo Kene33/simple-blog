@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bookmark, CircleUserRound, House, LogIn, LogOut, Menu, Moon, PenLine, Plus, Search, ShieldCheck, Sun, X } from "lucide-react";
+import { Bookmark, CircleUserRound, House, LogIn, LogOut, Menu, MessageCircle, Moon, PenLine, Plus, Search, ShieldCheck, Sun, X } from "lucide-react";
 import { Brand } from "./Brand";
 import { Avatar } from "./Avatar";
 import { api } from "../lib/api";
@@ -14,6 +14,7 @@ const links = [
   ["/", "Лента", House],
   ["/search", "Поиск", Search],
   ["/posts/new", "Создать", PenLine]
+  , ["/messages", "Сообщения", MessageCircle]
 ];
 
 function NavLink({ to, label, Icon, badge }) {
@@ -85,7 +86,7 @@ export function AppShell({ children, title = "Лента", right }) {
   return <div className="app-shell">
     <Sidebar theme={theme} onThemeToggle={toggleTheme} />
     <header className="mobile-header"><Link to="/" className="brand-link"><Brand compact /></Link><b>{title}</b><span className="mobile-header-actions"><ThemeButton theme={theme} onToggle={toggleTheme} /><button className="icon-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label={mobileMenu ? "Закрыть меню" : "Открыть меню"}>{mobileMenu ? <X /> : <Menu />}</button></span></header>
-    {mobileMenu && <div className="mobile-menu"><button onClick={() => go("/")}>Лента</button><button onClick={() => go("/search")}>Поиск</button><button onClick={() => user ? go("/posts/new") : guestOnly("создать публикацию")}>Новый пост</button><button onClick={() => user ? go("/me") : guestOnly("открыть профиль")}>Профиль</button>{user && <button onClick={() => go("/bookmarks")}>Закладки</button>}{isStaff && <button onClick={() => go("/moderation")}>Модерация</button>}{user && <button onClick={signOut}>Выйти</button>}</div>}
+    {mobileMenu && <div className="mobile-menu"><button onClick={() => go("/")}>Лента</button><button onClick={() => go("/search")}>Поиск</button>{user && <button onClick={() => go("/messages")}>Сообщения</button>}<button onClick={() => user ? go("/posts/new") : guestOnly("создать публикацию")}>Новый пост</button><button onClick={() => user ? go("/me") : guestOnly("открыть профиль")}>Профиль</button>{user && <button onClick={() => go("/bookmarks")}>Закладки</button>}{isStaff && <button onClick={() => go("/moderation")}>Модерация</button>}{user && <button onClick={signOut}>Выйти</button>}</div>}
     <main className="main-content">{children}</main>
     {right && <aside className="right-rail">{right}</aside>}
     {guestNotice && <div className="guest-notice" role="alert"><span>{guestNotice}</span><button className="guest-login" onClick={() => { setGuestNotice(""); navigate("/login", { allowAuth: true }); }}>Войти</button><button onClick={() => setGuestNotice("")} aria-label="Закрыть уведомление"><X size={16} /></button></div>}

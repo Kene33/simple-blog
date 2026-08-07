@@ -12,6 +12,7 @@ import { ModerationPage } from "./pages/ModerationPage";
 import { SearchPage } from "./pages/SearchPage";
 import { BookmarksPage, DraftsPage } from "./pages/SavedPages";
 import { SystemStatesPage } from "./pages/SystemStatesPage";
+import { MessagesPage } from "./pages/MessagesPage";
 import "./styles/app.css";
 
 function AppContent() {
@@ -33,6 +34,7 @@ function AppContent() {
   if (location.pathname === "/search") return <SearchPage />;
   if (location.pathname === "/bookmarks") return <BookmarksPage />;
   if (location.pathname === "/drafts") return <DraftsPage />;
+  if (location.pathname === "/messages") return <MessagesPage />;
   if (location.pathname === "/system-states") return <SystemStatesPage />;
   const userMatch = location.pathname.match(/^\/users\/([^/]+)$/);
   if (userMatch) return <ProfilePage username={userMatch[1]} />;
