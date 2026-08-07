@@ -1,3 +1,4 @@
+import asyncio
 from uuid import uuid4
 
 import pytest
@@ -19,11 +20,17 @@ class FakeWebSocket:
 
 
 class FakePubSub:
+    def __init__(self) -> None:
+        self.messages: asyncio.Queue[dict[str, object]] = asyncio.Queue()
+
     async def subscribe(self, channel: str) -> None:
         self.channel = channel
 
-    async def get_message(self, ignore_subscribe_messages: bool, timeout: float) -> None:
-        return None
+    async def get_message(self, ignore_subscribe_messages: bool, timeout: float) -> dict[str, object] | None:
+        try:
+            return await asyncio.wait_for(self.messages.get(), timeout=timeout)
+        except TimeoutError:
+            return None
 
     async def close(self) -> None:
         return None
@@ -81,4 +88,28 @@ async def test_redis_bridge_publishes_after_local_delivery() -> None:
     await bridge.publish(user_id, {"type": "message.created"})
     assert socket.events == [{"type": "message.created"}]
     assert redis.published[0][0] == "simple-blog:messaging"
+    await bridge.close()
+
+
+@pytest.mark.asyncio
+async def test_redis_bridge_delivers_events_from_another_instance() -> None:
+    hub = RealtimeHub()
+    user_id = uuid4()
+    socket = FakeWebSocket()
+    await hub.connect(user_id, socket)
+    redis = FakeRedis()
+    bridge = RedisRealtimeBridge("redis://test", hub, redis_client=redis)
+    await bridge.start()
+
+    await redis.pubsub_client.messages.put(
+        {
+            "data": '{"origin":"another-instance","user_id":"%s","event":{"type":"message.created"}}' % user_id,
+        }
+    )
+    for _ in range(20):
+        if socket.events:
+            break
+        await asyncio.sleep(0.01)
+
+    assert socket.events == [{"type": "message.created"}]
     await bridge.close()

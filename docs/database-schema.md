@@ -17,6 +17,9 @@ erDiagram
     USERS ||--o{ POST_LIKES : creates
     USERS ||--o{ SHARE_EVENTS : creates
     USERS ||--o{ REPORTS : submits
+    USERS ||--o{ CONVERSATION_MEMBERS : joins
+    USERS ||--o{ MESSAGES : sends
+    USERS ||--o{ USER_BLOCKS : blocks
 
     POSTS ||--o{ POST_TAGS : has
     TAGS ||--o{ POST_TAGS : labels
@@ -28,6 +31,9 @@ erDiagram
     POSTS ||--o{ REPORTS : targets
     COMMENTS ||--o{ COMMENTS : replies_to
     COMMENTS ||--o{ REPORTS : targets
+    CONVERSATIONS ||--o{ CONVERSATION_MEMBERS : contains
+    CONVERSATIONS ||--o{ MESSAGES : contains
+    MESSAGES ||--o{ CONVERSATION_MEMBERS : "last read"
 
     USERS {
         uuid id PK
@@ -134,6 +140,37 @@ erDiagram
         timestamptz created_at
         timestamptz resolved_at
     }
+
+    CONVERSATIONS {
+        uuid id PK
+        varchar direct_key UK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    CONVERSATION_MEMBERS {
+        uuid conversation_id PK,FK
+        uuid user_id PK,FK
+        uuid last_read_message_id FK
+        timestamptz muted_until
+        timestamptz joined_at
+    }
+
+    MESSAGES {
+        uuid id PK
+        uuid conversation_id FK
+        uuid sender_id FK
+        varchar body
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+
+    USER_BLOCKS {
+        uuid blocker_id PK,FK
+        uuid blocked_id PK,FK
+        timestamptz created_at
+    }
 ```
 
 ## Ownership and constraints
@@ -156,6 +193,13 @@ erDiagram
   constraint enforces this invariant.
 - Content uses `deleted_at` so a deleted post or comment can remain referenced
   by replies, reports, and interaction history.
+- `conversations.direct_key` uniquely identifies one direct conversation for a
+  pair of users. Membership is the access boundary for messages and read state.
+- `messages.body` is bounded to 4,000 characters by both request validation and
+  a database check constraint. Deleted messages retain a tombstone row.
+- `user_blocks` has a composite primary key and rejects self-blocks. The
+  messaging policy treats a block in either direction as a generic not-found
+  response to avoid disclosing relationship state.
 
 ## Indexes
 

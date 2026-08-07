@@ -14,7 +14,9 @@ flowchart LR
     App --> Content["Posts and comments"]
     App --> Social["Likes and sharing"]
     App --> Moderation["Reports"]
+    App --> Messaging["Direct messaging"]
     App --> DB[("PostgreSQL")]
+    App --> Redis[("Redis rate limit + Pub/Sub")]
     App --> Objects["S3 / MinIO"]
 ```
 
@@ -75,6 +77,18 @@ Comments use `parent_id` for unlimited nesting and load one level at a time.
 Likes use a unique user/post pair. Sharing records an event with an optional
 user ID so anonymous link copies can be counted without creating an account.
 
+### Direct messaging
+
+Direct messages are one-to-one text conversations. PostgreSQL is the source of
+truth for conversations, membership, messages, read markers, blocks, and
+tombstones. The REST API commits a message before publishing a lifecycle event.
+Authenticated WSS connections deliver events only to the intended member after
+Origin and cookie checks; membership is checked again for every subscription
+and delivery target. Redis provides rate-limit state and Pub/Sub between app
+instances, while each instance keeps only its local socket registry in memory.
+If realtime delivery is temporarily unavailable, clients resync from the
+cursor-paginated messages endpoint.
+
 ## Components
 
 | Component | Responsibility | State |
@@ -86,6 +100,7 @@ user ID so anonymous link copies can be counted without creating an account.
 | Media module | Validation, object keys, attachment lifecycle | PostgreSQL + S3 |
 | Interactions module | Likes, shares, counters | PostgreSQL |
 | Moderation module | Reports and admin queue | PostgreSQL |
+| Messaging module | Direct conversations, membership, messages, read state | PostgreSQL + Redis Pub/Sub |
 | Frontend | Browser state, rendering, user interactions | Browser cookies/storage |
 
 ## Cross-cutting behavior
@@ -109,10 +124,11 @@ See the focused contracts:
 
 ## Deployment shape
 
-Development uses Docker Compose with FastAPI, PostgreSQL, and MinIO. Production
-can replace MinIO with an S3-compatible provider and place a reverse proxy in
-front of FastAPI. The first release does not require Redis, a queue, or a
-separate search service.
+Development uses Docker Compose with FastAPI, PostgreSQL, MinIO, and Redis.
+Production can replace MinIO with an S3-compatible provider and place a reverse
+proxy in front of FastAPI. Redis is required for production rate-limit state
+and multi-instance messaging delivery; a single-process local run may use the
+in-memory fallback. A queue and separate search service remain deferred.
 
 The service must expose liveness and readiness checks. Alembic migrations run as
 an explicit deployment step before the application accepts traffic.
