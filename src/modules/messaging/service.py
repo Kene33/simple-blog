@@ -88,6 +88,13 @@ async def recipient_id(session: AsyncSession, conversation_id: UUID, user_id: UU
     return participant.id
 
 
+async def message_context(session: AsyncSession, message_id: UUID, user_id: UUID) -> tuple[Message, UUID]:
+    message = await session.scalar(select(Message).where(Message.id == message_id, Message.sender_id == user_id))
+    if message is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Message not found", 404)
+    return message, await recipient_id(session, message.conversation_id, user_id)
+
+
 async def get_or_create_direct(session: AsyncSession, actor: User, target: User) -> Conversation:
     await assert_can_contact(session, actor, target)
     key = _direct_key(actor.id, target.id)

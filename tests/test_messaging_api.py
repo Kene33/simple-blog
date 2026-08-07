@@ -44,3 +44,28 @@ async def test_direct_messages_are_isolated_to_conversation_members(client: Asyn
     finally:
         await other.aclose()
         await outsider.aclose()
+
+
+@pytest.mark.asyncio
+async def test_message_events_are_published_for_mutations(client: AsyncClient) -> None:
+    owner_csrf, _ = await register(client, "eventowner")
+    other = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        _, other_id = await register(other, "eventreader")
+        bridge = client._transport.app.state.realtime_bridge
+        events: list[tuple[str, str, dict[str, object]]] = []
+
+        async def publish(user_id: object, event: dict[str, object]) -> None:
+            events.append((str(user_id), str(event["type"]), event))
+
+        bridge.publish = publish
+        conversation = await client.post(f"/api/v1/conversations/direct/{other_id}", headers={"X-CSRF-Token": owner_csrf})
+        conversation_id = conversation.json()["id"]
+        message = await client.post(f"/api/v1/conversations/{conversation_id}/messages", json={"body": "Hello"}, headers={"X-CSRF-Token": owner_csrf})
+        message_id = message.json()["id"]
+        await client.patch(f"/api/v1/messages/{message_id}", json={"body": "Edited"}, headers={"X-CSRF-Token": owner_csrf})
+        await client.delete(f"/api/v1/messages/{message_id}", headers={"X-CSRF-Token": owner_csrf})
+        await other.patch(f"/api/v1/conversations/{conversation_id}/read", json={"message_id": message_id}, headers={"X-CSRF-Token": other.cookies.get("csrf_token")})
+        assert [event[1] for event in events] == ["message.created", "message.updated", "message.deleted", "message.read"]
+    finally:
+        await other.aclose()

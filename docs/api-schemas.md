@@ -267,6 +267,53 @@ The tombstone behavior applies to collection responses for a visible post.
 
 `body` is required and must contain 1–2,000 characters.
 
+## Direct message schemas
+
+### `MessageCreateRequest`
+
+```json
+{
+  "body": "Hello"
+}
+```
+
+`body` is trimmed plain text with a maximum of 4,000 characters. HTML is not a
+supported message format.
+
+### `MessageRead`
+
+```json
+{
+  "id": "uuid",
+  "conversation_id": "uuid",
+  "sender": {"id": "uuid", "username": "alice", "avatar_url": null},
+  "body": "Hello",
+  "is_deleted": false,
+  "created_at": "2026-08-08T12:30:00Z",
+  "updated_at": "2026-08-08T12:30:00Z"
+}
+```
+
+Deleted messages remain addressable in history as `[deleted]` tombstones. A
+message is visible only to members of its conversation.
+
+### `ConversationRead`
+
+```json
+{
+  "id": "uuid",
+  "participant": {"id": "uuid", "username": "bob", "avatar_url": null},
+  "last_message": null,
+  "unread_count": 0,
+  "created_at": "2026-08-08T12:30:00Z",
+  "updated_at": "2026-08-08T12:30:00Z"
+}
+```
+
+Message history uses the standard opaque cursor. WebSocket events use
+`message.created`, `message.updated`, `message.deleted`, and `message.read`;
+the REST cursor is authoritative after reconnect.
+
 ## Interaction schemas
 
 ### `LikeRead`

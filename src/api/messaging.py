@@ -20,6 +20,7 @@ from src.modules.messaging.service import (
     list_conversations,
     list_messages,
     mark_read,
+    message_context,
     recipient_id,
     serialize_conversation,
     serialize_message,
@@ -65,24 +66,31 @@ async def send_message(conversation_id: UUID, payload: MessageCreateRequest, req
 
 
 @router.patch("/api/v1/conversations/{conversation_id}/read", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
-async def read_conversation(conversation_id: UUID, payload: ConversationReadMarker, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+async def read_conversation(conversation_id: UUID, payload: ConversationReadMarker, request: Request, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+    target_id = await recipient_id(session, conversation_id, auth.user.id)
     await mark_read(session, conversation_id, auth.user.id, payload.message_id)
     await session.commit()
+    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.read", "data": {"conversation_id": str(conversation_id), "message_id": str(payload.message_id), "reader_id": str(auth.user.id)}})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.patch("/api/v1/messages/{message_id}", response_model=MessageRead)
-async def edit_message(message_id: UUID, payload: MessageUpdateRequest, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> MessageRead:
+async def edit_message(message_id: UUID, payload: MessageUpdateRequest, request: Request, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> MessageRead:
+    _, target_id = await message_context(session, message_id, auth.user.id)
     message = await update_message(session, message_id, auth.user, payload)
     await session.commit()
     await session.refresh(message)
-    return await serialize_message(session, message)
+    response = await serialize_message(session, message)
+    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.updated", "data": response.model_dump(mode="json")})
+    return response
 
 
 @router.delete("/api/v1/messages/{message_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
-async def remove_message(message_id: UUID, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+async def remove_message(message_id: UUID, request: Request, auth: CurrentAuth = Depends(require_unmuted_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+    message, target_id = await message_context(session, message_id, auth.user.id)
     await delete_message(session, message_id, auth.user)
     await session.commit()
+    await request.app.state.realtime_bridge.publish(target_id, {"type": "message.deleted", "data": {"id": str(message.id), "conversation_id": str(message.conversation_id)}})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

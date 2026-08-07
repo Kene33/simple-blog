@@ -194,6 +194,8 @@ moderation reasons are never included in public author data.
 | `PATCH` | `/conversations/{conversation_id}/read` | Member + CSRF | Mark a conversation as read | `204` |
 | `PATCH` | `/messages/{message_id}` | Sender + CSRF | Edit a message | `200` |
 | `DELETE` | `/messages/{message_id}` | Sender + CSRF | Soft-delete a message | `204` |
+| `POST` | `/users/{user_id}/block` | Access cookie + CSRF | Block a user from messaging | `204` |
+| `DELETE` | `/users/{user_id}/block` | Access cookie + CSRF | Remove a messaging block | `204` |
 
 The WebSocket endpoint is `/api/v1/ws/messages`. It authenticates with the access
 cookie, checks `Origin`, and emits only events for conversations the current
