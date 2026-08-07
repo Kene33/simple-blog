@@ -124,6 +124,27 @@ async def test_group_messages_are_delivered_to_all_members(client: AsyncClient) 
 
 
 @pytest.mark.asyncio
+async def test_group_admin_can_add_and_remove_members(client: AsyncClient) -> None:
+    owner_csrf, _ = await register(client, "groupadmin")
+    first = AsyncClient(transport=client._transport, base_url="http://testserver")
+    second = AsyncClient(transport=client._transport, base_url="http://testserver")
+    try:
+        _, first_id = await register(first, "groupmemberone")
+        _, second_id = await register(second, "groupmembertwo")
+        conversation = await client.post("/api/v1/conversations/groups", json={"title": "Team", "member_ids": [first_id]}, headers={"X-CSRF-Token": owner_csrf})
+        conversation_id = conversation.json()["id"]
+        added = await client.post(f"/api/v1/conversations/{conversation_id}/members", json={"user_id": second_id}, headers={"X-CSRF-Token": owner_csrf})
+        assert added.status_code == 204
+        assert len((await second.get(f"/api/v1/conversations/{conversation_id}/messages")).json()["items"]) == 0
+        removed = await client.delete(f"/api/v1/conversations/{conversation_id}/members/{second_id}", headers={"X-CSRF-Token": owner_csrf})
+        assert removed.status_code == 204
+        assert (await second.get(f"/api/v1/conversations/{conversation_id}/messages")).status_code == 404
+    finally:
+        await first.aclose()
+        await second.aclose()
+
+
+@pytest.mark.asyncio
 async def test_push_subscription_is_scoped_to_authenticated_user(client: AsyncClient) -> None:
     csrf, _ = await register(client, "pushowner")
     payload = {"endpoint": "https://push.example/subscription", "p256dh": "p256dh-key-value", "auth": "auth-key-value"}

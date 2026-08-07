@@ -79,3 +79,7 @@ class GroupCreateRequest(BaseModel):
         if not value:
             raise ValueError("Title must not be blank")
         return value
+
+
+class GroupMemberRequest(BaseModel):
+    user_id: UUID

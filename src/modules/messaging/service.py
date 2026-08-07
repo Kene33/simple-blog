@@ -20,6 +20,7 @@ from src.modules.messaging.schemas import (
     ConversationPage,
     ConversationRead,
     GroupCreateRequest,
+    GroupMemberRequest,
     MessageCreateRequest,
     MessagePage,
     MessageRead,
@@ -152,6 +153,46 @@ async def create_group(session: AsyncSession, actor: User, payload: GroupCreateR
     session.add_all(ConversationMember(conversation_id=conversation.id, user_id=member.id) for member in members)
     await session.flush()
     return conversation
+
+
+async def _group_admin(session: AsyncSession, conversation_id: UUID, user_id: UUID) -> Conversation:
+    conversation = await session.get(Conversation, conversation_id)
+    member = await session.scalar(select(ConversationMember).where(ConversationMember.conversation_id == conversation_id, ConversationMember.user_id == user_id))
+    if conversation is None or conversation.kind != "group" or member is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Group not found", 404)
+    if member.role != "admin":
+        raise AppError("FORBIDDEN", "Only group admins can manage members", 403)
+    return conversation
+
+
+async def add_group_member(session: AsyncSession, conversation_id: UUID, actor: User, payload: GroupMemberRequest) -> None:
+    conversation = await _group_admin(session, conversation_id, actor.id)
+    target = await session.get(User, payload.user_id)
+    if target is None or target.status != "active" or target.disabled_at is not None:
+        raise AppError("RESOURCE_NOT_FOUND", "User not found", 404)
+    await assert_can_contact(session, actor, target)
+    existing = await session.scalar(select(ConversationMember).where(ConversationMember.conversation_id == conversation.id, ConversationMember.user_id == target.id))
+    if existing is not None:
+        raise AppError("RESOURCE_CONFLICT", "User is already a group member", 409)
+    session.add(ConversationMember(conversation_id=conversation.id, user_id=target.id))
+    await session.flush()
+
+
+async def remove_group_member(session: AsyncSession, conversation_id: UUID, actor: User, target_id: UUID) -> None:
+    conversation = await session.get(Conversation, conversation_id)
+    actor_member = await session.scalar(select(ConversationMember).where(ConversationMember.conversation_id == conversation_id, ConversationMember.user_id == actor.id))
+    target_member = await session.scalar(select(ConversationMember).where(ConversationMember.conversation_id == conversation_id, ConversationMember.user_id == target_id))
+    if conversation is None or conversation.kind != "group" or actor_member is None or target_member is None:
+        raise AppError("RESOURCE_NOT_FOUND", "Group member not found", 404)
+    if target_id != actor.id:
+        if actor_member.role != "admin":
+            raise AppError("FORBIDDEN", "Only group admins can remove members", 403)
+        if target_id == conversation.created_by_id:
+            raise AppError("FORBIDDEN", "The group creator cannot be removed", 403)
+    elif target_id == conversation.created_by_id:
+        raise AppError("FORBIDDEN", "The group creator cannot leave", 403)
+    await session.delete(target_member)
+    await session.flush()
 
 
 async def _read_by_recipient(session: AsyncSession, message: Message) -> bool:

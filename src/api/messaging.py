@@ -20,12 +20,14 @@ from src.modules.messaging.schemas import (
     ConversationRead,
     ConversationReadMarker,
     GroupCreateRequest,
+    GroupMemberRequest,
     MessageCreateRequest,
     MessagePage,
     MessageRead,
     MessageUpdateRequest,
 )
 from src.modules.messaging.service import (
+    add_group_member,
     block_user,
     create_group,
     create_message,
@@ -38,6 +40,7 @@ from src.modules.messaging.service import (
     mute_conversation,
     recipient_id,
     recipient_ids,
+    remove_group_member,
     search_messages,
     serialize_conversation,
     serialize_message,
@@ -65,6 +68,20 @@ async def create_group_conversation(payload: GroupCreateRequest, request: Reques
     conversation = await create_group(session, auth.user, payload)
     await session.commit()
     return await serialize_conversation(session, conversation, auth.user.id)
+
+
+@router.post("/api/v1/conversations/{conversation_id}/members", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def add_member(conversation_id: UUID, payload: GroupMemberRequest, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+    await add_group_member(session, conversation_id, auth.user, payload)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/api/v1/conversations/{conversation_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+async def remove_member(conversation_id: UUID, user_id: UUID, auth: CurrentAuth = Depends(require_csrf), session: AsyncSession = Depends(get_session)) -> Response:
+    await remove_group_member(session, conversation_id, auth.user, user_id)
+    await session.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/api/v1/conversations", response_model=ConversationPage)
