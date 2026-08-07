@@ -11,6 +11,7 @@ from src.core.errors import AppError
 from src.db.models import Conversation, User
 from src.db.session import get_session
 from src.modules.auth.dependencies import CurrentAuth, get_current_auth, get_websocket_auth, require_csrf, require_unmuted_csrf
+from src.modules.messaging.policy import assert_can_contact
 from src.modules.messaging.schemas import (
     ConversationMuteRequest,
     ConversationPage,
@@ -161,6 +162,25 @@ async def websocket_messages(websocket: WebSocket, session: AsyncSession = Depen
                 return
             if event.get("type") == "ping":
                 await websocket.send_json({"type": "pong"})
+            elif event.get("type") == "typing":
+                try:
+                    conversation_id = UUID(str(event["conversation_id"]))
+                    is_typing = event["is_typing"]
+                    if not isinstance(is_typing, bool):
+                        raise ValueError
+                    target_id = await recipient_id(session, conversation_id, auth.user.id)
+                    target = await session.get(User, target_id)
+                    if target is None:
+                        raise AppError("RESOURCE_NOT_FOUND", "Conversation not found", 404)
+                    await assert_can_contact(session, auth.user, target)
+                    await websocket.app.state.rate_limiter.check(websocket, "message-typing", 120, 60, str(auth.user.id))  # type: ignore[arg-type]
+                    await websocket.app.state.realtime_bridge.publish(target_id, {"type": "typing", "conversation_id": str(conversation_id), "user_id": str(auth.user.id), "is_typing": is_typing})
+                except (KeyError, TypeError, ValueError):
+                    await websocket.close(code=4400)
+                    return
+                except AppError:
+                    await websocket.close(code=4403)
+                    return
             else:
                 await websocket.close(code=4400)
                 return

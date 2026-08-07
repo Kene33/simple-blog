@@ -11,7 +11,7 @@ export function normalizeMessageEvent(event) {
     const message = event.message || data.message || data;
     return { ...event, conversation_id: event.conversation_id || message.conversation_id, message };
   }
-  return { ...event, conversation_id: event.conversation_id || data.conversation_id, message_id: event.message_id || data.message_id, reader_id: event.reader_id || data.reader_id };
+  return { ...event, conversation_id: event.conversation_id || data.conversation_id, message_id: event.message_id || data.message_id, reader_id: event.reader_id || data.reader_id, user_id: event.user_id || data.user_id, is_typing: event.is_typing ?? data.is_typing };
 }
 
 export function createMessagesSocket({ onEvent, onState }) {
@@ -19,18 +19,19 @@ export function createMessagesSocket({ onEvent, onState }) {
   let stopped = false;
   let retry = 0;
   let timer;
+  let heartbeat;
   const connect = () => {
     if (stopped || !navigator.onLine) { onState("offline"); return; }
     onState(retry ? "reconnecting" : "connecting");
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     socket = new WebSocket(`${protocol}//${window.location.host}/api/v1/ws/messages`);
-    socket.onopen = () => { retry = 0; onState("connected"); };
+    socket.onopen = () => { retry = 0; onState("connected"); heartbeat = setInterval(() => { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "ping" })); }, 25000); };
     socket.onmessage = (event) => { try { const normalized = normalizeMessageEvent(JSON.parse(event.data)); if (normalized) onEvent(normalized); } catch { } };
     socket.onerror = () => socket.close();
-    socket.onclose = () => { if (stopped) return; onState(navigator.onLine ? "reconnecting" : "offline"); retry += 1; timer = setTimeout(connect, Math.min(30000, 1000 * 2 ** Math.min(retry, 5))); };
+    socket.onclose = () => { clearInterval(heartbeat); if (stopped) return; onState(navigator.onLine ? "reconnecting" : "offline"); retry += 1; timer = setTimeout(connect, Math.min(30000, 1000 * 2 ** Math.min(retry, 5))); };
   };
   const online = () => { retry = 0; connect(); };
   const offline = () => { onState("offline"); socket?.close(); };
   window.addEventListener("online", online); window.addEventListener("offline", offline); connect();
-  return { close() { stopped = true; clearTimeout(timer); window.removeEventListener("online", online); window.removeEventListener("offline", offline); socket?.close(); } };
+  return { send(event) { if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(event)); }, close() { stopped = true; clearTimeout(timer); clearInterval(heartbeat); window.removeEventListener("online", online); window.removeEventListener("offline", offline); socket?.close(); } };
 }
