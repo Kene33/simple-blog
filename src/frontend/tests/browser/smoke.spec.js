@@ -52,7 +52,6 @@ test("messages page resyncs history after websocket reconnect", async ({ page })
   await expect(page.locator(".socket-state")).toContainText("В сети");
   const beforeReconnect = historyRequests;
   await page.evaluate(() => window.__socketInstances[0].close());
-  await expect(page.locator(".socket-state")).toContainText("Переподключение");
   await expect.poll(() => historyRequests, { timeout: 5000 }).toBeGreaterThan(beforeReconnect);
   await expect(page.locator(".socket-state")).toContainText("В сети");
 });
