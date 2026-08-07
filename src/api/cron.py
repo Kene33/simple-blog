@@ -27,6 +27,7 @@ async def keepalive(request: Request, session: AsyncSession = Depends(get_sessio
     return {"status": "ok"}
 
 
+@router.get("/message-retention", include_in_schema=False, response_model=None)
 @router.post("/message-retention", include_in_schema=False, response_model=None)
 async def message_retention(request: Request, session: AsyncSession = Depends(get_session), settings: Settings = Depends(get_settings)) -> dict[str, int] | JSONResponse:
     if not _authorized(request, settings):

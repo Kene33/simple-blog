@@ -39,6 +39,9 @@ async def test_message_retention_requires_cron_secret(client: AsyncClient) -> No
     response = await client.post("/api/internal/message-retention", headers={"Authorization": "Bearer test-cron-secret"})
     assert response.status_code == 200
     assert response.json() == {"deleted": 0}
+    response = await client.get("/api/internal/message-retention", headers={"Authorization": "Bearer test-cron-secret"})
+    assert response.status_code == 200
+    assert response.json() == {"deleted": 0}
 
 
 @pytest.mark.asyncio
