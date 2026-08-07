@@ -2,7 +2,7 @@
 
 ## Verified locally
 
-- PostgreSQL migrations reach `0021_push_subscriptions (head)`.
+- PostgreSQL migrations reach `0022_messaging_devices (head)`.
 - Two independent Uvicorn processes on ports `8101` and `8102` share one
   Redis instance.
 - A WebSocket connected to instance B receives a message sent through REST on
@@ -15,6 +15,13 @@
 - Browser E2E covers offline state and WebSocket reconnect history resync; CI
   installs Chromium before running it.
 - Retention service removes only soft-deleted messages older than the cutoff.
+
+## Verified production
+
+- Production database migration `0022_messaging_devices` is applied.
+- Authenticated production WSS ping/pong passes.
+- Two production accounts exchanged an opaque encrypted envelope through the
+  production API and WebSocket path: `TWO_INSTANCE_REDIS_WSS=PASS`.
 
 ## Verify authenticated production WSS
 
@@ -37,11 +44,9 @@ python scripts/check_production_wss.py
 ```
 
 The check validates HTTPS base URL, the production reverse proxy, the
-authenticated WebSocket handshake, and the ping/pong protocol. The current
-public production domain responds to health checks and rejects unauthenticated
-WebSocket handshakes with `403`. Authenticated WSS remains the only external
-check pending: the local `kene` credentials are not accepted by the current
-deployment, so use a dedicated production account or short-lived access cookie.
+authenticated WebSocket handshake, and the ping/pong protocol. The public
+production domain responds to health checks and rejects unauthenticated
+WebSocket handshakes with `403`.
 
 ## Required Vercel settings
 
