@@ -83,7 +83,7 @@ export function AppShell({ children, title = "Лента", right }) {
   const go = (to) => { setMobileMenu(false); navigate(to); };
   const guestOnly = (action) => { setMobileMenu(false); setGuestNotice(`Чтобы ${action}, войдите в аккаунт.`); };
   const signOut = async () => { setMobileMenu(false); await logout(); navigate("/"); };
-  return <div className="app-shell">
+  return <div className={`app-shell ${location.pathname === "/messages" ? "messages-shell" : ""}`}>
     <Sidebar theme={theme} onThemeToggle={toggleTheme} />
     <header className="mobile-header"><Link to="/" className="brand-link"><Brand compact /></Link><b>{title}</b><span className="mobile-header-actions"><ThemeButton theme={theme} onToggle={toggleTheme} /><button className="icon-button" onClick={() => setMobileMenu(!mobileMenu)} aria-label={mobileMenu ? "Закрыть меню" : "Открыть меню"}>{mobileMenu ? <X /> : <Menu />}</button></span></header>
     {mobileMenu && <div className="mobile-menu"><button onClick={() => go("/")}>Лента</button><button onClick={() => go("/search")}>Поиск</button>{user && <button onClick={() => go("/messages")}>Сообщения</button>}<button onClick={() => user ? go("/posts/new") : guestOnly("создать публикацию")}>Новый пост</button><button onClick={() => user ? go("/me") : guestOnly("открыть профиль")}>Профиль</button>{user && <button onClick={() => go("/bookmarks")}>Закладки</button>}{isStaff && <button onClick={() => go("/moderation")}>Модерация</button>}{user && <button onClick={signOut}>Выйти</button>}</div>}
