@@ -9,6 +9,7 @@
     "check:post-files": "node src/lib/postFiles.check.mjs && node src/lib/postTags.check.mjs",
     "check:comment-tree": "node src/lib/commentTree.check.mjs",
     "check:messages": "node src/lib/messages.check.mjs",
+    "test:browser": "playwright test",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -18,5 +19,7 @@
     "react-dom": "^19.0.0",
     "vite": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
+  }
 }
