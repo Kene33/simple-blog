@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  Bell,
   Check,
   CheckCheck,
   LoaderCircle,
@@ -696,8 +697,8 @@ export function MessagesPage() {
               <h1>Сообщения</h1>
               <small>Личные разговоры</small>
             </div>
-            <div>
-              <button onClick={enablePush} aria-label="Включить push-уведомления">🔔</button>
+            <div className="messages-header-actions">
+              <button onClick={enablePush} aria-label="Включить push-уведомления"><Bell size={21} /></button>
               <button onClick={() => setGroupModal(true)} aria-label="Создать группу">
                 <MessageCircle size={22} />
               </button>
