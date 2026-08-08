@@ -9,6 +9,7 @@ const devices = [
 ];
 const envelope = await encryptMessage("secret message", sender, devices, "conversation-1");
 assert.equal(await decryptEnvelope(envelope, recipient, devices, "conversation-1"), "secret message");
+assert.equal(await decryptEnvelope(null, null, [], "conversation-1"), null);
 assert.equal(await decryptEnvelope(envelope, sender, devices, "conversation-1"), "secret message");
 const backup = await createRecoveryBackup(sender, "a sufficiently long recovery phrase");
 const restored = await restoreIdentity(backup, "a sufficiently long recovery phrase", sender.id);

@@ -44,6 +44,7 @@ export async function encryptMessage(text, identity, devices, conversationId) {
 }
 
 export async function decryptEnvelope(envelope, identity, devices, conversationId) {
+  if (!identity || !Array.isArray(devices) || !devices.length) return null;
   const recipient = envelope?.recipients?.find((item) => item.device_id === identity.id);
   const sender = devices.find((device) => device.id === envelope?.sender_device_id);
   if (!recipient || !sender) return null;

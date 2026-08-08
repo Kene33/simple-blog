@@ -192,8 +192,14 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
     setState("loading");
     let socket;
     const load = async () => {
-      const identity = await ensureRegisteredIdentity();
-      const devices = (await api.conversationDevices(conversation.id)).items || [];
+      let identity = null;
+      let devices = [];
+      try {
+        identity = await ensureRegisteredIdentity();
+        devices = (await api.conversationDevices(conversation.id)).items || [];
+      } catch {
+        setNotice("Защищённое устройство пока недоступно — сообщения можно читать без расшифровки");
+      }
       cryptoRef.current = { identity, devices };
       const page = await api.conversationMessages(conversation.id, { limit: 30 });
       if (cancelled) return;
@@ -286,6 +292,10 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
     setBusy(true);
     try {
       const { identity, devices } = cryptoRef.current;
+      if (!identity || !devices.length) {
+        setNotice("Для отправки зарегистрируйте защищённое устройство");
+        return;
+      }
       const envelope = await encryptMessage(value, identity, devices, conversation.id);
       const message = await api.sendMessage(conversation.id, { envelope });
       const decrypted = { ...message, body: value };
@@ -448,7 +458,9 @@ function ConversationView({ conversation, currentUser, onBack, onChanged }) {
             ? "В сети"
             : socketState === "offline"
               ? "Офлайн"
-              : "Переподключение…"}
+              : socketState === "connecting"
+                ? "Подключение…"
+                : "Переподключение…"}
         </span>
         <div className="conversation-actions">
           <button
