@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bookmark, CircleUserRound, House, LogIn, LogOut, Menu, MessageCircle, Moon, PenLine, Plus, Search, ShieldCheck, Sun, X } from "lucide-react";
+import { Bookmark, CircleUserRound, House, LogIn, LogOut, Menu, MessageCircle, Moon, Plus, Search, ShieldCheck, Sun, X } from "lucide-react";
 import { Brand } from "./Brand";
 import { Avatar } from "./Avatar";
 import { api } from "../lib/api";
@@ -13,8 +13,7 @@ export function notifyGuest(action) {
 const links = [
   ["/", "Лента", House],
   ["/search", "Поиск", Search],
-  ["/posts/new", "Создать", PenLine]
-  , ["/messages", "Сообщения", MessageCircle]
+  ["/messages", "Сообщения", MessageCircle]
 ];
 
 function NavLink({ to, label, Icon, badge }) {
