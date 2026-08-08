@@ -552,6 +552,12 @@ export function MessagesPage() {
   const [state, setState] = useState("loading");
   const [searchError, setSearchError] = useState("");
   const [searching, setSearching] = useState(false);
+  const [groupModal, setGroupModal] = useState(false);
+  const [groupTitle, setGroupTitle] = useState("");
+  const [groupMemberInput, setGroupMemberInput] = useState("");
+  const [groupMembers, setGroupMembers] = useState([]);
+  const [groupMemberError, setGroupMemberError] = useState("");
+  const [groupMemberChecking, setGroupMemberChecking] = useState(false);
   const filtered = useMemo(
     () =>
       conversations.filter((item) => {
@@ -624,24 +630,50 @@ export function MessagesPage() {
       setSearching(false);
     }
   };
-  const createGroup = async () => {
-    const title = window.prompt("Название группы");
-    const usernames = window.prompt("Username участников через запятую");
-    if (!title || !usernames) return;
+  const addGroupMember = async (raw) => {
+    const username = raw.trim().replace(/^@/, "").toLowerCase();
+    if (!username) return;
+    if (groupMembers.some((member) => member.username === username)) {
+      setGroupMemberInput("");
+      return;
+    }
+    setGroupMemberChecking(true);
+    setGroupMemberError("");
+    try {
+      const person = await api.user(username);
+      setGroupMembers((members) => [...members, { username, user: person }]);
+      setGroupMemberInput("");
+    } catch (error) {
+      setGroupMemberError(errorStatus(error) === 404 ? `Пользователь @${username} не найден` : "Не удалось проверить пользователя");
+    } finally {
+      setGroupMemberChecking(false);
+    }
+  };
+  const handleGroupMemberInput = (event) => {
+    const value = event.target.value;
+    const parts = value.split(",");
+    if (parts.length > 1) {
+      parts.slice(0, -1).forEach((part) => addGroupMember(part));
+      setGroupMemberInput(parts.at(-1) || "");
+    } else setGroupMemberInput(value);
+  };
+  const createGroup = async (event) => {
+    event.preventDefault();
+    const title = groupTitle.trim();
+    if (!title || !groupMembers.length || groupMemberChecking) return;
     setSearching(true);
     try {
-      const people = await Promise.all(
-        usernames
-          .split(",")
-          .map((name) => api.user(name.trim().replace(/^@/, ""))),
-      );
       const conversation = await api.createGroup({
         title,
-        member_ids: people.map((person) => person.id),
+        member_ids: groupMembers.map((member) => member.user.id),
       });
       setConversations((items) => [conversation, ...items]);
       setSelected(conversation);
-    } catch {
+      setGroupModal(false);
+      setGroupTitle("");
+      setGroupMembers([]);
+      setGroupMemberInput("");
+    } catch (error) {
       setSearchError("Не удалось создать группу");
     } finally {
       setSearching(false);
@@ -666,7 +698,7 @@ export function MessagesPage() {
             </div>
             <div>
               <button onClick={enablePush} aria-label="Включить push-уведомления">🔔</button>
-              <button onClick={createGroup} aria-label="Создать группу">
+              <button onClick={() => setGroupModal(true)} aria-label="Создать группу">
                 <MessageCircle size={22} />
               </button>
             </div>
@@ -774,6 +806,7 @@ export function MessagesPage() {
           </div>
         )}
       </section>
+      {groupModal && <div className="group-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setGroupModal(false); }}><form className="group-modal" onSubmit={createGroup}><header><div><h2>Новая группа</h2><p>Добавьте участников в разговор</p></div><button type="button" className="group-modal-close" onClick={() => setGroupModal(false)} aria-label="Закрыть"><X size={18} /></button></header><label>Название группы<input value={groupTitle} onChange={(event) => setGroupTitle(event.target.value)} placeholder="Например, Команда Simple" autoFocus /></label><label>Участники<small>Введите username и нажмите Enter или запятую</small><div className="group-member-field">{groupMembers.map((member) => <span className="group-member-chip" key={member.username}><Avatar user={member.user} /><b>@{member.username}</b><button type="button" onClick={() => setGroupMembers((members) => members.filter((item) => item.username !== member.username))} aria-label={`Удалить @${member.username}`}><X size={13} /></button></span>)}<input value={groupMemberInput} onChange={handleGroupMemberInput} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addGroupMember(groupMemberInput); } }} placeholder={groupMembers.length ? "Добавить ещё" : "@username"} /></div></label>{groupMemberChecking && <small className="group-member-status">Проверяем пользователя…</small>}{groupMemberError && <small className="messages-error">{groupMemberError}</small>}<footer><button type="button" className="outline-button" onClick={() => setGroupModal(false)}>Отмена</button><button type="submit" className="primary" disabled={!groupTitle.trim() || !groupMembers.length || groupMemberChecking || searching}>Создать группу</button></footer></form></div>}
     </AppShell>
   );
 }
